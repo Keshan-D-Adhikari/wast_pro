@@ -33,7 +33,7 @@ export default function Splash() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#3ab938ff', // light cream (like image)
+    backgroundColor: '#efefefff', // light cream (like image)
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -1,0 +1,37 @@
+# ===============================
+# SmartWaste Pro - Backend Requirements
+# ===============================
+
+# 1. Node.js
+Node.js >= 18.x
+
+# 2. MongoDB
+MongoDB Community Server
+OR
+MongoDB Atlas (Cloud)
+
+# 3. Environment Variables (Create .env locally)
+MONGO_URI=mongodb://localhost:27017/smartwaste
+JWT_SECRET=your_jwt_secret
+PORT=5000
+
+# 4. Backend Dependencies (npm install will handle)
+express
+mongoose
+bcryptjs
+jsonwebtoken
+cors
+dotenv
+
+# 5. How to Run Backend
+cd backend
+npm install
+npm run start
+
+# 6. API Endpoints
+POST /api/auth/login
+POST /api/auth/register
+
+# NOTE:
+# Do NOT upload .env file to GitHub.
+# Each developer must create their own .env file locally.
