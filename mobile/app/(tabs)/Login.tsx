@@ -5,48 +5,62 @@ import {
   TouchableOpacity,
   StyleSheet,
   ImageBackground,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Login() {
+  const router = useRouter();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  // 🔥 ANDROID EMULATOR → 10.0.2.2
+  const BASE_URL = 'http://10.0.2.2:5000';
 
   /* ================= LOGIN FUNCTION ================= */
   const handleLogin = async () => {
     try {
-      const res = await fetch('http://172.20.10.4:5000/api/auth/login', {
+      setLoading(true);
+
+      console.log('Sending request...');
+
+      const res = await fetch(`${BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
+
+      console.log('Response:', data);
 
       if (!res.ok) {
         alert(data.msg || 'Login failed');
         return;
       }
 
-      // ✅ SUCCESS
+      // ✅ SAVE TOKEN
+      await AsyncStorage.setItem('token', data.token);
+
       alert('Login Success');
-      console.log('LOGIN RESPONSE:', data);
 
-      // TODO (next steps):
-      // 1. Save token (AsyncStorage)
-      // 2. Redirect based on role
-      // if (data.user.role === 'seller') router.push('/seller');
-      // else router.push('/buyer');
+      // ✅ ROLE BASED NAVIGATION
+      if (data.user.role === 'seller') {
+        router.replace('/(tabs)/seller/SellerDashboard');
+      } else {
+        router.replace('/(tabs)/buyer/BuyerDashboard');
+      }
 
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      console.log(err);
       alert('Server not reachable');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,31 +71,21 @@ export default function Login() {
       style={styles.background}
       resizeMode="cover"
     >
-      {/* Overlay */}
       <View style={styles.overlay}>
-
-        {/* Logo */}
         <View style={styles.header}>
           <Image
             source={require('../../assets/images/logo.png')}
             style={styles.logo}
-            contentFit="contain"
           />
           <Text style={styles.appName}>SmartWaste Pro</Text>
         </View>
 
-        {/* Card */}
         <View style={styles.card}>
           <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>
-            Log in to continue managing waste sustainably
-          </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Email Address"
-            placeholderTextColor="#6B7280"
-            keyboardType="email-address"
+            placeholder="Email"
             value={email}
             onChangeText={setEmail}
           />
@@ -89,34 +93,31 @@ export default function Login() {
           <TextInput
             style={styles.input}
             placeholder="Password"
-            placeholderTextColor="#6B7280"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
           />
 
-          <TouchableOpacity>
-            <Text style={styles.forgot}>Forgot password?</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.loginBtn}
             onPress={handleLogin}
+            disabled={loading}
           >
-            <Text style={styles.loginText}>Log In</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginText}>Log In</Text>
+            )}
           </TouchableOpacity>
 
-          {/* Create Account */}
-          <View style={styles.signupRow}>
-            <Text style={styles.signupText}>Don’t have an account?</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/CreateAccount')}
-            >
-              <Text style={styles.signupLink}> Create Account</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/CreateAccount')}
+          >
+            <Text style={styles.signup}>
+              Don’t have an account? Create Account
+            </Text>
+          </TouchableOpacity>
         </View>
-
       </View>
     </ImageBackground>
   );
@@ -125,85 +126,46 @@ export default function Login() {
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
+  background: { flex: 1 },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 61, 35, 0.55)',
-    padding: 24,
+    backgroundColor: 'rgba(15,61,35,0.6)',
     justifyContent: 'center',
+    padding: 24,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    marginBottom: 8,
-  },
-  appName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+  header: { alignItems: 'center', marginBottom: 30 },
+  logo: { width: 60, height: 60 },
+  appName: { color: '#fff', fontSize: 20, fontWeight: '700' },
+
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    backgroundColor: '#fff',
+    borderRadius: 20,
     padding: 24,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   input: {
-    backgroundColor: '#F5F9F4',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    fontSize: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#D1E7D6',
-  },
-  forgot: {
-    color: '#4F772D',
-    textAlign: 'right',
-    marginBottom: 20,
-    fontSize: 13,
-    fontWeight: '500',
+    backgroundColor: '#f1f5f2',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
   },
   loginBtn: {
     backgroundColor: '#4F772D',
-    paddingVertical: 16,
+    padding: 16,
     borderRadius: 30,
     alignItems: 'center',
   },
   loginText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#fff',
     fontWeight: '600',
   },
-  signupRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 18,
-  },
-  signupText: {
-    color: '#6B7280',
-    fontSize: 13,
-  },
-  signupLink: {
+  signup: {
+    textAlign: 'center',
+    marginTop: 16,
     color: '#4F772D',
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

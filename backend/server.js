@@ -3,19 +3,24 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user'); // ✅ NEW
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+/* MongoDB */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected'))
-  .catch(err => console.log('❌ Mongo Error:', err));
+  .catch((err) => console.log(err));
 
-app.use('/api/auth', require('./routes/auth'));
+/* Routes */
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes); // ✅ NEW
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(5000, () => {
+  console.log('🚀 Server running on port 5000');
 });
