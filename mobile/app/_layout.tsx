@@ -14,9 +14,15 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          gestureEnabled: true,             // ⬅️ Swipe එක On කරනවා
+          gestureDirection: 'horizontal',   // ⬅️ හරහට අදින්න දෙනවා
+          animation: 'slide_from_right',    // ⬅️ Animation එක හදනවා
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
