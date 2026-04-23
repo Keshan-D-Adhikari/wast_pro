@@ -17,9 +17,9 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          gestureEnabled: true,             // ⬅️ Swipe එක On කරනවා
-          gestureDirection: 'horizontal',   // ⬅️ හරහට අදින්න දෙනවා
-          animation: 'slide_from_right',    // ⬅️ Animation එක හදනවා
+          gestureEnabled: true,
+          gestureDirection: 'horizontal',
+          animation: 'slide_from_right',
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

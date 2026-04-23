@@ -1,8 +1,17 @@
-# Ignore node modules everywhere
+# dependencies
+node_modules/
 **/node_modules/
+
+# Expo
+.expo/
+
+# Environment files
+*.env
+.env.local
+
+# Firebase keys and configs
+serviceAccountKey.json
+google-services.json
 
 # Logs
 *.log
-
-# Environment files
-.env

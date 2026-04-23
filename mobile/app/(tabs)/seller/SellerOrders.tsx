@@ -1,11 +1,37 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState, useEffect } from "react";
+import { db, auth } from "../../../firebaseConfig";
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 
 export default function SellerOrders() {
   const router = useRouter();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const OrderCard = ({ type, buyer, status, date, price, weight }: any) => (
+  useEffect(() => {
+    if (!auth.currentUser) return;
+
+    const q = query(
+      collection(db, "orders"),
+      where("sellerUid", "==", auth.currentUser.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const ordersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setOrders(ordersList);
+      setLoading(false);
+    }, (error) => {
+      console.log("Error fetching seller orders:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const OrderCard = ({ type, buyer, status, date, price, weight, paymentMethod }: any) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.typeRow}>
@@ -28,6 +54,17 @@ export default function SellerOrders() {
         <Text style={styles.detailText}>Weight: {weight} kg</Text>
         <Text style={styles.priceText}>Total: Rs {price}</Text>
       </View>
+
+      <View style={styles.paymentBox}>
+        <Ionicons 
+          name={paymentMethod === 'card' ? "card-outline" : "cash-outline"} 
+          size={16} 
+          color="#6B7280" 
+        />
+        <Text style={styles.paymentText}>
+          {paymentMethod === 'card' ? "Paid by Card" : "Cash on Delivery"}
+        </Text>
+      </View>
     </View>
   );
 
@@ -42,32 +79,27 @@ export default function SellerOrders() {
 
       <Text style={styles.sectionTitle}>Recent Transactions</Text>
 
-      <OrderCard 
-        type="Plastic Waste" 
-        buyer="Green Recycling" 
-        status="Pending" 
-        date="Oct 24, 2025" 
-        weight="12.5" 
-        price="1060" 
-      />
-      
-      <OrderCard 
-        type="Paper Waste" 
-        buyer="Eco Lanka" 
-        status="Completed" 
-        date="Oct 20, 2025" 
-        weight="8.0" 
-        price="480" 
-      />
-
-      <OrderCard 
-        type="Glass Waste" 
-        buyer="GlassCo" 
-        status="Completed" 
-        date="Oct 15, 2025" 
-        weight="15.0" 
-        price="1050" 
-      />
+      {loading ? (
+        <ActivityIndicator size="large" color="#4F772D" style={{ marginTop: 20 }} />
+      ) : orders.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="document-text-outline" size={60} color="#D1D5DB" />
+          <Text style={styles.emptyText}>No orders received yet</Text>
+        </View>
+      ) : (
+        orders.map((order) => (
+          <OrderCard 
+            key={order.id}
+            type={order.wasteType} 
+            buyer={order.buyerName} 
+            status={order.status} 
+            date={order.createdAt?.toDate() ? order.createdAt.toDate().toLocaleDateString() : "Just now"} 
+            weight={order.weightKg} 
+            price={order.totalPrice} 
+            paymentMethod={order.paymentMethod}
+          />
+        ))
+      )}
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -160,5 +192,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "bold",
     color: "#4F772D",
+  },
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    marginTop: 10,
+  },
+  paymentBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6'
+  },
+  paymentText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500'
   }
 });
