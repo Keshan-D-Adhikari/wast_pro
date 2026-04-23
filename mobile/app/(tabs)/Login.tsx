@@ -6,11 +6,16 @@ import {
   StyleSheet,
   ImageBackground,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// firebase import
+import { auth, db } from '../../firebaseConfig';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function Login() {
   const router = useRouter();
@@ -19,46 +24,47 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 🔥 ANDROID EMULATOR → 10.0.2.2
-  const BASE_URL = 'http://10.0.2.2:5000';
-
-  /* ================= LOGIN FUNCTION ================= */
+  /* ================= FIREBASE LOGIN FUNCTION ================= */
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password.");
+      return;
+    }
+
     try {
       setLoading(true);
+      console.log('Attempting Firebase Login...');
 
-      console.log('Sending request...');
+      // 1. Login via Firebase Auth (Server unreachable error does not appear here)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      const res = await fetch(`${BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      console.log('Login Auth Success:', user.uid);
 
-      const data = await res.json();
+      // 2. Reading this User's Role (Seller/Buyer) from Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const userRole = userData.role;
 
-      console.log('Response:', data);
+        console.log('User Role found:', userRole);
+        Alert.alert("Success", `Welcome back, ${userData.fullName}!`);
 
-      if (!res.ok) {
-        alert(data.msg || 'Login failed');
-        return;
-      }
-
-      // ✅ SAVE TOKEN
-      await AsyncStorage.setItem('token', data.token);
-
-      alert('Login Success');
-
-      // ✅ ROLE BASED NAVIGATION
-      if (data.user.role === 'seller') {
-        router.replace('/(tabs)/seller/SellerDashboard');
+        // 3. Sending to the relevant Dashboard according to the role
+        if (userRole === 'seller') {
+          router.replace('/(tabs)/seller/SellerDashboard' as any);
+        } else {
+          router.replace('/(tabs)/buyer/BuyerDashboard' as any);
+        }
       } else {
-        router.replace('/(tabs)/buyer/BuyerDashboard');
+        Alert.alert("Error", "User details not found in Firestore. Please register again.");
       }
 
-    } catch (err) {
-      console.log(err);
-      alert('Server not reachable');
+    } catch (err: any) {
+      console.log('Login Error:', err.code);
+      // The error that appears if you provide incorrect details.
+      Alert.alert('Login Failed', 'Invalid email or password. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -86,13 +92,17 @@ export default function Login() {
           <TextInput
             style={styles.input}
             placeholder="Email"
+            placeholderTextColor="#999"
             value={email}
             onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
           />
 
           <TextInput
             style={styles.input}
             placeholder="Password"
+            placeholderTextColor="#999"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -111,10 +121,10 @@ export default function Login() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => router.push('/(tabs)/CreateAccount')}
+            onPress={() => router.push('/(tabs)/CreateAccount' as any)}
           >
             <Text style={styles.signup}>
-              Don’t have an account? Create Account
+              Don’t have an account? <Text style={{fontWeight: 'bold'}}>Create Account</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -122,8 +132,6 @@ export default function Login() {
     </ImageBackground>
   );
 }
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   background: { flex: 1 },
@@ -136,36 +144,43 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: 30 },
   logo: { width: 60, height: 60 },
   appName: { color: '#fff', fontSize: 20, fontWeight: '700' },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 24,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 20,
+    color: '#111827'
   },
   input: {
     backgroundColor: '#f1f5f2',
     borderRadius: 12,
     padding: 14,
     marginBottom: 14,
+    color: '#333'
   },
   loginBtn: {
     backgroundColor: '#4F772D',
     padding: 16,
     borderRadius: 30,
     alignItems: 'center',
+    marginTop: 10
   },
   loginText: {
     color: '#fff',
     fontWeight: '600',
+    fontSize: 16
   },
   signup: {
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 20,
     color: '#4F772D',
   },
 });

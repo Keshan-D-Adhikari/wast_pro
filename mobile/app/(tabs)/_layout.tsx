@@ -5,9 +5,9 @@ export default function TabLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        gestureEnabled: true,             // ⬅️ Swipe එක On කරනවා
-        gestureDirection: 'horizontal',   // ⬅️ හරහට අදින්න දෙනවා
-        animation: 'slide_from_right',    // ⬅️ ලස්සනට Animation එකක් එනවා
+        gestureEnabled: true,             // ⬅️ Turning on Swipe
+        gestureDirection: 'horizontal',   // ⬅️ Let me pull you across.
+        animation: 'slide_from_right',    // ⬅️ A beautiful animation is coming.
       }}
     />
   );

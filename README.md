@@ -115,5 +115,6 @@ Clone the repository:
 
 # Author
 
-Keshan D. Adhikari  
+Keshan D. Adhikari   
+
 Final Year Project – SmartWaste Pro
