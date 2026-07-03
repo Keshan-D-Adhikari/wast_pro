@@ -45,7 +45,9 @@
           "photosPermission": "Allow SmartWaste Pro to access your photos to set profile picture.",
           "cameraPermission": "Allow SmartWaste Pro to take a photo for your profile picture."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

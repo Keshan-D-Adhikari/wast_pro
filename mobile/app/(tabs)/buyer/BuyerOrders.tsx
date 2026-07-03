@@ -1,3 +1,5 @@
+
+
 import {
   View,
   Text,
@@ -16,6 +18,7 @@ import {
   onSnapshot,
   updateDoc,
   addDoc,
+  deleteDoc,
   doc,
   serverTimestamp
 } from 'firebase/firestore';
@@ -64,6 +67,9 @@ export default function BuyerOrders() {
     }
   }, [orders]);
 
+  // Load buyer orders in real time from Firestore
+  // Filters by buyerUid and sorts newest first
+  // onSnapshot updates list automatically
   useEffect(() => {
     if (!auth.currentUser) return;
 
@@ -76,6 +82,7 @@ export default function BuyerOrders() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersList = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Order))
+        .filter(order => order.status !== 'cancelled')
         .sort((a, b) => {
           const timeA = a.createdAt?.seconds || 0;
           const timeB = b.createdAt?.seconds || 0;
@@ -91,43 +98,64 @@ export default function BuyerOrders() {
     return () => unsubscribe();
   }, []);
 
-  const handleCancelOrder = async (order: Order) => {
+
+  const handleCancelOrder = async (order: any) => {
     Alert.alert(
       'Cancel Order',
-      'Are you sure? The listing will return to marketplace.',
+      'Are you sure? This order will be removed.',
       [
         { text: 'No', style: 'cancel' },
         {
           text: 'Yes, Cancel',
           style: 'destructive',
           onPress: async () => {
-            await updateDoc(
-              doc(db, 'orders', order.id), {
-              status: 'cancelled',
-              cancelledAt: serverTimestamp()
-            });
-            await updateDoc(
-              doc(db, 'marketplace', order.listingId), {
-              status: 'available'
-            });
-            await addDoc(
-              collection(db, 'notifications'), {
-              toUid: order.sellerUid,
-              type: 'order_cancelled',
-              message: order.buyerName +
-                ' cancelled the order for ' +
-                order.wasteType + ' waste.',
-              read: false,
-              createdAt: serverTimestamp()
-            });
-            Alert.alert('Cancelled',
-              'Order cancelled. Listing is back on marketplace.');
+            try {
+
+              await deleteDoc(
+                doc(db, 'orders', order.id)
+              );
+
+              // Restore listing to marketplace
+              if (order.listingId) {
+                await updateDoc(
+                  doc(db, 'marketplace', 
+                    order.listingId), {
+                  status: 'available'
+                });
+              }
+
+              // Notify seller
+              await addDoc(
+                collection(db, 'notifications'), {
+                toUid: order.sellerUid,
+                type: 'order_cancelled',
+                message: (order.buyerName || 'Buyer')
+                  + ' cancelled the order for '
+                  + order.wasteType + ' waste.',
+                read: false,
+                createdAt: serverTimestamp()
+              });
+
+              Alert.alert(
+                'Removed',
+                'Order removed from your purchases.'
+              );
+
+            } catch (error) {
+              console.log('Cancel error:', error);
+              Alert.alert(
+                'Error',
+                'Could not remove order.'
+              );
+            }
           }
         }
       ]
     );
   };
 
+  // Opens map showing route to seller bin location
+  // Gets buyer GPS location before opening modal
   const handleOrderMap = async (order: Order) => {
     try {
       setSelectedOrder(order);
@@ -193,13 +221,12 @@ export default function BuyerOrders() {
             order.status === 'pending' && { backgroundColor: '#FFF3E0' },
             order.status === 'confirmed' && { backgroundColor: '#E3F2FD' },
             order.status === 'completed' && { backgroundColor: '#E8F5E9' },
-            order.status === 'cancelled' && { backgroundColor: '#FFEBEE' }
           ]}>
             <Text style={{
               fontSize: 12, fontWeight: '700',
               color: order.status === 'pending' ? '#E65100' :
                 order.status === 'confirmed' ? '#1565C0' :
-                  order.status === 'completed' ? '#2E7D32' : '#C62828'
+                  '#2E7D32'
             }}>
               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
             </Text>
@@ -239,17 +266,28 @@ export default function BuyerOrders() {
             <TouchableOpacity
               onPress={() => handleCancelOrder(order)}
               style={{
-                flex: 1, padding: 10, borderRadius: 8,
+                flex: 1,
                 backgroundColor: '#FFEBEE',
-                borderWidth: 1, borderColor: '#EF9A9A',
-                alignItems: 'center', marginRight: 6
+                borderWidth: 1,
+                borderColor: '#EF9A9A',
+                borderRadius: 8,
+                padding: 10,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                marginRight: 6
               }}
             >
-              <Ionicons name="close-circle-outline"
-                size={16} color="#C62828" />
-              <Text style={{
-                color: '#C62828', fontSize: 12,
-                marginTop: 2
+              <Ionicons 
+                name="close-circle-outline" 
+                size={16} 
+                color="#C62828"
+                style={{ marginRight: 4 }}
+              />
+              <Text style={{ 
+                color: '#C62828', 
+                fontSize: 13,
+                fontWeight: '600'
               }}>
                 Cancel
               </Text>
@@ -263,7 +301,8 @@ export default function BuyerOrders() {
                 flex: 1, padding: 10, borderRadius: 8,
                 backgroundColor: '#E8F5E9',
                 borderWidth: 1, borderColor: '#A5D6A7',
-                alignItems: 'center', marginLeft: 6
+                alignItems: 'center', marginLeft: 
+                  order.status === 'pending' ? 6 : 0
               }}
             >
               <Ionicons name="location-outline"
@@ -294,6 +333,11 @@ export default function BuyerOrders() {
       {loading ? (
         <ActivityIndicator size="large" color="#4F772D" style={{ marginTop: 50 }} />
       ) : (
+        // Render active orders list
+        // Shows empty state if no orders exist
+        // Each card shows: waste type, seller, 
+        // weight, amount, payment method,
+        // status badge, action buttons
         <ScrollView ref={scrollRef} style={styles.container} showsVerticalScrollIndicator={false}>
           {orders.length === 0 ? (
             <View style={styles.emptyState}>
@@ -403,7 +447,6 @@ const styles = StyleSheet.create({
   pendingBadge: { backgroundColor: '#FFF3E0' },
   confirmedBadge: { backgroundColor: '#E3F2FD' },
   completedBadge: { backgroundColor: '#E8F5E9' },
-  cancelledBadge: { backgroundColor: '#FFEBEE' },
   statusText: { fontSize: 12, fontWeight: '700' },
 
   cardInfo: { marginBottom: 12 },
