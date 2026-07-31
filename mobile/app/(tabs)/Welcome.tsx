@@ -1,14 +1,19 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ImageBackground,
-} from 'react-native';
+import { View, Text, StyleSheet, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Palette, Space, Radius, Type } from '@/constants/design';
+import { Button } from '@/components/ui/button';
+
+const HIGHLIGHTS: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [
+  { icon: 'hardware-chip-outline', text: 'Live smart-bin sensor readings' },
+  { icon: 'storefront-outline', text: 'Sell recyclables to nearby buyers' },
+  { icon: 'navigate-outline', text: 'Pickup routes and distances' },
+];
 
 export default function Welcome() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
     <ImageBackground
@@ -16,22 +21,29 @@ export default function Welcome() {
       style={styles.background}
       resizeMode="cover"
     >
-      {/* Content */}
-      <View style={styles.content}>
+      {/* Scrim keeps the copy readable regardless of the photo behind it */}
+      <View style={styles.scrim} />
 
-        <Text style={styles.title}>WAST PRO</Text>
+      <View style={[styles.content, { paddingBottom: insets.bottom + Space['3xl'] }]}>
+        <Text style={styles.eyebrow}>SMARTWASTE PRO</Text>
+        <Text style={styles.title}>Manage waste smartly,{'\n'}create a cleaner world.</Text>
 
-        <Text style={styles.subtitle}>
-          Manage waste smartly, create a cleaner world.
-        </Text>
+        <View style={styles.highlights}>
+          {HIGHLIGHTS.map((item) => (
+            <View key={item.text} style={styles.highlightRow}>
+              <View style={styles.highlightIcon}>
+                <Ionicons name={item.icon} size={15} color={Palette.brand[600]} />
+              </View>
+              <Text style={styles.highlightText}>{item.text}</Text>
+            </View>
+          ))}
+        </View>
 
-        <TouchableOpacity
-          style={styles.button}
+        <Button
+          label="Get Started"
+          icon="arrow-forward"
           onPress={() => router.push('/(tabs)/Login')}
-        >
-          <Text style={styles.buttonText}>Get Started</Text>
-        </TouchableOpacity>
-
+        />
       </View>
     </ImageBackground>
   );
@@ -40,39 +52,34 @@ export default function Welcome() {
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
+  background: { flex: 1, justifyContent: 'flex-end' },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(244, 248, 242, 0.78)',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'flex-end',
-    paddingBottom: 60,
-    backgroundColor: 'rgba(255,255,255,0.15)', // soft overlay
+  content: { paddingHorizontal: Space['2xl'] },
+  eyebrow: {
+    ...Type.caption,
+    color: Palette.brand[600],
+    letterSpacing: 1.6,
+    marginBottom: Space.md,
   },
   title: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#000000',
-    marginBottom: 10,
+    ...Type.h1,
+    fontSize: 32,
+    lineHeight: 40,
+    color: Palette.brand[900],
+    marginBottom: Space['2xl'],
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#333333',
-    marginBottom: 30,
-    lineHeight: 20,
-    maxWidth: '85%',
+  highlights: { gap: Space.md, marginBottom: Space['3xl'] },
+  highlightRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  highlightIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.brand[100],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  button: {
-    backgroundColor: '#4F772D', // eco green
-    paddingVertical: 14,
-    paddingHorizontal: 30,
-    borderRadius: 30,
-    alignSelf: 'flex-start',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  highlightText: { ...Type.small, color: Palette.ink[700], fontWeight: '500', flex: 1 },
 });

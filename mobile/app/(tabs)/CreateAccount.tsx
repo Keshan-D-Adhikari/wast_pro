@@ -1,33 +1,53 @@
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ScrollView, 
-  ImageBackground, 
-  Alert, 
-  ActivityIndicator 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  ImageBackground,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ⬅️ Importing Firebase Tools
 // This is where you connect to Firebase via the Keys in firebaseConfig.js.
-import { auth, db } from '../../firebaseConfig'; 
+import { auth, db } from '../../firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 
+import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
+import { Button } from '@/components/ui/button';
+import { TextField } from '@/components/ui/text-field';
+
+type Role = 'seller' | 'buyer';
+
+const ROLES: {
+  key: Role;
+  icon: keyof typeof Ionicons.glyphMap;
+  name: string;
+  desc: string;
+}[] = [
+  { key: 'seller', icon: 'trash-outline', name: 'Seller', desc: 'Monitor bins & sell recyclables' },
+  { key: 'buyer', icon: 'repeat-outline', name: 'Buyer', desc: 'Purchase recyclable materials' },
+];
+
 export default function CreateAccount() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
   const [loading, setLoading] = useState(false);
-  const [role, setRole] = useState<'seller' | 'buyer'>('seller');
+  const [role, setRole] = useState<Role>('seller');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   // ⬅️ The main function of registration
   const handleContinue = async () => {
@@ -59,12 +79,12 @@ export default function CreateAccount() {
       });
 
       Alert.alert("Success 🎉", "Account created successfully!");
-      
+
       // 4. Sending to the relevant Dashboard according to the role
       if (role === 'seller') {
-        router.push('/(tabs)/seller/SellerProfile' as any);
+        router.replace('/(tabs)/seller/SellerDashboard' as any);
       } else {
-        router.push('/(tabs)/buyer/BuyerProfile' as any);
+        router.replace('/(tabs)/buyer/BuyerDashboard' as any);
       }
     } catch (error: any) {
       // If something goes wrong (e.g. if the email has been used before), an error will be displayed.
@@ -75,95 +95,171 @@ export default function CreateAccount() {
   };
 
   return (
-    <ImageBackground 
-      source={require('../../assets/images/back2.png')} 
-      style={styles.background} 
+    <ImageBackground
+      source={require('../../assets/images/back2.png')}
+      style={styles.background}
       resizeMode="cover"
     >
-      <View style={styles.overlay}>
-        <SafeAreaView style={styles.safe}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-            <View style={styles.card}>
-              <Text style={styles.title}>Create Your Account</Text>
+      <View style={styles.scrim} />
 
-              {/* Inputs */}
-              <View style={styles.inputBox}>
-                <Text style={styles.label}>Full Name</Text>
-                <TextInput style={styles.input} placeholder="Your full name" value={name} onChangeText={setName}/>
-              </View>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + Space.xl, paddingBottom: insets.bottom + Space['3xl'] },
+          ]}
+        >
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+            <Ionicons name="arrow-back" size={20} color={Palette.white} />
+          </TouchableOpacity>
 
-              <View style={styles.inputBox}>
-                <Text style={styles.label}>Email Address</Text>
-                <TextInput style={styles.input} placeholder="email@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none"/>
-              </View>
+          <View style={styles.card}>
+            <Text style={Type.h1}>Create your account</Text>
+            <Text style={[Type.small, styles.cardSubtitle]}>
+              Choose how you’ll use SmartWaste Pro
+            </Text>
 
-              <View style={styles.inputBox}>
-                <Text style={styles.label}>Password</Text>
-                <TextInput style={styles.input} placeholder="At least 6 characters" secureTextEntry value={password} onChangeText={setPassword}/>
-              </View>
-
-              <View style={styles.inputBox}>
-                <Text style={styles.label}>Confirm Password</Text>
-                <TextInput style={styles.input} placeholder="Confirm your password" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword}/>
-              </View>
-
-              {/* Role Selection */}
-              <Text style={styles.roleTitle}>I am a...</Text>
-              
-              <TouchableOpacity 
-                style={[styles.roleCard, role === 'seller' && styles.roleSelected]} 
-                onPress={() => setRole('seller')}
-              >
-                <Ionicons name="trash-outline" size={22} color={role === 'seller' ? "#4F772D" : "#6B7280"} />
-                <View style={styles.roleText}>
-                  <Text style={styles.roleName}>Seller</Text>
-                  <Text style={styles.roleDesc}>Monitor bins & sell recyclables</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.roleCard, role === 'buyer' && styles.roleSelected]} 
-                onPress={() => setRole('buyer')}
-              >
-                <Ionicons name="repeat-outline" size={22} color={role === 'buyer' ? "#4F772D" : "#6B7280"} />
-                <View style={styles.roleText}>
-                  <Text style={styles.roleName}>Buyer</Text>
-                  <Text style={styles.roleDesc}>Purchase recyclable materials</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Submit Button */}
-              <TouchableOpacity style={styles.button} onPress={handleContinue} disabled={loading}>
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Continue</Text>
-                )}
-              </TouchableOpacity>
+            {/* Role Selection — moved above the form so the labels below make sense */}
+            <View style={styles.roleGroup}>
+              {ROLES.map((r) => {
+                const selected = role === r.key;
+                return (
+                  <TouchableOpacity
+                    key={r.key}
+                    style={[styles.roleCard, selected && styles.roleSelected]}
+                    onPress={() => setRole(r.key)}
+                    activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <View style={[styles.roleIcon, selected && styles.roleIconSelected]}>
+                      <Ionicons
+                        name={r.icon}
+                        size={20}
+                        color={selected ? Palette.white : Palette.ink[500]}
+                      />
+                    </View>
+                    <View style={styles.roleText}>
+                      <Text style={Type.bodyStrong}>{r.name}</Text>
+                      <Text style={Type.caption}>{r.desc}</Text>
+                    </View>
+                    <Ionicons
+                      name={selected ? 'radio-button-on' : 'radio-button-off'}
+                      size={20}
+                      color={selected ? Palette.brand[600] : Palette.ink[200]}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          </ScrollView>
-        </SafeAreaView>
-      </View>
+
+            <TextField
+              label={role === 'buyer' ? 'Company / Full Name' : 'Full Name'}
+              icon={role === 'buyer' ? 'business-outline' : 'person-outline'}
+              placeholder="Your full name"
+              value={name}
+              onChangeText={setName}
+            />
+
+            <TextField
+              label="Email Address"
+              icon="mail-outline"
+              placeholder="email@example.com"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <TextField
+              label="Password"
+              icon="lock-closed-outline"
+              placeholder="At least 6 characters"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              autoCapitalize="none"
+            />
+
+            <TextField
+              label="Confirm Password"
+              icon="lock-closed-outline"
+              placeholder="Re-enter your password"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              autoCapitalize="none"
+              error={mismatch ? 'Passwords do not match' : undefined}
+            />
+
+            <Button label="Create Account" onPress={handleContinue} loading={loading} />
+
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/Login' as any)}
+              style={styles.loginRow}
+              hitSlop={8}
+            >
+              <Text style={Type.small}>
+                Already registered? <Text style={styles.loginLink}>Log in</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ImageBackground>
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
   background: { flex: 1 },
-  overlay: { flex: 1, backgroundColor: 'rgba(15,61,35,0.65)' },
-  safe: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 24 },
-  card: { width: '90%', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, elevation: 10 },
-  title: { fontSize: 24, fontWeight: '800', marginBottom: 20, color: '#111827', textAlign: 'center' },
-  inputBox: { marginBottom: 12 },
-  label: { fontSize: 13, fontWeight: '600', marginBottom: 6, color: '#374151' },
-  input: { borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 12, padding: 12, backgroundColor: '#F9FAFB' },
-  roleTitle: { marginTop: 10, marginBottom: 10, fontSize: 15, fontWeight: '700', color: '#1F2937' },
-  roleCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, marginBottom: 10 },
-  roleSelected: { borderColor: '#4F772D', backgroundColor: '#F4F9F4' },
-  roleText: { marginLeft: 12, flex: 1 },
-  roleName: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  roleDesc: { fontSize: 12, color: '#6B7280' },
-  button: { backgroundColor: '#4F772D', paddingVertical: 15, borderRadius: 30, alignItems: 'center', marginTop: 15, shadowColor: '#4F772D', shadowOpacity: 0.3, shadowRadius: 5, elevation: 5 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  flex: { flex: 1 },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: Palette.overlay },
+  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Space.xl },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Space.lg,
+  },
+  card: {
+    backgroundColor: Palette.surface,
+    borderRadius: Radius.xl,
+    padding: Space['2xl'],
+    ...Shadow[3],
+  },
+  cardSubtitle: { marginTop: Space.xs, marginBottom: Space.xl },
+  roleGroup: { gap: Space.md, marginBottom: Space['2xl'] },
+  roleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    padding: Space.md,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Palette.ink[200],
+    backgroundColor: Palette.surface,
+  },
+  roleSelected: { borderColor: Palette.brand[600], backgroundColor: Palette.brand[50] },
+  roleIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.sm,
+    backgroundColor: Palette.ink[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleIconSelected: { backgroundColor: Palette.brand[600] },
+  roleText: { flex: 1, gap: 2 },
+  loginRow: { alignItems: 'center', marginTop: Space.xl },
+  loginLink: { ...Type.smallStrong, color: Palette.brand[600], fontWeight: '700' },
 });

@@ -2,11 +2,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  TextInput,
   Alert,
-  ActivityIndicator,
   Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -14,20 +11,30 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
 import * as Location from "expo-location";
 import { db, auth } from "../../../firebaseConfig";
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  where, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  serverTimestamp, 
-  getDoc 
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  addDoc,
+  updateDoc,
+  doc,
+  serverTimestamp,
+  getDoc
 } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from "react-native-maps";
 import { MarketplaceItem, UserLocation } from "../../../types";
+
+import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
+import { Screen, ScreenHeader } from "@/components/ui/screen";
+import { Card, SectionTitle, Divider, DetailRow } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState, LoadingState } from "@/components/ui/empty-state";
+import { TextField } from "@/components/ui/text-field";
+import { BottomNav } from "@/components/ui/bottom-nav";
+import { Sheet } from "@/components/ui/sheet";
 
 export default function BuyerDashboard() {
   const router = useRouter();
@@ -53,6 +60,8 @@ export default function BuyerDashboard() {
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
     (async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
@@ -63,7 +72,7 @@ export default function BuyerDashboard() {
       } catch (err) { console.log(err); }
 
       const q = query(collection(db, "marketplace"), where("status", "==", "available"));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      unsubscribe = onSnapshot(q, (snapshot) => {
         const itemList = snapshot.docs.map(doc => {
           const data = doc.data() as Omit<MarketplaceItem, 'id'>;
           return { id: doc.id, ...data } as MarketplaceItem;
@@ -75,8 +84,11 @@ export default function BuyerDashboard() {
         console.error("Firestore onSnapshot error:", error);
         setLoading(false);
       });
-      return () => unsubscribe();
     })();
+
+    // Detach the listener on unmount — returning it from inside the async
+    // IIFE above would never reach React
+    return () => unsubscribe?.();
   }, []);
 
   useEffect(() => {
@@ -152,10 +164,10 @@ export default function BuyerDashboard() {
         status: "sold"
       });
 
-      const notificationMsg = buyerName + ' placed an order for your ' 
-        + buyingItem.wasteType + ' waste - Rs ' 
-        + buyingItem.totalPrice 
-        + (method==='card' ? ' (PAID)' : ' (Cash on Delivery)');
+      const notificationMsg = buyerName + ' placed an order for your '
+        + buyingItem.wasteType + ' waste - Rs '
+        + buyingItem.totalPrice
+        + (method === 'card' ? ' (PAID)' : ' (Cash on Delivery)');
 
       await addDoc(collection(db, "notifications"), {
         toUid: buyingItem.sellerUid,
@@ -210,112 +222,173 @@ export default function BuyerDashboard() {
     else if (paymentMethod === 'card') handleCardPayment();
   };
 
-  const formatCardNumber = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    const matched = cleaned.match(/.{1,4}/g);
-    return matched ? matched.join(' ') : cleaned;
-  };
-
   const getCardType = (number: string) => {
     if (number.startsWith('4')) return 'VISA';
     if (number.startsWith('5')) return 'Mastercard';
     return null;
   };
 
-  if (loading) return <ActivityIndicator size="large" color="#4F772D" style={{ flex: 1 }} />;
+  const openRouteMap = async (item: MarketplaceItem) => {
+    try {
+      setSelectedItem(item);
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow location access');
+        return;
+      }
+
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced
+      });
+
+      const buyer = {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude
+      };
+
+      setUserLocation(buyer);
+
+      const dist = calculateDistance(
+        buyer.latitude, buyer.longitude,
+        item.location.latitude, item.location.longitude
+      );
+      setRouteDistance(dist.toFixed(1));
+
+      setMapModalVisible(true);
+    } catch (error) {
+      console.log('Map error:', error);
+      Alert.alert('Error', 'Could not open map');
+    }
+  };
+
+  /* ================= LISTING CARD ================= */
+  const ListingCard = ({ item }: { item: MarketplaceItem }) => {
+    const accent = wasteAccent(item.wasteType);
+    const distance = getDistance(item.location);
+    const pricePerKg = item.weightKg ? (item.totalPrice / item.weightKg) : 0;
+
+    return (
+      <Card style={styles.listingCard}>
+        <View style={styles.listingHeader}>
+          <View style={[styles.listingIcon, { backgroundColor: accent.tint }]}>
+            <Ionicons name="cube-outline" size={19} color={accent.base} />
+          </View>
+          <View style={styles.listingTitleBlock}>
+            <Text style={[Type.bodyStrong, styles.listingType]} numberOfLines={1}>
+              {item.wasteType} waste
+            </Text>
+            <Text style={Type.caption} numberOfLines={1}>{item.sellerName}</Text>
+          </View>
+          <Badge
+            label={distance === 'N/A' ? 'Distance N/A' : `${distance} km`}
+            icon="location-outline"
+            color={{ base: Palette.brand[700], tint: Palette.brand[100] }}
+          />
+        </View>
+
+        <Divider />
+
+        <View style={styles.listingMetrics}>
+          <View style={styles.metricBlock}>
+            <Text style={Type.caption}>WEIGHT</Text>
+            <Text style={Type.bodyStrong}>{item.weightKg} kg</Text>
+          </View>
+          <View style={styles.metricBlock}>
+            <Text style={Type.caption}>RATE</Text>
+            <Text style={Type.bodyStrong}>Rs {pricePerKg.toFixed(0)}/kg</Text>
+          </View>
+          <View style={styles.metricBlock}>
+            <Text style={Type.caption}>TOTAL</Text>
+            <Text style={styles.listingTotal}>Rs {item.totalPrice || 0}</Text>
+          </View>
+        </View>
+
+        <View style={styles.listingActions}>
+          <Button
+            label="Route"
+            icon="map-outline"
+            variant="secondary"
+            onPress={() => openRouteMap(item)}
+            style={styles.actionFlex}
+          />
+          <Button
+            label="Buy Now"
+            icon="cart-outline"
+            onPress={() => handleBuyNow(item)}
+            style={styles.actionFlex}
+          />
+        </View>
+      </Card>
+    );
+  };
 
   return (
-    <View style={styles.mainContainer}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.header}>Buyer Dashboard</Text>
-        <TextInput
-          placeholder="Search waste (Plastic, Paper...)"
-          style={styles.search}
+    <View style={styles.root}>
+      <Screen withBottomNav>
+        <ScreenHeader title="Browse waste" subtitle="Find recyclable waste near you" />
+
+        <TextField
+          icon="search-outline"
+          placeholder="Search waste (plastic, metal, food…)"
           value={searchText}
           onChangeText={setSearchText}
+          autoCapitalize="none"
+          containerStyle={styles.search}
         />
-        <Text style={styles.sectionTitle}>Available Marketplace</Text>
-        {filteredItems.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.wasteType}>{item.wasteType} Waste</Text>
-              <Text style={styles.distance}>📍 {getDistance(item.location)} km</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailText}>Weight: {item.weightKg} kg</Text>
-              <Text style={styles.priceText}>Price: Rs {item.totalPrice || 0}</Text>
-            </View>
-            <View style={styles.btnRow}>
-              <TouchableOpacity style={styles.mapBtn} onPress={async () => {
-                try {
-                  setSelectedItem(item);
 
-                  const { status } = await Location.requestForegroundPermissionsAsync();
-                  if (status !== 'granted') {
-                    Alert.alert('Permission needed', 'Please allow location access');
-                    return;
-                  }
+        {loading ? (
+          <LoadingState message="Loading the marketplace…" />
+        ) : filteredItems.length === 0 ? (
+          <EmptyState
+            icon={searchText ? 'search-outline' : 'storefront-outline'}
+            title={searchText ? 'No matches' : 'Nothing listed yet'}
+            message={
+              searchText
+                ? `No available waste matches “${searchText}”.`
+                : 'Sellers have not listed any waste yet. Check back shortly.'
+            }
+            actionLabel={searchText ? 'Clear search' : undefined}
+            onAction={searchText ? () => setSearchText('') : undefined}
+          />
+        ) : (
+          <>
+            <SectionTitle meta={`${filteredItems.length} available`}>
+              Available marketplace
+            </SectionTitle>
+            {filteredItems.map((item) => (
+              <ListingCard key={item.id} item={item} />
+            ))}
+          </>
+        )}
+      </Screen>
 
-                  const pos = await Location.getCurrentPositionAsync({
-                    accuracy: Location.Accuracy.Balanced
-                  });
-
-                  const buyer = {
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude
-                  };
-
-                  const seller = {
-                    latitude: item.location.latitude,
-                    longitude: item.location.longitude
-                  };
-
-                  setUserLocation(buyer);
-
-                  const dist = calculateDistance(
-                    buyer.latitude, buyer.longitude,
-                    seller.latitude, seller.longitude
-                  );
-                  setRouteDistance(dist.toFixed(1));
-
-                  setMapModalVisible(true);
-                } catch (error) {
-                  console.log('Map error:', error);
-                  Alert.alert('Error', 'Could not open map');
-                }
-              }}>
-                <Text style={styles.mapBtnText}>Map</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.buyBtn} onPress={() => handleBuyNow(item)}>
-                <Text style={styles.buyBtnText}>Buy Now</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-
-      {/* Map Modal */}
+      {/* Map Modal — full screen so the route is readable */}
       <Modal visible={mapModalVisible} animationType="slide">
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        <SafeAreaView style={styles.mapModalRoot}>
           <View style={styles.mapModalHeader}>
-            <View>
-              <Text style={styles.mapModalTitle}>Pickup Route</Text>
-              <Text style={styles.mapModalDistance}>
-                {routeDistance ? `${routeDistance} km away` : 'Calculating...'}
+            <View style={styles.flex}>
+              <Text style={Type.h2}>Pickup route</Text>
+              <Text style={[Type.small, styles.mapModalMeta]}>
+                {routeDistance ? `${routeDistance} km · straight line` : 'Calculating…'}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => {
-              setMapModalVisible(false);
-              setRouteDistance(null);
-            }} style={styles.closeMapBtn}>
-              <Ionicons name="close" size={28} color="#333" />
+            <TouchableOpacity
+              onPress={() => {
+                setMapModalVisible(false);
+                setRouteDistance(null);
+              }}
+              style={styles.closeMapBtn}
+              hitSlop={8}
+            >
+              <Ionicons name="close" size={24} color={Palette.ink[700]} />
             </TouchableOpacity>
           </View>
 
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
-            style={styles.fullMap}
+            style={styles.flex}
             initialRegion={userLocation && selectedItem ? {
               latitude: (userLocation.latitude + selectedItem.location.latitude) / 2,
               longitude: (userLocation.longitude + selectedItem.location.longitude) / 2,
@@ -338,12 +411,7 @@ export default function BuyerDashboard() {
                   }}
                   title="Your Location"
                 >
-                  <View style={{
-                    width: 22, height: 22, borderRadius: 11,
-                    backgroundColor: '#4285F4',
-                    borderWidth: 3, borderColor: 'white',
-                    elevation: 5
-                  }} />
+                  <View style={styles.buyerDot} />
                 </Marker>
 
                 {/* Seller Marker */}
@@ -354,12 +422,14 @@ export default function BuyerDashboard() {
                   }}
                   title={selectedItem.sellerName}
                 >
-                  <Ionicons name="location" size={40} color="#4F772D" />
+                  <Ionicons name="location" size={38} color={Palette.brand[600]} />
                   <Callout>
-                    <View style={styles.calloutContainer}>
-                      <Text style={styles.calloutTitle}>{selectedItem.sellerName}</Text>
-                      <Text style={styles.calloutText}>{selectedItem.wasteType} Waste</Text>
-                      <Text style={styles.calloutText}>{selectedItem.weightKg} kg | Rs {selectedItem.totalPrice}</Text>
+                    <View style={styles.callout}>
+                      <Text style={Type.smallStrong}>{selectedItem.sellerName}</Text>
+                      <Text style={Type.caption}>{selectedItem.wasteType} waste</Text>
+                      <Text style={Type.caption}>
+                        {selectedItem.weightKg} kg · Rs {selectedItem.totalPrice}
+                      </Text>
                     </View>
                   </Callout>
                 </Marker>
@@ -378,51 +448,10 @@ export default function BuyerDashboard() {
             )}
           </MapView>
 
-          <View style={{
-            backgroundColor: 'white',
-            padding: 16,
-            borderTopWidth: 0.5,
-            borderTopColor: '#eee'
-          }}>
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: 12
-            }}>
-              <View style={{
-                backgroundColor: '#E8F5E9',
-                borderRadius: 8,
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                marginRight: 10,
-                flexDirection: 'row',
-                alignItems: 'center'
-              }}>
-                <Ionicons
-                  name="location-outline"
-                  size={16}
-                  color="#4F772D"
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={{
-                  color: '#4F772D',
-                  fontWeight: '700',
-                  fontSize: 16
-                }}>
-                  {routeDistance
-                    ? routeDistance + ' km away'
-                    : 'Calculating...'}
-                </Text>
-              </View>
-              <Text style={{
-                color: '#888',
-                fontSize: 12
-              }}>
-                straight line distance
-              </Text>
-            </View>
-
-            <TouchableOpacity
+          <View style={styles.mapFooter}>
+            <Button
+              label={`Buy Now · Rs ${selectedItem?.totalPrice ?? 0}`}
+              icon="cart-outline"
               onPress={() => {
                 setMapModalVisible(false);
                 setTimeout(() => {
@@ -431,259 +460,206 @@ export default function BuyerDashboard() {
                   }
                 }, 300);
               }}
-              style={{
-                backgroundColor: '#4F772D',
-                padding: 16,
-                borderRadius: 12,
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center'
-              }}
-            >
-              <Ionicons
-                name="cart-outline"
-                size={20}
-                color="white"
-                style={{ marginRight: 8 }}
-              />
-              <Text style={{
-                color: 'white',
-                fontSize: 16,
-                fontWeight: '700'
-              }}>
-                Buy Now · Rs {selectedItem?.totalPrice}
-              </Text>
-            </TouchableOpacity>
+            />
           </View>
         </SafeAreaView>
       </Modal>
 
-      {/* Payment Selection Modal */}
-      <Modal visible={paymentModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.confirmCard}>
-            <Text style={styles.confirmTitle}>Complete Purchase</Text>
+      {/* Payment Sheet */}
+      <Sheet
+        visible={paymentModalVisible}
+        title="Complete purchase"
+        onClose={() => {
+          setPaymentModalVisible(false);
+          setPaymentMethod('');
+          setCardDetails({ name: '', number: '', expiry: '', cvv: '' });
+        }}
+        scrollable
+      >
+        {/* Order Summary Card */}
+        <Card tone="brand" elevation={0} style={styles.summaryCard}>
+          <DetailRow label="Waste type" value={buyingItem?.wasteType ?? '—'} />
+          <DetailRow label="Weight" value={`${buyingItem?.weightKg ?? 0} kg`} />
+          <DetailRow label="Seller" value={buyingItem?.sellerName ?? '—'} />
+          <Divider />
+          <DetailRow label="Total" value={`Rs ${buyingItem?.totalPrice ?? 0}`} emphasis />
+        </Card>
 
-            {/* Order Summary Card */}
-            <View style={{
-              backgroundColor: '#f9f9f9',
-              borderRadius: 10,
-              padding: 15,
-              marginBottom: 20
-            }}>
-              <Text style={styles.summaryText}>Waste Type: <Text style={styles.bold}>{buyingItem?.wasteType}</Text></Text>
-              <Text style={styles.summaryText}>Weight: <Text style={styles.bold}>{buyingItem?.weightKg} kg</Text></Text>
-              <Text style={styles.summaryText}>Seller: <Text style={styles.bold}>{buyingItem?.sellerName}</Text></Text>
-              <Text style={styles.summaryText}>Total: <Text style={[styles.bold, { color: '#4F772D' }]}>Rs {buyingItem?.totalPrice}</Text></Text>
-            </View>
+        <Text style={[Type.caption, styles.paymentLabel]}>PAYMENT METHOD</Text>
 
-            {/* Payment Options Side by Side */}
-            <View style={{ flexDirection: 'row', marginBottom: 20 }}>
+        <View style={styles.payRow}>
+          {([
+            { key: 'cash', icon: 'cash-outline', title: 'Cash on delivery', sub: 'Pay when collected' },
+            { key: 'card', icon: 'card-outline', title: 'Card payment', sub: 'Pay now' },
+          ] as const).map((opt) => {
+            const selected = paymentMethod === opt.key;
+            return (
               <TouchableOpacity
-                onPress={() => setPaymentMethod('cash')}
-                style={{
-                  flex: 1, padding: 15, borderRadius: 10,
-                  borderWidth: paymentMethod === 'cash' ? 2 : 1,
-                  borderColor: paymentMethod === 'cash' ? '#4F772D' : '#ddd',
-                  backgroundColor: paymentMethod === 'cash' ? '#E8F5E9' : 'white',
-                  marginRight: 8, alignItems: 'center'
-                }}
+                key={opt.key}
+                onPress={() => setPaymentMethod(opt.key)}
+                activeOpacity={0.8}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                style={[styles.payOption, selected && styles.payOptionSelected]}
               >
-                <Ionicons name="cash-outline" size={30} color="#4F772D" />
-                <Text style={{ fontWeight: '600', marginTop: 8 }}>Cash on Delivery</Text>
-                <Text style={{ fontSize: 11, color: '#888', textAlign: 'center' }}>Pay when collected</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setPaymentMethod('card')}
-                style={{
-                  flex: 1, padding: 15, borderRadius: 10,
-                  borderWidth: paymentMethod === 'card' ? 2 : 1,
-                  borderColor: paymentMethod === 'card' ? '#4F772D' : '#ddd',
-                  backgroundColor: paymentMethod === 'card' ? '#E8F5E9' : 'white',
-                  marginLeft: 8, alignItems: 'center'
-                }}
-              >
-                <Ionicons name="card-outline" size={30} color="#4F772D" />
-                <Text style={{ fontWeight: '600', marginTop: 8 }}>Card Payment</Text>
-                <Text style={{ fontSize: 11, color: '#888', textAlign: 'center' }}>Pay now securely</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Card Form */}
-            {paymentMethod === 'card' && (
-              <View style={{ marginTop: 10 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={styles.inputLabel}>Card Details</Text>
-                  {getCardType(cardDetails.number) && (
-                    <View style={styles.cardBadge}>
-                      <Text style={styles.cardBadgeText}>{getCardType(cardDetails.number)}</Text>
-                    </View>
-                  )}
-                </View>
-                <TextInput
-                  style={styles.cardInput}
-                  placeholder="Cardholder Name"
-                  value={cardDetails.name}
-                  onChangeText={(t) => setCardDetails({ ...cardDetails, name: t })}
+                <Ionicons
+                  name={opt.icon}
+                  size={24}
+                  color={selected ? Palette.brand[600] : Palette.ink[500]}
                 />
-                <TextInput
-                  style={styles.cardInput}
-                  placeholder="Card Number (16 digits)"
-                  keyboardType="numeric"
-                  maxLength={16}
-                  value={cardDetails.number}
-                  onChangeText={(t) => setCardDetails({ ...cardDetails, number: t.replace(/\D/g, '') })}
-                />
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TextInput
-                    style={[styles.cardInput, { flex: 1 }]}
-                    placeholder="MM/YY"
-                    maxLength={5}
-                    value={cardDetails.expiry}
-                    onChangeText={(t) => setCardDetails({ ...cardDetails, expiry: t })}
-                  />
-                  <TextInput
-                    style={[styles.cardInput, { flex: 1 }]}
-                    placeholder="CVV"
-                    keyboardType="numeric"
-                    maxLength={3}
-                    secureTextEntry
-                    value={cardDetails.cvv}
-                    onChangeText={(t) => setCardDetails({ ...cardDetails, cvv: t })}
-                  />
-                </View>
-              </View>
-            )}
-
-            <TouchableOpacity
-              onPress={handleConfirmOrder}
-              disabled={!paymentMethod}
-              style={{
-                backgroundColor: paymentMethod ? '#4F772D' : '#ccc',
-                padding: 16,
-                borderRadius: 12,
-                alignItems: 'center',
-                marginTop: 20
-              }}
-            >
-              <Text style={{
-                color: 'white',
-                fontSize: 16,
-                fontWeight: '700'
-              }}>
-                {paymentMethod === 'card' ? 'Pay Now' : 'Confirm Order'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.cancelBtn, { marginTop: 10, borderWidth: 0 }]}
-              onPress={() => {
-                setPaymentModalVisible(false);
-                setPaymentMethod('');
-                setCardDetails({ name: '', number: '', expiry: '', cvv: '' });
-              }}
-            >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+                <Text style={[Type.smallStrong, styles.payTitle]}>{opt.title}</Text>
+                <Text style={styles.paySub}>{opt.sub}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </Modal>
 
+        {/* Card Form */}
+        {paymentMethod === 'card' && (
+          <View style={styles.cardForm}>
+            <View style={styles.cardFormHeader}>
+              <Text style={Type.caption}>CARD DETAILS</Text>
+              {getCardType(cardDetails.number) && (
+                <Badge label={getCardType(cardDetails.number)!} tone="info" />
+              )}
+            </View>
 
+            <TextField
+              placeholder="Cardholder name"
+              value={cardDetails.name}
+              onChangeText={(t) => setCardDetails({ ...cardDetails, name: t })}
+            />
+            <TextField
+              placeholder="Card number (16 digits)"
+              keyboardType="numeric"
+              maxLength={16}
+              value={cardDetails.number}
+              onChangeText={(t) => setCardDetails({ ...cardDetails, number: t.replace(/\D/g, '') })}
+            />
+            <View style={styles.cardRow}>
+              <TextField
+                placeholder="MM/YY"
+                maxLength={5}
+                value={cardDetails.expiry}
+                onChangeText={(t) => setCardDetails({ ...cardDetails, expiry: t })}
+                containerStyle={styles.flex}
+              />
+              <TextField
+                placeholder="CVV"
+                keyboardType="numeric"
+                maxLength={3}
+                secureTextEntry
+                value={cardDetails.cvv}
+                onChangeText={(t) => setCardDetails({ ...cardDetails, cvv: t })}
+                containerStyle={styles.flex}
+              />
+            </View>
 
-      {/* Bottom Bar (Updated) */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="home" size={24} color="#4F772D" />
-          <Text style={[styles.navText, { color: "#4F772D" }]}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/(tabs)/buyer/BuyerOrders" as any)}>
-          <Ionicons name="cart-outline" size={24} color="#9CA3AF" />
-          <Text style={styles.navText}>Orders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/(tabs)/buyer/BuyerProfile" as any)}>
-          <Ionicons name="person-outline" size={24} color="#9CA3AF" />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+            <Text style={styles.demoNote}>
+              Demo checkout — no real payment is processed and card numbers are not stored.
+            </Text>
+          </View>
+        )}
+
+        <Button
+          label={paymentMethod === 'card' ? 'Pay now' : 'Confirm order'}
+          onPress={handleConfirmOrder}
+          disabled={!paymentMethod}
+          loading={purchaseLoading}
+        />
+      </Sheet>
+
+      <BottomNav role="buyer" active="home" />
     </View>
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: "#F5F9F4" },
-  container: { flex: 1, padding: 20, paddingTop: 60 },
-  header: { fontSize: 26, fontWeight: "700", color: "#111827", marginBottom: 20 },
-  search: { borderWidth: 1, borderColor: "#D1D5DB", backgroundColor: "#fff", padding: 14, borderRadius: 12, marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
-  card: { backgroundColor: "#fff", padding: 16, borderRadius: 16, marginBottom: 14, elevation: 2 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between" },
-  wasteType: { fontSize: 16, fontWeight: "700" },
-  distance: { fontSize: 13, color: "#4F772D" },
-  detailText: { fontSize: 14, color: "#4B5563", marginVertical: 4 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 },
-  priceText: { fontSize: 14, fontWeight: '700', color: '#4F772D' },
-  btnRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, gap: 10 },
-  mapBtn: { flex: 1, backgroundColor: "#E5E7EB", padding: 12, borderRadius: 10, alignItems: "center" },
-  mapBtnText: { color: "#374151", fontWeight: "bold" },
-  buyBtn: { flex: 1, backgroundColor: "#4F772D", padding: 12, borderRadius: 10, alignItems: "center" },
-  buyBtnText: { color: "#fff", fontWeight: "bold" },
-  backBtn: { position: 'absolute', top: 50, left: 20, backgroundColor: '#4F772D', padding: 12, borderRadius: 30, flexDirection: 'row', alignItems: 'center' },
-  backBtnText: { color: '#fff', marginLeft: 8, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  confirmCard: { backgroundColor: '#fff', width: '85%', borderRadius: 20, padding: 24 },
-  confirmTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  confirmDetails: { marginBottom: 20 },
-  confirmLabel: { fontSize: 15, color: '#666', marginBottom: 5 },
-  confirmValue: { fontWeight: 'bold', color: '#111' },
-  modalBtnRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  cancelBtn: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center' },
-  cancelBtnText: { color: '#666', fontWeight: 'bold' },
-  confirmBtn: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: '#4F772D', alignItems: 'center' },
-  confirmBtnText: { color: '#fff', fontWeight: 'bold' },
-  bottomBar: { flexDirection: "row", justifyContent: "space-around", backgroundColor: "#fff", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#E5E7EB" },
-  navItem: { alignItems: "center" },
-  navText: { fontSize: 12, marginTop: 4 },
+  root: { flex: 1, backgroundColor: Palette.background },
+  flex: { flex: 1 },
 
-  // Map Modal Styles
-  mapModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  mapModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
-  mapModalDistance: { fontSize: 14, color: '#4F772D', fontWeight: '600' },
-  mapModalDuration: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  closeMapBtn: { padding: 4 },
-  fullMap: { flex: 1 },
-  mapFooter: { padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  mapBuyBtn: { backgroundColor: '#4F772D', padding: 16, borderRadius: 12, alignItems: 'center' },
-  mapBuyBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  calloutContainer: { width: 150, padding: 5 },
-  calloutTitle: { fontWeight: 'bold', fontSize: 14, marginBottom: 2 },
-  calloutText: { fontSize: 12, color: '#4B5563' },
+  search: { marginBottom: 0 },
 
-  // Payment UI Styles
-  summaryBox: { backgroundColor: '#F9FAFB', padding: 15, borderRadius: 12, marginBottom: 20 },
-  summaryText: { fontSize: 14, color: '#4B5563', marginBottom: 4 },
-  paymentLabel: { fontSize: 15, fontWeight: '600', color: '#374151', marginBottom: 12 },
-  paymentOption: {
+  listingCard: { marginBottom: Space.md },
+  listingHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  listingIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listingTitleBlock: { flex: 1, gap: 2 },
+  listingType: { textTransform: 'capitalize' },
+  listingMetrics: { flexDirection: 'row', gap: Space.md },
+  metricBlock: { flex: 1, gap: 2 },
+  listingTotal: { ...Type.bodyStrong, color: Palette.brand[600], fontWeight: '800' },
+  listingActions: { flexDirection: 'row', gap: Space.md, marginTop: Space.lg },
+  actionFlex: { flex: 1 },
+
+  // Map Modal
+  mapModalRoot: { flex: 1, backgroundColor: Palette.surface },
+  mapModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    marginBottom: 12
+    gap: Space.md,
+    padding: Space.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.ink[100],
   },
-  selectedOption: { backgroundColor: '#E8F5E9', borderColor: '#4F772D' },
-  paymentIcon: { width: 45, height: 45, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  optionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  optionSub: { fontSize: 13, color: '#6B7280' },
-  checkIcon: { position: 'absolute', right: 15 },
+  mapModalMeta: { color: Palette.brand[600], fontWeight: '600', marginTop: 2 },
+  closeMapBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buyerDot: {
+    width: 20,
+    height: 20,
+    borderRadius: Radius.pill,
+    backgroundColor: '#4285F4',
+    borderWidth: 3,
+    borderColor: Palette.white,
+    ...Shadow[2],
+  },
+  callout: { width: 150, padding: Space.xs, gap: 2 },
+  mapFooter: {
+    padding: Space.xl,
+    backgroundColor: Palette.surface,
+    borderTopWidth: 1,
+    borderTopColor: Palette.ink[100],
+  },
 
-  // Card Form Styles
-  cardModalHeader: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', position: 'relative', marginBottom: 20 },
-  cardBadge: { position: 'absolute', right: 0, backgroundColor: '#4F772D', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  cardBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  inputLabel: { fontSize: 13, color: '#6B7280', marginBottom: 6, fontWeight: '500' },
-  cardInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 15, color: '#111827' },
-  bold: { fontWeight: '700', color: '#111827' }
+  // Payment
+  summaryCard: { marginBottom: Space.xl },
+  paymentLabel: { marginBottom: Space.md },
+  payRow: { flexDirection: 'row', gap: Space.md, marginBottom: Space.lg },
+  payOption: {
+    flex: 1,
+    alignItems: 'center',
+    gap: Space.xs,
+    padding: Space.lg,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Palette.ink[200],
+    backgroundColor: Palette.surface,
+  },
+  payOptionSelected: { borderColor: Palette.brand[600], backgroundColor: Palette.brand[50] },
+  payTitle: { textAlign: 'center' },
+  paySub: { ...Type.caption, textAlign: 'center', color: Palette.ink[300] },
+
+  cardForm: { marginBottom: Space.sm },
+  cardFormHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Space.md,
+  },
+  cardRow: { flexDirection: 'row', gap: Space.md },
+  demoNote: { ...Type.caption, color: Palette.ink[300], marginBottom: Space.lg },
 });

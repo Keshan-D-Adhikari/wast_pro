@@ -1,13 +1,9 @@
-
-
 import {
   View,
   Text,
   TouchableOpacity,
   Modal,
   Alert,
-  ScrollView,
-  ActivityIndicator,
   StyleSheet
 } from 'react-native';
 import {
@@ -27,9 +23,17 @@ import * as Location from 'expo-location';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Order, UserLocation } from "../../../types";
+
+import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
+import { Screen, ScreenHeader } from "@/components/ui/screen";
+import { Card, SectionTitle, Divider, DetailRow } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
+import { EmptyState, LoadingState } from "@/components/ui/empty-state";
+import { BottomNav } from "@/components/ui/bottom-nav";
 
 const calculateDistance = (
   lat1: number, lon1: number,
@@ -59,13 +63,6 @@ export default function BuyerOrders() {
   const [sellerLocation, setSellerLocation] = useState<UserLocation | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
-
-  useEffect(() => {
-    if (orders.length > 0) {
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-    }
-  }, [orders]);
 
   // Load buyer orders in real time from Firestore
   // Filters by buyerUid and sorts newest first
@@ -98,7 +95,6 @@ export default function BuyerOrders() {
     return () => unsubscribe();
   }, []);
 
-
   const handleCancelOrder = async (order: any) => {
     Alert.alert(
       'Cancel Order',
@@ -118,7 +114,7 @@ export default function BuyerOrders() {
               // Restore listing to marketplace
               if (order.listingId) {
                 await updateDoc(
-                  doc(db, 'marketplace', 
+                  doc(db, 'marketplace',
                     order.listingId), {
                   status: 'available'
                 });
@@ -158,6 +154,15 @@ export default function BuyerOrders() {
   // Gets buyer GPS location before opening modal
   const handleOrderMap = async (order: Order) => {
     try {
+      // Older seeded orders were written without coordinates
+      if (
+        typeof order.location?.latitude !== 'number' ||
+        typeof order.location?.longitude !== 'number'
+      ) {
+        Alert.alert('Location unavailable', 'This order has no pickup coordinates recorded.');
+        return;
+      }
+
       setSelectedOrder(order);
 
       const { status } = await
@@ -199,191 +204,128 @@ export default function BuyerOrders() {
     }
   };
 
-  const OrderCard = ({ order, index }: { order: Order, index: number }) => {
+  const totalSpent = orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+
+  const OrderCard = ({ order, isLatest }: { order: Order; isLatest: boolean }) => {
+    const accent = wasteAccent(order.wasteType);
+
     return (
-      <View style={{
-        backgroundColor: 'white', borderRadius: 12,
-        padding: 16, marginBottom: 12,
-        elevation: 2,
-        borderLeftWidth: index === 0 ? 4 : 0,
-        borderLeftColor: '#4F772D',
-      }}>
-
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between'
-        }}>
-          <Text style={{ fontSize: 16, fontWeight: '700' }}>
-            {order.wasteType} Waste
-          </Text>
-          <View style={[
-            styles.statusBadge,
-            order.status === 'pending' && { backgroundColor: '#FFF3E0' },
-            order.status === 'confirmed' && { backgroundColor: '#E3F2FD' },
-            order.status === 'completed' && { backgroundColor: '#E8F5E9' },
-          ]}>
-            <Text style={{
-              fontSize: 12, fontWeight: '700',
-              color: order.status === 'pending' ? '#E65100' :
-                order.status === 'confirmed' ? '#1565C0' :
-                  '#2E7D32'
-            }}>
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-            </Text>
+      <Card style={[styles.card, isLatest && styles.cardLatest]}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.typeIcon, { backgroundColor: accent.tint }]}>
+            <Ionicons name="cube-outline" size={17} color={accent.base} />
           </View>
+          <Text style={[Type.bodyStrong, styles.typeText]} numberOfLines={1}>
+            {order.wasteType} waste
+          </Text>
+          <Badge label={statusLabel(order.status)} tone={statusTone(order.status)} />
         </View>
 
-        <View style={{ marginVertical: 10 }}>
-          <Text>Seller: {order.sellerName}</Text>
-          <Text>Weight: {order.weightKg} kg</Text>
-          <Text>Amount: Rs {order.totalPrice}</Text>
-        </View>
+        <Divider />
 
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
+        <DetailRow label="Seller" value={order.sellerName || '—'} />
+        <DetailRow label="Weight" value={`${order.weightKg} kg`} />
+        <DetailRow label="Amount" value={`Rs ${order.totalPrice}`} emphasis />
+
+        <View style={styles.badgeRow}>
           {order.paymentMethod === 'cash' ? (
-            <View style={[styles.miniBadge, { backgroundColor: '#FFF3E0' }]}>
-              <Text style={{ color: '#E65100', fontSize: 10, fontWeight: '700' }}>Cash on Delivery</Text>
-            </View>
+            <Badge label="Cash on delivery" tone="warning" icon="cash-outline" />
           ) : (
-            <View style={[styles.miniBadge, { backgroundColor: '#E3F2FD' }]}>
-              <Text style={{ color: '#1565C0', fontSize: 10, fontWeight: '700' }}>Card •••• {order.paymentLast4}</Text>
-            </View>
+            <Badge
+              label={order.paymentLast4 ? `Card •••• ${order.paymentLast4}` : 'Card'}
+              tone="info"
+              icon="card-outline"
+            />
           )}
-
-          {order.paymentStatus === 'paid' ? (
-            <View style={[styles.miniBadge, { backgroundColor: '#E8F5E9' }]}>
-              <Text style={{ color: '#2E7D32', fontSize: 10, fontWeight: '700' }}>Paid</Text>
-            </View>
-          ) : order.paymentMethod === 'cash' && (
-            <View style={[styles.miniBadge, { backgroundColor: '#FFFDE7' }]}>
-              <Text style={{ color: '#FBC02D', fontSize: 10, fontWeight: '700' }}>Pay on delivery</Text>
-            </View>
-          )}
+          {order.paymentStatus === 'paid' && <Badge label="Paid" tone="success" />}
         </View>
 
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <View style={styles.actions}>
           {order.status === 'pending' && (
-            <TouchableOpacity
+            <Button
+              label="Cancel"
+              icon="close-circle-outline"
+              variant="danger"
               onPress={() => handleCancelOrder(order)}
-              style={{
-                flex: 1,
-                backgroundColor: '#FFEBEE',
-                borderWidth: 1,
-                borderColor: '#EF9A9A',
-                borderRadius: 8,
-                padding: 10,
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center',
-                marginRight: 6
-              }}
-            >
-              <Ionicons 
-                name="close-circle-outline" 
-                size={16} 
-                color="#C62828"
-                style={{ marginRight: 4 }}
-              />
-              <Text style={{ 
-                color: '#C62828', 
-                fontSize: 13,
-                fontWeight: '600'
-              }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
+              style={styles.actionFlex}
+            />
           )}
-
-          {order.status !== 'cancelled' && (
-            <TouchableOpacity
-              onPress={() => handleOrderMap(order)}
-              style={{
-                flex: 1, padding: 10, borderRadius: 8,
-                backgroundColor: '#E8F5E9',
-                borderWidth: 1, borderColor: '#A5D6A7',
-                alignItems: 'center', marginLeft: 
-                  order.status === 'pending' ? 6 : 0
-              }}
-            >
-              <Ionicons name="location-outline"
-                size={16} color="#2E7D32" />
-              <Text style={{
-                color: '#2E7D32', fontSize: 12,
-                marginTop: 2
-              }}>
-                View Location
-              </Text>
-            </TouchableOpacity>
-          )}
+          <Button
+            label="View location"
+            icon="location-outline"
+            variant="secondary"
+            onPress={() => handleOrderMap(order)}
+            style={styles.actionFlex}
+          />
         </View>
-      </View>
+      </Card>
     );
   };
 
   return (
-    <View style={styles.mainContainer}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.title}>My Purchases</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.root}>
+      <Screen withBottomNav>
+        <ScreenHeader title="My purchases" subtitle="Orders you placed with sellers" back />
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#4F772D" style={{ marginTop: 50 }} />
-      ) : (
-        // Render active orders list
-        // Shows empty state if no orders exist
-        // Each card shows: waste type, seller, 
-        // weight, amount, payment method,
-        // status badge, action buttons
-        <ScrollView ref={scrollRef} style={styles.container} showsVerticalScrollIndicator={false}>
-          {orders.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="cart-outline" size={80} color="#D1D5DB" />
-              <Text style={styles.emptyText}>No purchases yet</Text>
-              <TouchableOpacity
-                style={styles.shopBtn}
-                onPress={() => router.push("/(tabs)/buyer/BuyerDashboard" as any)}
-              >
-                <Text style={styles.shopBtnText}>Start Shopping</Text>
-              </TouchableOpacity>
+        {!loading && orders.length > 0 && (
+          <Card tone="brand" elevation={0} style={styles.summaryCard}>
+            <View style={styles.summaryItem}>
+              <Text style={Type.caption}>ORDERS</Text>
+              <Text style={styles.summaryValue}>{orders.length}</Text>
             </View>
-          ) : (
-            orders.map((order, index) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                index={index}
-              />
-            ))
-          )}
-          <View style={{ height: 40 }} />
-        </ScrollView>
-      )}
+            <View style={styles.summaryRule} />
+            <View style={styles.summaryItem}>
+              <Text style={Type.caption}>TOTAL VALUE</Text>
+              <Text style={styles.summaryValue}>Rs {totalSpent.toFixed(0)}</Text>
+            </View>
+          </Card>
+        )}
+
+        {loading ? (
+          <LoadingState message="Loading your purchases…" />
+        ) : orders.length === 0 ? (
+          <EmptyState
+            icon="cart-outline"
+            title="No purchases yet"
+            message="Browse the marketplace to buy recyclable waste from nearby sellers."
+            actionLabel="Start shopping"
+            onAction={() => router.push("/(tabs)/buyer/BuyerDashboard" as any)}
+          />
+        ) : (
+          <>
+            <SectionTitle meta={`${orders.length} active`}>Your orders</SectionTitle>
+            {orders.map((order, index) => (
+              <OrderCard key={order.id} order={order} isLatest={index === 0} />
+            ))}
+          </>
+        )}
+      </Screen>
 
       {/* Order Location Map Modal */}
       <Modal visible={orderMapVisible} animationType="slide">
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        <SafeAreaView style={styles.mapRoot}>
           <View style={styles.mapHeader}>
-            <View>
-              <Text style={styles.mapTitle}>Pickup Location</Text>
-              <Text style={styles.mapSubTitle}>
-                {selectedOrder?.wasteType} Waste - Rs {selectedOrder?.totalPrice}
+            <View style={styles.flex}>
+              <Text style={Type.h2}>Pickup location</Text>
+              <Text style={Type.small}>
+                {selectedOrder?.wasteType} waste · Rs {selectedOrder?.totalPrice}
               </Text>
-              {routeDistance && (
-                <Text style={styles.routeInfo}>{routeDistance} km away · straight line</Text>
+              {!!routeDistance && (
+                <Text style={styles.routeInfo}>{routeDistance} km · straight line</Text>
               )}
             </View>
-            <TouchableOpacity onPress={() => setOrderMapVisible(false)} style={styles.closeBtn}>
-              <Ionicons name="close" size={28} color="#333" />
+            <TouchableOpacity
+              onPress={() => setOrderMapVisible(false)}
+              style={styles.closeBtn}
+              hitSlop={8}
+            >
+              <Ionicons name="close" size={24} color={Palette.ink[700]} />
             </TouchableOpacity>
           </View>
 
           <MapView
             provider={PROVIDER_GOOGLE}
-            style={{ flex: 1 }}
+            style={styles.flex}
             initialRegion={buyerLocation && sellerLocation ? {
               latitude: (buyerLocation.latitude + sellerLocation.latitude) / 2,
               longitude: (buyerLocation.longitude + sellerLocation.longitude) / 2,
@@ -393,9 +335,11 @@ export default function BuyerOrders() {
           >
             {buyerLocation && sellerLocation && (
               <>
-                <Marker coordinate={buyerLocation} title="You" />
+                <Marker coordinate={buyerLocation} title="You">
+                  <View style={styles.buyerDot} />
+                </Marker>
                 <Marker coordinate={sellerLocation} title="Seller Location">
-                  <Ionicons name="location" size={40} color="#4F772D" />
+                  <Ionicons name="location" size={38} color={Palette.brand[600]} />
                 </Marker>
 
                 <Polyline
@@ -409,73 +353,103 @@ export default function BuyerOrders() {
           </MapView>
 
           <View style={styles.mapFooter}>
-            <View style={[
-              styles.statusBanner,
-              selectedOrder?.status === 'confirmed' ? { backgroundColor: '#E8F5E9' } : { backgroundColor: '#FFF3E0' }
-            ]}>
+            <View
+              style={[
+                styles.statusBanner,
+                { backgroundColor: Palette.status[statusTone(selectedOrder?.status)].tint },
+              ]}
+            >
               <Ionicons
                 name={selectedOrder?.status === 'confirmed' ? "checkmark-circle" : "time"}
-                size={20} color={selectedOrder?.status === 'confirmed' ? "#2E7D32" : "#E65100"}
+                size={18}
+                color={Palette.status[statusTone(selectedOrder?.status)].base}
               />
               {selectedOrder && (
-                <Text style={{
-                  fontWeight: '700', fontSize: 14,
-                  color: selectedOrder.status === 'confirmed' ? "#2E7D32" : "#E65100"
-                }}>
-                  Order Status: {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                <Text
+                  style={[
+                    Type.smallStrong,
+                    { color: Palette.status[statusTone(selectedOrder.status)].base },
+                  ]}
+                >
+                  Order status: {statusLabel(selectedOrder.status)}
                 </Text>
               )}
             </View>
           </View>
         </SafeAreaView>
       </Modal>
+
+      <BottomNav role="buyer" active="orders" />
     </View>
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: "#F5F9F4" },
-  container: { flex: 1, padding: 20 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 60, marginBottom: 10 },
-  backBtn: { padding: 8, backgroundColor: "#fff", borderRadius: 12, elevation: 2 },
-  title: { fontSize: 22, fontWeight: "bold", color: "#111827" },
+  root: { flex: 1, backgroundColor: Palette.background },
+  flex: { flex: 1 },
 
-  orderCard: { backgroundColor: 'white', borderRadius: 12, padding: 16, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  cardType: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  pendingBadge: { backgroundColor: '#FFF3E0' },
-  confirmedBadge: { backgroundColor: '#E3F2FD' },
-  completedBadge: { backgroundColor: '#E8F5E9' },
-  statusText: { fontSize: 12, fontWeight: '700' },
+  summaryCard: { flexDirection: 'row', alignItems: 'center', padding: Space.lg },
+  summaryItem: { flex: 1, gap: Space.xs },
+  summaryValue: { ...Type.h2, color: Palette.brand[900] },
+  summaryRule: { width: 1, height: 34, backgroundColor: Palette.brand[200], marginHorizontal: Space.lg },
 
-  cardInfo: { marginBottom: 12 },
-  infoLine: { fontSize: 14, color: '#4B5563', marginBottom: 4 },
-  bold: { fontWeight: '600', color: '#111827' },
-
-  paymentBadgeRow: { flexDirection: 'row', gap: 8, marginBottom: 15 },
-  miniBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 0 },
-
-  cardActions: { flexDirection: 'row', justifyContent: 'space-between' },
-  actionBtnCancel: { flex: 1, padding: 10, borderRadius: 8, backgroundColor: '#FFEBEE', borderWidth: 1, borderColor: '#EF9A9A', alignItems: 'center', marginRight: 6, flexDirection: 'row', justifyContent: 'center', gap: 4 },
-  actionBtnMap: { flex: 1, padding: 10, borderRadius: 8, backgroundColor: '#E8F5E9', borderWidth: 1, borderColor: '#A5D6A7', alignItems: 'center', marginLeft: 6, flexDirection: 'row', justifyContent: 'center', gap: 4 },
-  actionBtnTextCancel: { color: '#C62828', fontSize: 12, fontWeight: '700' },
-  actionBtnTextMap: { color: '#2E7D32', fontSize: 12, fontWeight: '700' },
-
-  emptyState: { alignItems: 'center', marginTop: 100 },
-  emptyText: { fontSize: 18, color: '#9CA3AF', marginTop: 15, marginBottom: 20 },
-  shopBtn: { backgroundColor: '#4F772D', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 25 },
-  shopBtnText: { color: '#fff', fontWeight: 'bold' },
+  card: { marginBottom: Space.md },
+  cardLatest: { borderLeftWidth: 4, borderLeftColor: Palette.brand[600] },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  typeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeText: { flex: 1, textTransform: 'capitalize' },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm, marginTop: Space.sm },
+  actions: { flexDirection: 'row', gap: Space.md, marginTop: Space.lg },
+  actionFlex: { flex: 1 },
 
   // Map Modal
-  mapHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  mapTitle: { fontSize: 18, fontWeight: 'bold' },
-  mapSubTitle: { fontSize: 14, color: '#666' },
-  routeInfo: { fontSize: 12, color: '#4F772D', fontWeight: '600', marginTop: 2 },
-  closeBtn: { padding: 5 },
-  mapFooter: { padding: 20, backgroundColor: '#fff' },
-  statusBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 10, gap: 8 },
-  confirmedBanner: { backgroundColor: '#E8F5E9' },
-  pendingBanner: { backgroundColor: '#FFF3E0' },
-  statusBannerText: { fontWeight: '700', fontSize: 14 }
+  mapRoot: { flex: 1, backgroundColor: Palette.surface },
+  mapHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    padding: Space.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.ink[100],
+  },
+  routeInfo: { ...Type.caption, color: Palette.brand[600], fontWeight: '700', marginTop: 2 },
+  closeBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buyerDot: {
+    width: 20,
+    height: 20,
+    borderRadius: Radius.pill,
+    backgroundColor: '#4285F4',
+    borderWidth: 3,
+    borderColor: Palette.white,
+    ...Shadow[2],
+  },
+  mapFooter: {
+    padding: Space.xl,
+    backgroundColor: Palette.surface,
+    borderTopWidth: 1,
+    borderTopColor: Palette.ink[100],
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
+    padding: Space.md,
+    borderRadius: Radius.md,
+  },
 });
