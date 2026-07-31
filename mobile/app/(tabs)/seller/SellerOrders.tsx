@@ -1,9 +1,16 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { db, auth } from "../../../firebaseConfig";
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+
+import { Palette, Space, Radius, Type, wasteAccent } from "@/constants/design";
+import { Screen, ScreenHeader } from "@/components/ui/screen";
+import { Card, SectionTitle, Divider, DetailRow } from "@/components/ui/card";
+import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
+import { EmptyState, LoadingState } from "@/components/ui/empty-state";
+import { BottomNav } from "@/components/ui/bottom-nav";
 
 export default function SellerOrders() {
   const router = useRouter();
@@ -31,189 +38,109 @@ export default function SellerOrders() {
     return () => unsubscribe();
   }, []);
 
-  const OrderCard = ({ type, buyer, status, date, price, weight, paymentMethod }: any) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.typeRow}>
-          <Ionicons name="leaf" size={20} color="#4F772D" />
-          <Text style={styles.type}>{type}</Text>
-        </View>
-        <View style={[styles.badge, status === 'Completed' ? styles.badgeSuccess : styles.badgePending]}>
-          <Text style={[styles.badgeText, status === 'Completed' ? styles.textSuccess : styles.textPending]}>
-            {status}
+  const totalEarned = orders
+    .filter((o) => o.status === 'completed')
+    .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+
+  const OrderCard = ({ order }: { order: any }) => {
+    const accent = wasteAccent(order.wasteType);
+    const date = order.createdAt?.toDate()
+      ? order.createdAt.toDate().toLocaleDateString()
+      : "Just now";
+
+    return (
+      <Card style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.typeIcon, { backgroundColor: accent.tint }]}>
+            <Ionicons name="leaf" size={17} color={accent.base} />
+          </View>
+          <Text style={[Type.bodyStrong, styles.typeText]} numberOfLines={1}>
+            {order.wasteType} waste
           </Text>
+          <Badge label={statusLabel(order.status)} tone={statusTone(order.status)} />
         </View>
-      </View>
-      
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailText}>Buyer: <Text style={styles.bold}>{buyer}</Text></Text>
-        <Text style={styles.detailText}>Date: {date}</Text>
-      </View>
 
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailText}>Weight: {weight} kg</Text>
-        <Text style={styles.priceText}>Total: Rs {price}</Text>
-      </View>
+        <Divider />
 
-      <View style={styles.paymentBox}>
-        <Ionicons 
-          name={paymentMethod === 'card' ? "card-outline" : "cash-outline"} 
-          size={16} 
-          color="#6B7280" 
-        />
-        <Text style={styles.paymentText}>
-          {paymentMethod === 'card' ? "Paid by Card" : "Cash on Delivery"}
-        </Text>
-      </View>
-    </View>
-  );
+        <DetailRow label="Buyer" value={order.buyerName || '—'} />
+        <DetailRow label="Weight" value={`${order.weightKg} kg`} />
+        <DetailRow label="Date" value={date} />
+        <DetailRow label="Total" value={`Rs ${order.totalPrice}`} emphasis />
+
+        <View style={styles.paymentRow}>
+          <Badge
+            label={order.paymentMethod === 'card' ? 'Paid by card' : 'Cash on delivery'}
+            tone={order.paymentMethod === 'card' ? 'info' : 'warning'}
+            icon={order.paymentMethod === 'card' ? 'card-outline' : 'cash-outline'}
+          />
+        </View>
+      </Card>
+    );
+  };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>My Orders</Text>
-        <TouchableOpacity style={styles.filterBtn}>
-          <Ionicons name="filter" size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
+    <View style={styles.root}>
+      <Screen withBottomNav>
+        <ScreenHeader title="My orders" subtitle="Purchases buyers made from you" back />
 
-      <Text style={styles.sectionTitle}>Recent Transactions</Text>
+        {!loading && orders.length > 0 && (
+          <Card tone="brand" elevation={0} style={styles.summaryCard}>
+            <View style={styles.summaryItem}>
+              <Text style={Type.caption}>TOTAL ORDERS</Text>
+              <Text style={styles.summaryValue}>{orders.length}</Text>
+            </View>
+            <View style={styles.summaryRule} />
+            <View style={styles.summaryItem}>
+              <Text style={Type.caption}>EARNED (COMPLETED)</Text>
+              <Text style={styles.summaryValue}>Rs {totalEarned.toFixed(0)}</Text>
+            </View>
+          </Card>
+        )}
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#4F772D" style={{ marginTop: 20 }} />
-      ) : orders.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="document-text-outline" size={60} color="#D1D5DB" />
-          <Text style={styles.emptyText}>No orders received yet</Text>
-        </View>
-      ) : (
-        orders.map((order) => (
-          <OrderCard 
-            key={order.id}
-            type={order.wasteType} 
-            buyer={order.buyerName} 
-            status={order.status} 
-            date={order.createdAt?.toDate() ? order.createdAt.toDate().toLocaleDateString() : "Just now"} 
-            weight={order.weightKg} 
-            price={order.totalPrice} 
-            paymentMethod={order.paymentMethod}
+        {loading ? (
+          <LoadingState message="Loading your orders…" />
+        ) : orders.length === 0 ? (
+          <EmptyState
+            icon="receipt-outline"
+            title="No orders yet"
+            message="When a buyer purchases one of your listings it will show up here."
+            actionLabel="Add a listing"
+            onAction={() => router.push("/(tabs)/seller/AddWaste" as any)}
           />
-        ))
-      )}
+        ) : (
+          <>
+            <SectionTitle meta={`${orders.length} total`}>Recent transactions</SectionTitle>
+            {orders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
+          </>
+        )}
+      </Screen>
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      <BottomNav role="seller" active="orders" />
+    </View>
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F9F4",
-    padding: 20,
-    paddingTop: 60,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "#111827",
-  },
-  filterBtn: {
-    backgroundColor: "#4F772D",
-    padding: 10,
-    borderRadius: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#6B7280",
-    marginBottom: 15,
-  },
-  card: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 15,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-    paddingBottom: 10,
-  },
-  typeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  type: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#1F2937",
-    marginLeft: 6,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgePending: { backgroundColor: "#FEF3C7" },
-  badgeSuccess: { backgroundColor: "#D1FAE5" },
-  badgeText: { fontSize: 12, fontWeight: "bold" },
-  textPending: { color: "#D97706" },
-  textSuccess: { color: "#059669" },
-  detailsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: "#4B5563",
-  },
-  bold: {
-    fontWeight: "600",
-    color: "#111827",
-  },
-  priceText: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "#4F772D",
-  },
-  emptyState: {
+  root: { flex: 1, backgroundColor: Palette.background },
+
+  summaryCard: { flexDirection: 'row', alignItems: 'center', padding: Space.lg },
+  summaryItem: { flex: 1, gap: Space.xs },
+  summaryValue: { ...Type.h2, color: Palette.brand[900] },
+  summaryRule: { width: 1, height: 34, backgroundColor: Palette.brand[200], marginHorizontal: Space.lg },
+
+  card: { marginBottom: Space.md },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  typeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.sm,
     alignItems: 'center',
-    marginTop: 50,
+    justifyContent: 'center',
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#9CA3AF',
-    marginTop: 10,
-  },
-  paymentBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6'
-  },
-  paymentText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500'
-  }
+  typeText: { flex: 1, textTransform: 'capitalize' },
+  paymentRow: { marginTop: Space.sm },
 });
