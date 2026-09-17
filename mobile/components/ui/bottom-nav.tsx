@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Palette, Space, Type, BOTTOM_NAV_HEIGHT } from '@/constants/design';
 
@@ -11,7 +11,7 @@ type Tab = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   activeIcon: keyof typeof Ionicons.glyphMap;
-  route: string;
+  route: Href;
 };
 
 const SELLER_TABS: Tab[] = [
@@ -49,7 +49,7 @@ export function BottomNav({ role, active }: { role: 'seller' | 'buyer'; active: 
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={tab.label}
             onPress={() => {
-              if (!isActive) router.push(tab.route as any);
+              if (!isActive) router.push(tab.route);
             }}
           >
             <Ionicons

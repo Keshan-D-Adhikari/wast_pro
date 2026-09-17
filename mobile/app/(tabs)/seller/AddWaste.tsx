@@ -11,8 +11,15 @@ import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/badge';
 import { TextField } from '@/components/ui/text-field';
 import { BottomNav } from '@/components/ui/bottom-nav';
+import { BinCompartment, BinData, UserLocation, WasteType } from '../../../types';
 
-const priceConfig: any = {
+interface WasteTypeConfig {
+  pricePerKg: number;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+}
+
+const priceConfig: Record<WasteType, WasteTypeConfig> = {
   plastic: {
     pricePerKg: 45,
     icon: 'cube-outline',
@@ -36,22 +43,14 @@ interface WasteItem {
   selected: boolean;
 }
 
-// Each compartment in the "bins" document is stored nested, e.g.
-// plastic: { level: 78, weight: 12.5 }  — level is % full, weight is kg available
-interface BinCompartment {
-  level?: number;
-  weight?: number;
-  moisture?: number;
-}
-
 export default function AddWaste() {
   const [loading, setLoading] = useState(false);
-  const [binData, setBinData] = useState<any>(null);
+  const [binData, setBinData] = useState<BinData | null>(null);
   const [binExists, setBinExists] = useState<boolean | null>(null);
   const [sellerName, setSellerName] = useState('');
-  const [sellerBinLocation, setSellerBinLocation] = useState<any>(null);
+  const [sellerBinLocation, setSellerBinLocation] = useState<UserLocation | null>(null);
 
-  const [wasteItems, setWasteItems] = useState<{ [key: string]: WasteItem }>({
+  const [wasteItems, setWasteItems] = useState<Record<WasteType, WasteItem>>({
     plastic: { weight: '', total: 0, selected: false },
     food:    { weight: '', total: 0, selected: false },
     metal:   { weight: '', total: 0, selected: false },
@@ -75,7 +74,7 @@ export default function AddWaste() {
     const binRef = doc(db, "bins", auth.currentUser.uid);
     const unsubscribe = onSnapshot(binRef, (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
+        const data = docSnap.data() as BinData;
         setBinData(data);
         setBinExists(true);
         if (data.location) {
@@ -96,18 +95,18 @@ export default function AddWaste() {
 
   // Bin compartments are stored nested (plastic: { level, weight }),
   // so read through the compartment object instead of a flat field.
-  const getCompartment = (type: string): BinCompartment =>
-    (binData?.[type] as BinCompartment) || {};
+  const getCompartment = (type: WasteType): BinCompartment =>
+    binData?.[type] || {};
 
-  const availableKg = (type: string): number => getCompartment(type).weight ?? 0;
-  const fillLevel = (type: string): number => getCompartment(type).level ?? 0;
+  const availableKg = (type: WasteType): number => getCompartment(type).weight ?? 0;
+  const fillLevel = (type: WasteType): number => getCompartment(type).level ?? 0;
 
-  const handleWeightChange = (type: string, value: string) => {
+  const handleWeightChange = (type: WasteType, value: string) => {
     const cleaned = value.replace(/[^0-9.]/g, '');
     const price = priceConfig[type].pricePerKg;
     const total = parseFloat(cleaned) * price;
 
-    setWasteItems((prev: any) => ({
+    setWasteItems(prev => ({
       ...prev,
       [type]: {
         weight: cleaned,
@@ -118,16 +117,16 @@ export default function AddWaste() {
   };
 
   const grandTotal = Object.values(wasteItems)
-    .reduce((sum: number, item: any) => sum + item.total, 0);
+    .reduce((sum, item) => sum + item.total, 0);
 
   const selectedCount = Object.values(wasteItems)
-    .filter((item: any) => item.selected).length;
+    .filter(item => item.selected).length;
 
   const handleSubmit = async () => {
     const selectedItems = Object.entries(wasteItems)
       .filter(([_, item]) =>
         item.selected && parseFloat(item.weight) > 0
-      ) as [string, WasteItem][];
+      ) as [WasteType, WasteItem][];
 
     if (selectedItems.length === 0) {
       Alert.alert('Error', 'Please enter weight for at least one waste type');
@@ -206,8 +205,8 @@ export default function AddWaste() {
         metal:   { weight:'', total:0, selected:false },
       });
 
-    } catch (error: any) {
-      Alert.alert('Error', 'Could not add listing: ' + error.message);
+    } catch (error: unknown) {
+      Alert.alert('Error', 'Could not add listing: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -230,7 +229,7 @@ export default function AddWaste() {
           Waste types
         </SectionTitle>
 
-        {Object.entries(priceConfig).map(([type, config]: [string, any]) => {
+        {(Object.entries(priceConfig) as [WasteType, WasteTypeConfig][]).map(([type, config]) => {
           const item = wasteItems[type];
           const accent = wasteAccent(type);
           const exceeds = item.weight !== '' && binData && parseFloat(item.weight) > availableKg(type);
@@ -295,7 +294,7 @@ export default function AddWaste() {
           <>
             <SectionTitle>Order summary</SectionTitle>
             <Card tone="brand" elevation={0}>
-              {Object.entries(wasteItems).map(([type, item]: [string, any]) =>
+              {(Object.entries(wasteItems) as [WasteType, WasteItem][]).map(([type, item]) =>
                 item.selected ? (
                   <DetailRow
                     key={type}

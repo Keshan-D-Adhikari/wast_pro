@@ -7,7 +7,7 @@ export default function MapView({ style, children }: AnyProps) {
   return (
     <View style={[styles.container, style]}>
       <Text style={styles.text}>
-        Map view isn't available in the web preview.{'\n'}Open this app in Expo Go on Android/iOS to see the live map.
+        Map view isn&apos;t available in the web preview.{'\n'}Open this app in Expo Go on Android/iOS to see the live map.
       </Text>
       {children}
     </View>

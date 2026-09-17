@@ -54,7 +54,7 @@ export default function Welcome() {
 const styles = StyleSheet.create({
   background: { flex: 1, justifyContent: 'flex-end' },
   scrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(244, 248, 242, 0.78)',
   },
   content: { paddingHorizontal: Space['2xl'] },

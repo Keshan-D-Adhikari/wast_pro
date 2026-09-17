@@ -11,10 +11,11 @@ import { Card, SectionTitle, Divider, DetailRow } from "@/components/ui/card";
 import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { Order } from "../../../types";
 
 export default function SellerOrders() {
   const router = useRouter();
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function SellerOrders() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const ordersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setOrders(ordersList);
       setLoading(false);
     }, (error) => {
@@ -42,9 +43,9 @@ export default function SellerOrders() {
     .filter((o) => o.status === 'completed')
     .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
-  const OrderCard = ({ order }: { order: any }) => {
+  const OrderCard = ({ order }: { order: Order }) => {
     const accent = wasteAccent(order.wasteType);
-    const date = order.createdAt?.toDate()
+    const date = order.createdAt?.toDate
       ? order.createdAt.toDate().toLocaleDateString()
       : "Just now";
 
@@ -105,7 +106,7 @@ export default function SellerOrders() {
             title="No orders yet"
             message="When a buyer purchases one of your listings it will show up here."
             actionLabel="Add a listing"
-            onAction={() => router.push("/(tabs)/seller/AddWaste" as any)}
+            onAction={() => router.push("/(tabs)/seller/AddWaste")}
           />
         ) : (
           <>

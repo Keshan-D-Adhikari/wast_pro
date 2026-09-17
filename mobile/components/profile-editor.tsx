@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, StorageError } from 'firebase/storage';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -101,7 +101,7 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
 
       // Convert to blob using XMLHttpRequest — fetch() does not handle
       // file:// URIs reliably in React Native
-      const blob: any = await new Promise((resolve, reject) => {
+      const blob = await new Promise<Blob>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.onload = function () {
           resolve(xhr.response);
@@ -117,8 +117,9 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
       // Upload blob to Firebase Storage
       const snapshot = await uploadBytes(storageRef, blob);
 
-      // Close blob
-      if (blob.close) blob.close();
+      // Close blob — React Native's Blob polyfill exposes this to free
+      // resources; it's not part of the standard Blob type.
+      (blob as unknown as { close?: () => void }).close?.();
 
       // Get download URL
       const downloadURL = await getDownloadURL(snapshot.ref);
@@ -128,9 +129,10 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
 
       setPhotoURL(downloadURL);
       Alert.alert('Success', 'Profile photo updated! ✨');
-    } catch (error: any) {
-      console.error('Upload error:', error.code, error.message);
-      Alert.alert('Upload Failed', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof StorageError ? error.message : 'Please try again.';
+      console.error('Upload error:', error);
+      Alert.alert('Upload Failed', message);
     } finally {
       setUploading(false);
     }
@@ -153,8 +155,8 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
           : 'Your profile details have been updated! ✅'
       );
       router.back();
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to update profile: ' + error.message);
+    } catch (error: unknown) {
+      Alert.alert('Error', 'Failed to update profile: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }

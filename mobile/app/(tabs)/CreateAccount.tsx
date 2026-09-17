@@ -82,13 +82,13 @@ export default function CreateAccount() {
 
       // 4. Sending to the relevant Dashboard according to the role
       if (role === 'seller') {
-        router.replace('/(tabs)/seller/SellerDashboard' as any);
+        router.replace('/(tabs)/seller/SellerDashboard');
       } else {
-        router.replace('/(tabs)/buyer/BuyerDashboard' as any);
+        router.replace('/(tabs)/buyer/BuyerDashboard');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If something goes wrong (e.g. if the email has been used before), an error will be displayed.
-      Alert.alert("Registration Failed", error.message);
+      Alert.alert("Registration Failed", error instanceof Error ? error.message : "Please try again.");
     } finally {
       setLoading(false);
     }
@@ -200,7 +200,7 @@ export default function CreateAccount() {
             <Button label="Create Account" onPress={handleContinue} loading={loading} />
 
             <TouchableOpacity
-              onPress={() => router.push('/(tabs)/Login' as any)}
+              onPress={() => router.push('/(tabs)/Login')}
               style={styles.loginRow}
               hitSlop={8}
             >
@@ -220,7 +220,7 @@ export default function CreateAccount() {
 const styles = StyleSheet.create({
   background: { flex: 1 },
   flex: { flex: 1 },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: Palette.overlay },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: Palette.overlay },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Space.xl },
   backBtn: {
     width: 38,

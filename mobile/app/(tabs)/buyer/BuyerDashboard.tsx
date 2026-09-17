@@ -25,6 +25,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from "../../../components/platform-map";
 import { MarketplaceItem, UserLocation } from "../../../types";
+import { calculateDistance } from "../../../utils/distance";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
@@ -40,7 +41,6 @@ export default function BuyerDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<MarketplaceItem[]>([]);
   const [searchText, setSearchText] = useState('');
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
@@ -57,6 +57,9 @@ export default function BuyerDashboard() {
   });
 
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
+  // `any` here is deliberate: MapView's ref type differs between the native
+  // (react-native-maps) and web (placeholder) halves of platform-map, and this
+  // ref is only ever passed straight through to <MapView ref={mapRef} />.
   const mapRef = useRef<any>(null);
 
   useEffect(() => {
@@ -78,7 +81,6 @@ export default function BuyerDashboard() {
           return { id: doc.id, ...data } as MarketplaceItem;
         });
         setItems(itemList);
-        setFilteredItems(itemList);
         setLoading(false);
       }, (error) => {
         console.error("Firestore onSnapshot error:", error);
@@ -91,31 +93,10 @@ export default function BuyerDashboard() {
     return () => unsubscribe?.();
   }, []);
 
-  useEffect(() => {
-    const filtered = items.filter(item =>
-      (item.wasteType || '').toLowerCase().includes(searchText.toLowerCase())
-    );
-    setFilteredItems(filtered);
-  }, [searchText, items]);
-
-  const calculateDistance = (
-    lat1: number, lon1: number,
-    lat2: number, lon2: number
-  ): number => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(1 - a)
-    );
-    return R * c;
-  };
+  // Derived from items + searchText — no effect needed, just recompute on render.
+  const filteredItems = items.filter(item =>
+    (item.wasteType || '').toLowerCase().includes(searchText.toLowerCase())
+  );
 
   const getDistance = (sellerLoc: { latitude: number; longitude: number }) => {
     if (!userLocation || !sellerLoc) return "N/A";
@@ -188,9 +169,9 @@ export default function BuyerDashboard() {
         Alert.alert("Order Placed!", 'Pay Rs ' + orderData.totalPrice + ' in cash when seller delivers.');
       }
 
-      router.push("/(tabs)/buyer/BuyerOrders" as any);
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
+      router.push("/(tabs)/buyer/BuyerOrders");
+    } catch (error: unknown) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Please try again.");
     } finally {
       setPurchaseLoading(false);
     }

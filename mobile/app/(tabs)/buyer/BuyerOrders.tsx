@@ -26,6 +26,7 @@ import { useRouter } from 'expo-router';
 import { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Order, UserLocation } from "../../../types";
+import { calculateDistance } from "../../../utils/distance";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
@@ -34,25 +35,6 @@ import { Button } from "@/components/ui/button";
 import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
-
-const calculateDistance = (
-  lat1: number, lon1: number,
-  lat2: number, lon2: number
-): number => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(
-    Math.sqrt(a),
-    Math.sqrt(1 - a)
-  );
-  return R * c;
-};
 
 export default function BuyerOrders() {
   const router = useRouter();
@@ -95,7 +77,7 @@ export default function BuyerOrders() {
     return () => unsubscribe();
   }, []);
 
-  const handleCancelOrder = async (order: any) => {
+  const handleCancelOrder = async (order: Order) => {
     Alert.alert(
       'Cancel Order',
       'Are you sure? This order will be removed.',
@@ -289,7 +271,7 @@ export default function BuyerOrders() {
             title="No purchases yet"
             message="Browse the marketplace to buy recyclable waste from nearby sellers."
             actionLabel="Start shopping"
-            onAction={() => router.push("/(tabs)/buyer/BuyerDashboard" as any)}
+            onAction={() => router.push("/(tabs)/buyer/BuyerDashboard")}
           />
         ) : (
           <>

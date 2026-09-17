@@ -10,7 +10,7 @@ import {
 import { PieChart } from "react-native-chart-kit";
 import MapView, { Marker, PROVIDER_GOOGLE } from "../../../components/platform-map";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // Firebase Imports
 import { db, auth } from "../../../firebaseConfig";
@@ -24,10 +24,11 @@ import { Notice } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { Sheet } from "@/components/ui/sheet";
+import { AppNotification, BinData, UserProfile, WasteType } from "../../../types";
 
 const screenWidth = Dimensions.get("window").width;
 
-const COMPARTMENTS: { type: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const COMPARTMENTS: { type: WasteType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { type: "plastic", label: "Plastic", icon: "cube-outline" },
   { type: "food", label: "Food", icon: "leaf-outline" },
   { type: "metal", label: "Metal", icon: "construct-outline" },
@@ -40,10 +41,10 @@ export default function SellerDashboard() {
   const [loading, setLoading] = useState(true);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [issueDescription, setIssueDescription] = useState("");
-  const [sellerData, setSellerData] = useState<any>(null);
+  const [sellerData, setSellerData] = useState<UserProfile | null>(null);
 
   //Data for compartment 3 according to objective 1 of the proposal [citation: 38]
-  const [binData, setBinData] = useState({
+  const [binData, setBinData] = useState<BinData>({
     plastic: { level: 0, weight: 0 },
     food: { level: 0, weight: 0, moisture: 0 },
     metal: { level: 0, weight: 0 },
@@ -52,9 +53,12 @@ export default function SellerDashboard() {
   // free-text address, so it cannot be used to place a map marker.
   const [binLocation, setBinLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
-  const [notifiedBins, setNotifiedBins] = useState<string[]>([]);
+  // Tracks which bins we've already sent an "over 80%" notification for.
+  // A ref (not state) because it's pure bookkeeping — never rendered — and
+  // keeping it out of state avoids re-running the notify effect on every change.
+  const notifiedBinsRef = useRef<WasteType[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -63,7 +67,7 @@ export default function SellerDashboard() {
     const userDocRef = doc(db, "users", user.uid);
     const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
-        setSellerData(docSnap.data());
+        setSellerData(docSnap.data() as UserProfile);
       }
     }, (error) => console.log("User Fetch Error:", error));
 
@@ -72,7 +76,7 @@ export default function SellerDashboard() {
     const unsubscribeBins = onSnapshot(binDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setBinData(data as any);
+        setBinData(data as BinData);
         if (
           typeof data.location?.latitude === 'number' &&
           typeof data.location?.longitude === 'number'
@@ -95,15 +99,15 @@ export default function SellerDashboard() {
       where("toUid", "==", user.uid)
     );
     const unsubscribeNotifs = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
       // Client-side sort by createdAt descending
-      list.sort((a: any, b: any) => {
+      list.sort((a, b) => {
         const timeA = a.createdAt?.toMillis() || 0;
         const timeB = b.createdAt?.toMillis() || 0;
         return timeB - timeA;
       });
       setNotifications(list);
-      setUnreadCount(list.filter((n: any) => !n.read).length);
+      setUnreadCount(list.filter(n => !n.read).length);
     });
 
     return () => {
@@ -117,8 +121,8 @@ export default function SellerDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    const checkAndNotify = async (type: string, level: number) => {
-      if (level > 80 && !notifiedBins.includes(type)) {
+    const checkAndNotify = async (type: WasteType, level: number) => {
+      if (level > 80 && !notifiedBinsRef.current.includes(type)) {
         try {
           await addDoc(collection(db, "notifications"), {
             toUid: user.uid,
@@ -127,19 +131,19 @@ export default function SellerDashboard() {
             read: false,
             createdAt: serverTimestamp(),
           });
-          setNotifiedBins(prev => [...prev, type]);
+          notifiedBinsRef.current = [...notifiedBinsRef.current, type];
         } catch (error) {
           console.error("Error sending bin notification:", error);
         }
-      } else if (level <= 80 && notifiedBins.includes(type)) {
+      } else if (level <= 80 && notifiedBinsRef.current.includes(type)) {
         // Reset notification state if it drops below threshold
-        setNotifiedBins(prev => prev.filter(t => t !== type));
+        notifiedBinsRef.current = notifiedBinsRef.current.filter(t => t !== type);
       }
     };
 
-    checkAndNotify("plastic", binData.plastic?.level);
-    checkAndNotify("food", binData.food?.level);
-    checkAndNotify("metal", binData.metal?.level);
+    checkAndNotify("plastic", binData.plastic?.level ?? 0);
+    checkAndNotify("food", binData.food?.level ?? 0);
+    checkAndNotify("metal", binData.metal?.level ?? 0);
   }, [binData, user]);
 
   const handleReportSubmit = () => {
@@ -164,13 +168,13 @@ export default function SellerDashboard() {
   };
 
   const totalWeight = COMPARTMENTS.reduce(
-    (sum, c) => sum + ((binData as any)[c.type]?.weight || 0),
+    (sum, c) => sum + (binData[c.type]?.weight || 0),
     0
   );
 
   // Bin Card UI Component
-  const BinCard = ({ type, label, icon }: { type: string; label: string; icon: keyof typeof Ionicons.glyphMap }) => {
-    const compartment = (binData as any)[type] || {};
+  const BinCard = ({ type, label, icon }: { type: WasteType; label: string; icon: keyof typeof Ionicons.glyphMap }) => {
+    const compartment = binData[type] || {};
     const level = compartment.level || 0;
     const weight = compartment.weight || 0;
     const moisture = compartment.moisture;
@@ -290,7 +294,7 @@ export default function SellerDashboard() {
           <PieChart
             data={COMPARTMENTS.map((c) => ({
               name: c.label,
-              population: (binData as any)[c.type]?.weight || 0.1,
+              population: binData[c.type]?.weight || 0.1,
               color: wasteAccent(c.type).base,
               legendFontColor: Palette.ink[700],
               legendFontSize: 12,

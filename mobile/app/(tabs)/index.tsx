@@ -1,15 +1,17 @@
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Image } from 'expo-image';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
 
 export default function Splash() {
   const router = useRouter();
 
-  // Gentle fade + rise so the logo settles into place rather than snapping in
-  const fade = useRef(new Animated.Value(0)).current;
-  const rise = useRef(new Animated.Value(16)).current;
+  // Gentle fade + rise so the logo settles into place rather than snapping in.
+  // Lazy useState init (rather than useRef().current) keeps this out of the
+  // render path itself.
+  const [fade] = useState(() => new Animated.Value(0));
+  const [rise] = useState(() => new Animated.Value(16));
 
   useEffect(() => {
     Animated.parallel([

@@ -12,11 +12,12 @@ import { Card, SectionTitle } from "@/components/ui/card";
 import { ListOption, StatTile } from "@/components/ui/list-option";
 import { LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { UserProfile } from "../../../types";
 
 export default function BuyerProfile() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState({
     totalPurchases: 0,
     totalWeight: 0
@@ -29,7 +30,7 @@ export default function BuyerProfile() {
         // 1. Fetch User Info
         const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
         if (userDoc.exists()) {
-          setUserData(userDoc.data());
+          setUserData(userDoc.data() as UserProfile);
         }
 
         // 2. Fetch Order Stats
@@ -68,7 +69,7 @@ export default function BuyerProfile() {
         onPress: async () => {
           try {
             await signOut(auth);
-            router.replace("/(tabs)/Welcome" as any);
+            router.replace("/(tabs)/Welcome");
           } catch {
             Alert.alert("Error", "Could not logout. Please try again.");
           }
@@ -163,19 +164,19 @@ export default function BuyerProfile() {
           icon="storefront-outline"
           title="Browse marketplace"
           subtitle="Find recyclable waste near you"
-          onPress={() => router.push("/(tabs)/buyer/BuyerDashboard" as any)}
+          onPress={() => router.push("/(tabs)/buyer/BuyerDashboard")}
         />
         <ListOption
           icon="person-outline"
           title="Edit profile"
           subtitle="Company name, phone and address"
-          onPress={() => router.push("/(tabs)/buyer/EditProfile" as any)}
+          onPress={() => router.push("/(tabs)/buyer/EditProfile")}
         />
         <ListOption
           icon="cart-outline"
           title="My purchases"
           subtitle="Track your orders"
-          onPress={() => router.push("/(tabs)/buyer/BuyerOrders" as any)}
+          onPress={() => router.push("/(tabs)/buyer/BuyerOrders")}
         />
         <ListOption
           icon="log-out-outline"

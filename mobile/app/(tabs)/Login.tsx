@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // firebase import
 import { auth, db } from '../../firebaseConfig';
+import { FirebaseError } from 'firebase/app';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -60,16 +61,16 @@ export default function Login() {
 
         // 3. Sending to the relevant Dashboard according to the role
         if (userRole === 'seller') {
-          router.replace('/(tabs)/seller/SellerDashboard' as any);
+          router.replace('/(tabs)/seller/SellerDashboard');
         } else {
-          router.replace('/(tabs)/buyer/BuyerDashboard' as any);
+          router.replace('/(tabs)/buyer/BuyerDashboard');
         }
       } else {
         Alert.alert("Error", "User details not found in Firestore. Please register again.");
       }
 
-    } catch (err: any) {
-      console.log('Login Error:', err.code);
+    } catch (err: unknown) {
+      console.log('Login Error:', err instanceof FirebaseError ? err.code : err);
       // The error that appears if you provide incorrect details.
       Alert.alert('Login Failed', 'Invalid email or password. Please check your credentials.');
     } finally {
@@ -151,7 +152,7 @@ export default function Login() {
             <Button label="Log In" onPress={handleLogin} loading={loading} />
 
             <TouchableOpacity
-              onPress={() => router.push('/(tabs)/CreateAccount' as any)}
+              onPress={() => router.push('/(tabs)/CreateAccount')}
               style={styles.signupRow}
               hitSlop={8}
             >
@@ -171,7 +172,7 @@ export default function Login() {
 const styles = StyleSheet.create({
   background: { flex: 1 },
   flex: { flex: 1 },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: Palette.overlay },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: Palette.overlay },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Space['2xl'] },
   brand: { alignItems: 'center', marginBottom: Space['3xl'] },
   logoBadge: {
