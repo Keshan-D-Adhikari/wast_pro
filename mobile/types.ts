@@ -2,19 +2,22 @@ import type { Timestamp } from 'firebase/firestore';
 
 export type WasteType = 'plastic' | 'food' | 'metal';
 
-// One compartment inside a seller's "bins/{uid}" document. Fields are optional
-// since a freshly-created bin doc, or one missing a sensor, may omit them.
+// One compartment inside the ESP32 firmware's "bins/Bin001" node in Realtime
+// Database (see iotConfig.js). Fields are optional since a freshly-flashed
+// device, or one missing a sensor, may not have uploaded them yet.
 export interface BinCompartment {
   level?: number;
   weight?: number;
   moisture?: number;
+  status?: string;
+  overweight?: boolean;
+  timestamp?: string;
 }
 
 export interface BinData {
   plastic: BinCompartment;
   food: BinCompartment;
   metal: BinCompartment;
-  location?: { latitude: number; longitude: number };
 }
 
 export interface AppNotification {

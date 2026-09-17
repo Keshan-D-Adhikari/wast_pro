@@ -15,6 +15,8 @@ import { useState, useEffect, useRef } from "react";
 // Firebase Imports
 import { db, auth } from "../../../firebaseConfig";
 import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { iotDb, BIN_ID } from "../../../iotConfig";
+import { ref as dbRef, onValue } from "firebase/database";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
 import { Screen } from "@/components/ui/screen";
@@ -49,9 +51,10 @@ export default function SellerDashboard() {
     food: { level: 0, weight: 0, moisture: 0 },
     metal: { level: 0, weight: 0 },
   });
-  // The bin's GeoPoint lives on the "bins" document — users.location is a
-  // free-text address, so it cannot be used to place a map marker.
-  const [binLocation, setBinLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // The ESP32 firmware doesn't upload GPS coordinates (see iotConfig.js),
+  // and users.location is a free-text address, so there's currently no
+  // source for a live bin location — the map below always shows "Not set".
+  const [binLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
@@ -71,21 +74,12 @@ export default function SellerDashboard() {
       }
     }, (error) => console.log("User Fetch Error:", error));
 
-    // 2. Sensor data (Fill Level, Weight, Moisture)
-    const binDocRef = doc(db, "bins", user.uid);
-    const unsubscribeBins = onSnapshot(binDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setBinData(data as BinData);
-        if (
-          typeof data.location?.latitude === 'number' &&
-          typeof data.location?.longitude === 'number'
-        ) {
-          setBinLocation({
-            latitude: data.location.latitude,
-            longitude: data.location.longitude,
-          });
-        }
+    // 2. Sensor data (Fill Level, Weight, Moisture) — lives in the ESP32
+    // firmware's own Realtime Database project, not this app's Firestore.
+    const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
+    const unsubscribeBins = onValue(binNodeRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setBinData(snapshot.val() as BinData);
       }
       setLoading(false);
     }, (error) => {

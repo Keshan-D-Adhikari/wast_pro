@@ -1,7 +1,10 @@
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { db, auth } from '../../../firebaseConfig';
-import { doc, getDoc, onSnapshot, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { iotDb, BIN_ID } from '../../../iotConfig';
+import { ref as dbRef, onValue } from 'firebase/database';
+import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from '@/constants/design';
@@ -71,17 +74,15 @@ export default function AddWaste() {
     };
     fetchUser();
 
-    const binRef = doc(db, "bins", auth.currentUser.uid);
-    const unsubscribe = onSnapshot(binRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as BinData;
-        setBinData(data);
+    // Live sensor readings come from the ESP32 firmware's own Realtime
+    // Database project (see iotConfig.js), not this app's Firestore.
+    const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
+    const unsubscribe = onValue(binNodeRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setBinData(snapshot.val() as BinData);
         setBinExists(true);
-        if (data.location) {
-          setSellerBinLocation(data.location);
-        }
       } else {
-        // No smart bin registered against this seller yet
+        // No smart bin reporting data yet
         setBinData(null);
         setBinExists(false);
       }
@@ -91,6 +92,24 @@ export default function AddWaste() {
     });
 
     return () => unsubscribe();
+  }, []);
+
+  // The firmware doesn't report the bin's GPS location, so capture the
+  // seller's current device location at listing time instead — buyers need
+  // some coordinate to route to, and this mirrors how BuyerDashboard already
+  // captures the buyer's own location.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+          setSellerBinLocation(loc.coords);
+        }
+      } catch (error) {
+        console.error("Error fetching seller location:", error);
+      }
+    })();
   }, []);
 
   // Bin compartments are stored nested (plastic: { level, weight }),
@@ -136,7 +155,7 @@ export default function AddWaste() {
     if (!binData) {
       Alert.alert(
         'No smart bin found',
-        'No smart bin is registered against your account yet, so there is no measured waste to list.'
+        'The smart bin is not reporting any sensor data yet, so there is no measured waste to list.'
       );
       return;
     }
@@ -162,8 +181,8 @@ export default function AddWaste() {
       typeof sellerBinLocation.longitude !== 'number'
     ) {
       Alert.alert(
-        'Bin location missing',
-        'Your smart bin has no location set, so buyers would not be able to find it. Please contact support.'
+        'Location missing',
+        'Could not get your current location, so buyers would not be able to find this listing. Please enable location access and try again.'
       );
       return;
     }
@@ -222,7 +241,7 @@ export default function AddWaste() {
         />
 
         {binExists === false && (
-          <Notice text="No smart bin is registered against your account yet, so there are no sensor readings to list from." />
+          <Notice text="The smart bin is not reporting any sensor data yet, so there are no readings to list from." />
         )}
 
         <SectionTitle tight meta={selectedCount > 0 ? `${selectedCount} selected` : undefined}>
