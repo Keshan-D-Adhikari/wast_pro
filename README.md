@@ -20,7 +20,7 @@ SmartWaste Pro bridges the gap between **waste producers** and **recycling compa
 ### Seller Features
 - 📊 Real-time IoT bin monitoring (Plastic, Food, Metal compartments)
 - ⚠️ Automatic alerts when bin exceeds 80% capacity
-- ⚡ Auto-listing on marketplace when bin reaches 70%
+- ⚡ Add waste to marketplace with one tap once a bin is nearly full (planned: fully automatic listing at 70%)
 - 💰 Earnings tracker (Total earned, This month, kg sold)
 - 🔔 In-app notification center with unread badge
 - ♻️ Add waste listings with auto price calculation
@@ -147,13 +147,15 @@ Buyer tracks in My Purchases
 
 ---
 
-## Auto Listing System
+## Listing Flow (current implementation)
 
-When a bin compartment reaches **70% fill level**:
-1. System automatically creates a marketplace listing
-2. Price calculated: `weight (kg) × price per kg`
-3. Seller receives notification
-4. Buyer sees ⚡ Auto Listed badge on the card
+1. Seller opens the bin's live sensor readings and taps **Add to Marketplace**
+2. Price is calculated automatically: `weight (kg) × price per kg`
+3. Listing appears instantly for buyers to browse
+
+> **Note:** Listing a bin's contents is currently a manual, one-tap action by the seller.
+> A bin exceeding 80% capacity triggers a notification/warning, but does **not** yet auto-create
+> a listing at 70% — that is planned future work, not implemented in the current build.
 
 ---
 
@@ -189,28 +191,30 @@ node scripts/seedMockData.js
 
 ### Firebase Configuration
 
-Create `mobile/firebaseConfig.js` with your Firebase project credentials:
+`mobile/firebaseConfig.js` (native) and `mobile/firebaseConfig.web.js` (web) already read their
+credentials from environment variables — copy `mobile/.env.example` to `mobile/.env` and fill in
+your own Firebase project's values:
 
-```javascript
-import { initializeApp } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+```bash
+cp mobile/.env.example mobile/.env
+```
 
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "wast-pro",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+```
+EXPO_PUBLIC_FIREBASE_API_KEY=your-api-key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+EXPO_PUBLIC_FIREBASE_APP_ID=your-app-id
+EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=your-measurement-id
+```
 
-const app = initializeApp(firebaseConfig);
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
-export const db = getFirestore(app);
+`.env` is gitignored — never commit it. Then deploy the Firestore rules for your project:
+
+```bash
+cd mobile
+npx firebase-tools login
+npx firebase-tools deploy --only firestore:rules
 ```
 
 ---
@@ -259,11 +263,11 @@ wast-pro/
 
 ## Security Notes
 
-> ⚠️ Before deploying to production:
-> - Move Firebase API keys to environment variables
-> - Configure Firestore Security Rules
-> - Enable email verification
-> - Set up Firebase App Check
+> - ✅ Firebase config now reads from `EXPO_PUBLIC_*` environment variables (see `mobile/.env.example`) instead of hardcoded keys
+> - ✅ Firestore Security Rules drafted at `mobile/firestore.rules` (role-scoped access per collection) — **must still be deployed** with `firebase deploy --only firestore:rules` (requires `firebase login` with the project owner's account)
+> - ⚠️ Before deploying to production, still needed:
+>   - Enable email verification
+>   - Set up Firebase App Check
 
 ---
 

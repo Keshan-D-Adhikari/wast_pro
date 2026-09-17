@@ -23,7 +23,7 @@ import {
   getDoc
 } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from "../../../components/platform-map";
 import { MarketplaceItem, UserLocation } from "../../../types";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
@@ -57,7 +57,7 @@ export default function BuyerDashboard() {
   });
 
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;

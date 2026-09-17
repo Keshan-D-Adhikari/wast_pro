@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../../../firebaseConfig';
 import * as Location from 'expo-location';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../../../components/platform-map';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from "react";

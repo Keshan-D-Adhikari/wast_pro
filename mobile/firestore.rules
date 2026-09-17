@@ -1,0 +1,64 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // users/{uid} - profile doc, keyed by the account's own auth uid.
+    // Any signed-in user can read a profile (buyer/seller names are shown to each other),
+    // but only the account owner can create/update their own doc, and role can't be changed after signup.
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) && request.resource.data.role == resource.data.role;
+      allow delete: if false;
+    }
+
+    // bins/{uid} - IoT sensor readings, keyed by the seller's own uid. Never read by buyers directly
+    // (marketplace listings snapshot the location/weight they need at creation time).
+    match /bins/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // marketplace/{listingId} - waste listings. Any signed-in user can browse them.
+    // Only the seller who created a listing can create/edit/delete it, except a buyer is allowed
+    // to flip `status` alone (available <-> sold) when buying or cancelling an order.
+    match /marketplace/{listingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.sellerUid == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.sellerUid == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+      );
+      allow delete: if isSignedIn() && resource.data.sellerUid == request.auth.uid;
+    }
+
+    // orders/{orderId} - purchases. Only the buyer or seller involved can see or touch an order.
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (
+        resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid
+      );
+      allow create: if isSignedIn() && request.resource.data.buyerUid == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid
+      );
+      allow delete: if isSignedIn() && resource.data.buyerUid == request.auth.uid;
+    }
+
+    // notifications/{id} - only the recipient can read or mark their own notification;
+    // any signed-in user can create one addressed to someone else (order/cancel events).
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && resource.data.toUid == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.toUid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.toUid == request.auth.uid;
+    }
+  }
+}

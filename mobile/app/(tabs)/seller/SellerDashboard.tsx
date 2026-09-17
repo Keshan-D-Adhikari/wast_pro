@@ -8,7 +8,7 @@ import {
   TextInput,
 } from "react-native";
 import { PieChart } from "react-native-chart-kit";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "../../../components/platform-map";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect } from "react";
 
