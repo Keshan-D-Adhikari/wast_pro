@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import Login from "./pages/Login";
 import NotAdmin from "./pages/NotAdmin";
 import Layout from "./pages/Layout";
+import Overview from "./pages/Overview";
 import BinStatus from "./pages/BinStatus";
 import Users from "./pages/Users";
 import Marketplace from "./pages/Marketplace";
@@ -20,7 +21,8 @@ function Gate() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<BinStatus />} />
+        <Route index element={<Overview />} />
+        <Route path="bins" element={<BinStatus />} />
         <Route path="users" element={<Users />} />
         <Route path="marketplace" element={<Marketplace />} />
         <Route path="orders" element={<Orders />} />

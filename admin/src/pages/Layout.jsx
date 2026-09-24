@@ -10,8 +10,9 @@ export default function Layout() {
         <h2>WastPro Admin</h2>
         <nav>
           <NavLink to="/" end>
-            Bin Status
+            Overview
           </NavLink>
+          <NavLink to="/bins">Bin Status</NavLink>
           <NavLink to="/users">Users</NavLink>
           <NavLink to="/marketplace">Marketplace</NavLink>
           <NavLink to="/orders">Orders</NavLink>

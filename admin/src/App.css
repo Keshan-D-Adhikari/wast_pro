@@ -163,6 +163,64 @@ body {
   margin-top: 0;
 }
 
+/* Toolbar (search + filters) */
+.toolbar {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.toolbar input[type="search"] {
+  flex: 1;
+  min-width: 220px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.toolbar select,
+td select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+}
+
+td select.badge {
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Stat cards (Overview) */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  color: #1f3d31;
+}
+
+.stat-label {
+  margin: 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+
 /* Tables */
 table {
   width: 100%;
