@@ -1,42 +1,255 @@
+:root {
+  color-scheme: light;
+}
+
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #f4f6f5;
+  color: #1a1a1a;
+}
+
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+/* Login */
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #eef3f0;
+}
+
+.login-card {
+  background: #fff;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-card h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+}
+
+.login-card .subtitle {
+  color: #666;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.login-card label {
+  display: block;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.login-card input {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.login-card button,
+.sidebar-footer button,
+.danger {
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+}
+
+.login-card button {
+  width: 100%;
+  background: #2f7d5c;
+  color: #fff;
+  margin-top: 0.5rem;
+}
+
+.error {
+  color: #c0392b;
+  font-size: 0.85rem;
+}
+
+/* App shell */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  background: #1f3d31;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+}
+
+.sidebar h2 {
+  font-size: 1.1rem;
+  margin: 0 0 1.5rem;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.sidebar nav a {
+  color: #d8e6de;
+  text-decoration: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+}
+
+.sidebar nav a.active,
+.sidebar nav a:hover {
+  background: #2f7d5c;
+  color: #fff;
+}
+
+.sidebar-footer {
+  border-top: 1px solid #345244;
+  padding-top: 1rem;
+  font-size: 0.8rem;
+}
+
+.sidebar-footer p {
+  margin: 0 0 0.5rem;
+  color: #cfe0d7;
+  word-break: break-all;
+}
+
+.sidebar-footer button {
+  background: #345244;
+  color: #fff;
+  width: 100%;
+}
+
+.content {
+  flex: 1;
   padding: 2rem;
-  text-align: center;
+  overflow-x: auto;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.content h1 {
+  margin: 0 0 0.25rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.subtitle {
+  color: #666;
+  margin-top: 0;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  margin-top: 1rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+}
+
+th {
+  background: #f0f2f0;
+}
+
+.badge {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.role-admin { background: #f6d365; }
+.role-seller { background: #c6e6c6; }
+.role-buyer { background: #cfe0f5; }
+
+.status-available,
+.status-pending { background: #fff3c4; }
+.status-sold,
+.status-completed,
+.status-confirmed { background: #c6e6c6; }
+.status-cancelled { background: #f5c6c6; }
+
+.danger {
+  background: #c0392b;
+  color: #fff;
+}
+
+/* Bin status cards */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
 }
 
 .card {
-  padding: 2em;
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
-.read-the-docs {
-  color: #888;
+.card h3 {
+  margin: 0 0 0.5rem;
+  text-transform: capitalize;
+}
+
+.card .level {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+
+.level-ok { color: #2f7d5c; }
+.level-warning { color: #c98a1a; }
+.level-critical { color: #c0392b; }
+
+.card dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 0.35rem;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.card dt {
+  color: #777;
+}
+
+.card dd {
+  margin: 0;
+  text-align: right;
 }

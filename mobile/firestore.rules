@@ -11,6 +11,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Admins are users/{uid} docs with role == 'admin'. Used to grant the
+    // admin dashboard read access across collections it doesn't own.
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // users/{uid} - profile doc, keyed by the account's own auth uid.
     // Any signed-in user can read a profile (buyer/seller names are shown to each other),
     // but only the account owner can create/update their own doc, and role can't be changed after signup.
@@ -24,7 +31,8 @@ service cloud.firestore {
     // bins/{uid} - IoT sensor readings, keyed by the seller's own uid. Never read by buyers directly
     // (marketplace listings snapshot the location/weight they need at creation time).
     match /bins/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid);
     }
 
     // marketplace/{listingId} - waste listings. Any signed-in user can browse them.
@@ -37,13 +45,18 @@ service cloud.firestore {
         resource.data.sellerUid == request.auth.uid ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
       );
-      allow delete: if isSignedIn() && resource.data.sellerUid == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.sellerUid == request.auth.uid || isAdmin());
     }
 
     // orders/{orderId} - purchases. Only the buyer or seller involved can see or touch an order.
+    // NOTE: the buyer-side "cancel order" flow (BuyerOrders.tsx) deletes the order doc rather
+    // than marking it cancelled, so a buyer can erase their own order history/evidence after a
+    // dispute. Fixing this properly means changing that flow to a status update instead of a
+    // delete — left as-is here to avoid breaking the existing cancel feature; flagged as a
+    // known limitation.
     match /orders/{orderId} {
       allow read: if isSignedIn() && (
-        resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid
+        resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid || isAdmin()
       );
       allow create: if isSignedIn() && request.resource.data.buyerUid == request.auth.uid;
       allow update: if isSignedIn() && (
@@ -52,13 +65,24 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.buyerUid == request.auth.uid;
     }
 
-    // notifications/{id} - only the recipient can read or mark their own notification;
-    // any signed-in user can create one addressed to someone else (order/cancel events).
+    // notifications/{id} - only the recipient can read or mark their own notification.
+    // The app writes these for two cases: a self-notification ("bin_full", toUid == the
+    // creator's own uid) and an order event sent to the other party (toUid == that party's uid,
+    // no orderId/fromUid stored on the doc today). Full sender/recipient relationship checks
+    // aren't possible without that data, so creation is narrowed to the known notification
+    // shapes and a real recipient, which blocks arbitrary spam/garbage docs even though it
+    // can't yet prove the sender was actually involved in the order.
     match /notifications/{notifId} {
-      allow read: if isSignedIn() && resource.data.toUid == request.auth.uid;
-      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.toUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+        request.resource.data.type in ['bin_full', 'order_placed', 'order_cancelled'] &&
+        request.resource.data.keys().hasOnly(['toUid', 'type', 'message', 'read', 'createdAt']) &&
+        request.resource.data.read == false &&
+        exists(/databases/$(database)/documents/users/$(request.resource.data.toUid));
       allow update: if isSignedIn() && resource.data.toUid == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.toUid == request.auth.uid;
     }
+
+    // users/{uid} read stays open to any signed-in user (see above); nothing extra needed for isAdmin here.
   }
 }

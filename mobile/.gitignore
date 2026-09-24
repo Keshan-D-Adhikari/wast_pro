@@ -34,7 +34,7 @@ yarn-error.*
 .env
 .env*.local
 
-# Claude Code tooling (local dev preview config, not part of the app)
+# Local editor/dev-tooling config, not part of the app
 .claude/
 
 # typescript
