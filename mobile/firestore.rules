@@ -24,7 +24,9 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid) && request.resource.data.role == resource.data.role;
+      allow update: if
+        (isOwner(uid) && request.resource.data.role == resource.data.role) ||
+        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
       allow delete: if false;
     }
 
@@ -60,7 +62,9 @@ service cloud.firestore {
       );
       allow create: if isSignedIn() && request.resource.data.buyerUid == request.auth.uid;
       allow update: if isSignedIn() && (
-        resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid
+        resource.data.buyerUid == request.auth.uid ||
+        resource.data.sellerUid == request.auth.uid ||
+        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
       );
       allow delete: if isSignedIn() && resource.data.buyerUid == request.auth.uid;
     }
