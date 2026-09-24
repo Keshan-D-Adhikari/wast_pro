@@ -77,10 +77,10 @@ export const Space = {
 /* ================= SHAPE ================= */
 
 export const Radius = {
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 24,
+  sm: 12,
+  md: 16,
+  lg: 20,
+  xl: 28,
   pill: 999,
 } as const;
 
@@ -94,17 +94,17 @@ export const Shadow = {
   none: {},
   1: {
     shadowColor: '#14261A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   2: {
     shadowColor: '#14261A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 18,
+    elevation: 4,
   },
   3: {
     shadowColor: '#14261A',

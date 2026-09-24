@@ -24,7 +24,7 @@ export function Screen({ children, scroll = true, withBottomNav = false, content
   const padding = {
     paddingTop: insets.top + Space.sm,
     paddingHorizontal: Space.xl,
-    paddingBottom: (withBottomNav ? BOTTOM_NAV_HEIGHT : 0) + insets.bottom + Space['3xl'],
+    paddingBottom: (withBottomNav ? BOTTOM_NAV_HEIGHT + Space['2xl'] : 0) + insets.bottom + Space['3xl'],
   };
 
   if (!scroll) {

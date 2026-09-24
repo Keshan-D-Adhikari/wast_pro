@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Href, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Palette, Space, Type, BOTTOM_NAV_HEIGHT } from '@/constants/design';
+import { Palette, Space, Radius, Shadow, Type, BOTTOM_NAV_HEIGHT } from '@/constants/design';
 
 type TabKey = 'home' | 'market' | 'orders' | 'profile';
 
@@ -28,8 +28,8 @@ const BUYER_TABS: Tab[] = [
 ];
 
 /**
- * Fixed bottom navigation shared by both roles. Replaces the hand-rolled bar
- * that used to be copied into every dashboard screen.
+ * Floating bottom navigation shared by both roles. Replaces the hand-rolled
+ * bar that used to be copied into every dashboard screen.
  */
 export function BottomNav({ role, active }: { role: 'seller' | 'buyer'; active: TabKey }) {
   const router = useRouter();
@@ -37,47 +37,61 @@ export function BottomNav({ role, active }: { role: 'seller' | 'buyer'; active: 
   const tabs = role === 'seller' ? SELLER_TABS : BUYER_TABS;
 
   return (
-    <View style={[styles.bar, { height: BOTTOM_NAV_HEIGHT + insets.bottom, paddingBottom: insets.bottom }]}>
-      {tabs.map((tab) => {
-        const isActive = tab.key === active;
-        return (
-          <TouchableOpacity
-            key={tab.key}
-            style={styles.item}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityState={{ selected: isActive }}
-            accessibilityLabel={tab.label}
-            onPress={() => {
-              if (!isActive) router.push(tab.route);
-            }}
-          >
-            <Ionicons
-              name={isActive ? tab.activeIcon : tab.icon}
-              size={23}
-              color={isActive ? Palette.brand[600] : Palette.ink[300]}
-            />
-            <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
+    <View style={[styles.wrap, { bottom: Space.lg + insets.bottom }]} pointerEvents="box-none">
+      <View style={[styles.bar, { height: BOTTOM_NAV_HEIGHT }]}>
+        {tabs.map((tab) => {
+          const isActive = tab.key === active;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={styles.item}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab.label}
+              onPress={() => {
+                if (!isActive) router.push(tab.route);
+              }}
+            >
+              <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
+                <Ionicons
+                  name={isActive ? tab.activeIcon : tab.icon}
+                  size={20}
+                  color={isActive ? Palette.white : Palette.ink[300]}
+                />
+              </View>
+              <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: {
+  wrap: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    left: Space.lg,
+    right: Space.lg,
+  },
+  bar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Palette.surface,
-    borderTopWidth: 1,
-    borderTopColor: Palette.ink[100],
+    borderRadius: Radius.xl,
+    paddingHorizontal: Space.sm,
+    ...Shadow[3],
   },
-  item: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingTop: Space.sm },
+  item: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: Space.sm },
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapActive: { backgroundColor: Palette.brand[600] },
   label: { ...Type.caption, color: Palette.ink[300], fontWeight: '600' },
   labelActive: { color: Palette.brand[600], fontWeight: '700' },
 });

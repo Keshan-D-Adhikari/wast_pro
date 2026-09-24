@@ -36,12 +36,22 @@ import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { TextField } from "@/components/ui/text-field";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { Sheet } from "@/components/ui/sheet";
+import { ChipGroup } from "@/components/ui/chip";
+
+const TYPE_FILTERS = [
+  { key: 'all', label: 'All types' },
+  { key: 'plastic', label: 'Plastic' },
+  { key: 'food', label: 'Food' },
+  { key: 'metal', label: 'Metal' },
+] as const;
+type TypeFilterKey = typeof TYPE_FILTERS[number]['key'];
 
 export default function BuyerDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [searchText, setSearchText] = useState('');
+  const [typeFilter, setTypeFilter] = useState<TypeFilterKey>('all');
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
   const [buyingItem, setBuyingItem] = useState<MarketplaceItem | null>(null);
@@ -94,9 +104,12 @@ export default function BuyerDashboard() {
   }, []);
 
   // Derived from items + searchText — no effect needed, just recompute on render.
-  const filteredItems = items.filter(item =>
-    (item.wasteType || '').toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredItems = items.filter(item => {
+    const type = (item.wasteType || '').toLowerCase();
+    const matchesFilter = typeFilter === 'all' || type === typeFilter;
+    const matchesSearch = type.includes(searchText.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
 
   const getDistance = (sellerLoc: { latitude: number; longitude: number }) => {
     if (!userLocation || !sellerLoc) return "N/A";
@@ -250,10 +263,10 @@ export default function BuyerDashboard() {
     const pricePerKg = item.weightKg ? (item.totalPrice / item.weightKg) : 0;
 
     return (
-      <Card style={styles.listingCard}>
+      <Card elevation={2} style={styles.listingCard}>
         <View style={styles.listingHeader}>
-          <View style={[styles.listingIcon, { backgroundColor: accent.tint }]}>
-            <Ionicons name="cube-outline" size={19} color={accent.base} />
+          <View style={[styles.listingIcon, { backgroundColor: accent.tint, borderColor: accent.base + '22' }]}>
+            <Ionicons name="cube" size={24} color={accent.base} />
           </View>
           <View style={styles.listingTitleBlock}>
             <Text style={[Type.bodyStrong, styles.listingType]} numberOfLines={1}>
@@ -261,8 +274,14 @@ export default function BuyerDashboard() {
             </Text>
             <Text style={Type.caption} numberOfLines={1}>{item.sellerName}</Text>
           </View>
+          <View style={[styles.priceRibbon, { backgroundColor: accent.base }]}>
+            <Text style={styles.priceRibbonText}>Rs {item.totalPrice || 0}</Text>
+          </View>
+        </View>
+
+        <View style={styles.distanceRow}>
           <Badge
-            label={distance === 'N/A' ? 'Distance N/A' : `${distance} km`}
+            label={distance === 'N/A' ? 'Distance N/A' : `${distance} km away`}
             icon="location-outline"
             color={{ base: Palette.brand[700], tint: Palette.brand[100] }}
           />
@@ -278,10 +297,6 @@ export default function BuyerDashboard() {
           <View style={styles.metricBlock}>
             <Text style={Type.caption}>RATE</Text>
             <Text style={Type.bodyStrong}>Rs {pricePerKg.toFixed(0)}/kg</Text>
-          </View>
-          <View style={styles.metricBlock}>
-            <Text style={Type.caption}>TOTAL</Text>
-            <Text style={styles.listingTotal}>Rs {item.totalPrice || 0}</Text>
           </View>
         </View>
 
@@ -317,6 +332,8 @@ export default function BuyerDashboard() {
           autoCapitalize="none"
           containerStyle={styles.search}
         />
+
+        <ChipGroup options={TYPE_FILTERS} value={typeFilter} onChange={setTypeFilter} />
 
         {loading ? (
           <LoadingState message="Loading the marketplace…" />
@@ -561,22 +578,29 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Palette.background },
   flex: { flex: 1 },
 
-  search: { marginBottom: 0 },
+  search: { marginBottom: Space.md },
 
-  listingCard: { marginBottom: Space.md },
+  listingCard: { marginBottom: Space.lg },
   listingHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   listingIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.sm,
+    width: 48,
+    height: 48,
+    borderRadius: Radius.md,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   listingTitleBlock: { flex: 1, gap: 2 },
   listingType: { textTransform: 'capitalize' },
+  priceRibbon: {
+    paddingHorizontal: Space.md,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+  },
+  priceRibbonText: { ...Type.smallStrong, color: Palette.white, fontWeight: '800' },
+  distanceRow: { marginTop: Space.md },
   listingMetrics: { flexDirection: 'row', gap: Space.md },
   metricBlock: { flex: 1, gap: 2 },
-  listingTotal: { ...Type.bodyStrong, color: Palette.brand[600], fontWeight: '800' },
   listingActions: { flexDirection: 'row', gap: Space.md, marginTop: Space.lg },
   actionFlex: { flex: 1 },
 
