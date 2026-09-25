@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { filterOrders } from "../lib/filters";
 
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
 
@@ -25,17 +26,10 @@ export default function Orders() {
     );
   }, []);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return orders.filter((o) => {
-      const matchesStatus = statusFilter === "all" || o.status === statusFilter;
-      const matchesTerm =
-        !term ||
-        o.buyerName?.toLowerCase().includes(term) ||
-        o.sellerName?.toLowerCase().includes(term);
-      return matchesStatus && matchesTerm;
-    });
-  }, [orders, search, statusFilter]);
+  const filtered = useMemo(
+    () => filterOrders(orders, { search, status: statusFilter }),
+    [orders, search, statusFilter]
+  );
 
   const handleStatusChange = async (order, status) => {
     if (status === order.status) return;

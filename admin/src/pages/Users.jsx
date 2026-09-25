@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { filterUsers } from "../lib/filters";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -19,17 +20,10 @@ export default function Users() {
     );
   }, []);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return users.filter((u) => {
-      const matchesRole = roleFilter === "all" || u.role === roleFilter;
-      const matchesTerm =
-        !term ||
-        u.fullName?.toLowerCase().includes(term) ||
-        u.email?.toLowerCase().includes(term);
-      return matchesRole && matchesTerm;
-    });
-  }, [users, search, roleFilter]);
+  const filtered = useMemo(
+    () => filterUsers(users, { search, role: roleFilter }),
+    [users, search, roleFilter]
+  );
 
   const toggleDisabled = async (u) => {
     const action = u.disabled ? "re-enable" : "disable";

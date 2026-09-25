@@ -6,6 +6,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { filterListings } from "../lib/filters";
 
 export default function Marketplace() {
   const [listings, setListings] = useState([]);
@@ -25,15 +26,10 @@ export default function Marketplace() {
     );
   }, []);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return listings.filter((item) => {
-      const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-      const matchesType = typeFilter === "all" || item.wasteType === typeFilter;
-      const matchesTerm = !term || item.sellerName?.toLowerCase().includes(term);
-      return matchesStatus && matchesType && matchesTerm;
-    });
-  }, [listings, search, statusFilter, typeFilter]);
+  const filtered = useMemo(
+    () => filterListings(listings, { search, status: statusFilter, wasteType: typeFilter }),
+    [listings, search, statusFilter, typeFilter]
+  );
 
   const handleRemove = async (id) => {
     if (!confirm("Remove this listing? This cannot be undone.")) return;
