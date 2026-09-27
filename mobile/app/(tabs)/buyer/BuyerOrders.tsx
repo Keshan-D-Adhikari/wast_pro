@@ -14,7 +14,6 @@ import {
   onSnapshot,
   updateDoc,
   addDoc,
-  deleteDoc,
   doc,
   serverTimestamp
 } from 'firebase/firestore';
@@ -80,7 +79,7 @@ export default function BuyerOrders() {
   const handleCancelOrder = async (order: Order) => {
     Alert.alert(
       'Cancel Order',
-      'Are you sure? This order will be removed.',
+      'Are you sure you want to cancel this order?',
       [
         { text: 'No', style: 'cancel' },
         {
@@ -89,9 +88,14 @@ export default function BuyerOrders() {
           onPress: async () => {
             try {
 
-              await deleteDoc(
-                doc(db, 'orders', order.id)
-              );
+              // Mark cancelled rather than deleting the order doc, so the
+              // order stays in history (visible to the seller/admin) instead
+              // of erasing evidence of what happened.
+              await updateDoc(
+                doc(db, 'orders', order.id), {
+                status: 'cancelled',
+                cancelledAt: serverTimestamp(),
+              });
 
               // Restore listing to marketplace
               if (order.listingId) {
@@ -115,15 +119,15 @@ export default function BuyerOrders() {
               });
 
               Alert.alert(
-                'Removed',
-                'Order removed from your purchases.'
+                'Cancelled',
+                'Order cancelled.'
               );
 
             } catch (error) {
               console.log('Cancel error:', error);
               Alert.alert(
                 'Error',
-                'Could not remove order.'
+                'Could not cancel order.'
               );
             }
           }

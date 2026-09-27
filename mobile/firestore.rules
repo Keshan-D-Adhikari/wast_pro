@@ -51,11 +51,9 @@ service cloud.firestore {
     }
 
     // orders/{orderId} - purchases. Only the buyer or seller involved can see or touch an order.
-    // NOTE: the buyer-side "cancel order" flow (BuyerOrders.tsx) deletes the order doc rather
-    // than marking it cancelled, so a buyer can erase their own order history/evidence after a
-    // dispute. Fixing this properly means changing that flow to a status update instead of a
-    // delete — left as-is here to avoid breaking the existing cancel feature; flagged as a
-    // known limitation.
+    // The buyer-side "cancel order" flow (BuyerOrders.tsx) marks the order cancelled via update
+    // rather than deleting it, so history/evidence survives a cancellation — deletion is
+    // disabled entirely.
     match /orders/{orderId} {
       allow read: if isSignedIn() && (
         resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid || isAdmin()
@@ -66,7 +64,7 @@ service cloud.firestore {
         resource.data.sellerUid == request.auth.uid ||
         (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
       );
-      allow delete: if isSignedIn() && resource.data.buyerUid == request.auth.uid;
+      allow delete: if false;
     }
 
     // notifications/{id} - only the recipient can read or mark their own notification.

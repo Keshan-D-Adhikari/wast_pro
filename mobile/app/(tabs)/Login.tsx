@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // firebase import
 import { auth, db } from '../../firebaseConfig';
 import { FirebaseError } from 'firebase/app';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
@@ -56,6 +56,14 @@ export default function Login() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const userRole = userData.role;
+
+        // An admin can flag an account as disabled (see admin/src/pages/Users.jsx);
+        // block the sign-in here rather than only hiding it in the admin UI.
+        if (userData.disabled) {
+          await signOut(auth);
+          Alert.alert('Account disabled', 'This account has been disabled. Contact an administrator.');
+          return;
+        }
 
         console.log('User Role found:', userRole);
 
