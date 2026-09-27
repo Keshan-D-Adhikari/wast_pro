@@ -13,12 +13,14 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 // firebase import
 import { auth, db } from '../../firebaseConfig';
 import { FirebaseError } from 'firebase/app';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { useGoogleSignIn } from '@/hooks/useGoogleSignIn';
 
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,36 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { ready: googleReady, signIn: signInWithGoogle } = useGoogleSignIn();
+
+  /* ================= ROUTE BY ROLE (shared by password + Google login) ================= */
+  const routeByRole = async (uid: string) => {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+
+    if (!userDoc.exists()) {
+      // Brand-new Google sign-in — no users/{uid} doc yet, so ask for a role.
+      router.replace('/(tabs)/ChooseRole');
+      return;
+    }
+
+    const role = userDoc.data().role;
+    router.replace(role === 'seller' ? '/(tabs)/seller/SellerDashboard' : '/(tabs)/buyer/BuyerDashboard');
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      const result = await signInWithGoogle();
+      if (!result) return; // cancelled
+
+      await routeByRole(result.user.uid);
+    } catch (err: unknown) {
+      Alert.alert('Google Sign-In Failed', err instanceof Error ? err.message : 'Please try again.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   /* ================= FIREBASE LOGIN FUNCTION ================= */
   const handleLogin = async () => {
@@ -151,6 +183,24 @@ export default function Login() {
 
             <Button label="Log In" onPress={handleLogin} loading={loading} />
 
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              onPress={handleGoogleSignIn}
+              disabled={!googleReady || googleLoading}
+              activeOpacity={0.85}
+              style={[styles.googleBtn, (!googleReady || googleLoading) && styles.googleBtnDisabled]}
+            >
+              <Ionicons name="logo-google" size={18} color={Palette.ink[700]} />
+              <Text style={styles.googleBtnText}>
+                {googleLoading ? 'Signing in…' : 'Continue with Google'}
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               onPress={() => router.push('/(tabs)/CreateAccount')}
               style={styles.signupRow}
@@ -198,4 +248,20 @@ const styles = StyleSheet.create({
   toggleText: { ...Type.caption, color: Palette.brand[600] },
   signupRow: { alignItems: 'center', marginTop: Space.xl },
   signupLink: { ...Type.smallStrong, color: Palette.brand[600], fontWeight: '700' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, marginVertical: Space.lg },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Palette.ink[200] },
+  dividerText: { ...Type.caption, color: Palette.ink[300] },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.sm,
+    height: 52,
+    borderRadius: Radius.pill,
+    borderWidth: 1.5,
+    borderColor: Palette.ink[200],
+    backgroundColor: Palette.surface,
+  },
+  googleBtnDisabled: { opacity: 0.5 },
+  googleBtnText: { ...Type.bodyStrong, color: Palette.ink[700] },
 });
