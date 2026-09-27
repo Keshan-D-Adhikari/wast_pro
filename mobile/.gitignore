@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env*.local
 
+# Cloud Functions
+functions/node_modules/
+functions/.env
+
 # Local editor/dev-tooling config, not part of the app
 .claude/
 

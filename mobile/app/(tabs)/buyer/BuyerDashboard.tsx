@@ -10,7 +10,10 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
 import * as Location from "expo-location";
-import { db, auth } from "../../../firebaseConfig";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
+import { db, auth, functions } from "../../../firebaseConfig";
+import { httpsCallable } from "firebase/functions";
 import {
   collection,
   onSnapshot,
@@ -59,12 +62,6 @@ export default function BuyerDashboard() {
   const [mapModalVisible, setMapModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
-  const [cardDetails, setCardDetails] = useState({
-    name: '',
-    number: '',
-    expiry: '',
-    cvv: ''
-  });
 
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
   // `any` here is deliberate: MapView's ref type differs between the native
@@ -125,7 +122,7 @@ export default function BuyerDashboard() {
     setPaymentModalVisible(true);
   };
 
-  const confirmPurchase = async (method: 'cash' | 'card', cardInfo?: { number: string }) => {
+  const confirmPurchase = async (method: 'cash' | 'card', cardLast4?: string | null) => {
     if (!auth.currentUser || !buyingItem) return;
 
     setPurchaseLoading(true);
@@ -145,7 +142,7 @@ export default function BuyerDashboard() {
         totalPrice: buyingItem.totalPrice,
         paymentMethod: method,
         paymentStatus: (method === 'card' ? 'paid' : 'pending') as 'paid' | 'pending',
-        paymentLast4: method === 'card' && cardInfo ? cardInfo.number.slice(-4) : null,
+        paymentLast4: method === 'card' ? (cardLast4 ?? null) : null,
         status: (method === 'card' ? 'confirmed' : 'pending') as 'pending' | 'confirmed' | 'completed' | 'cancelled',
         location: buyingItem.location,
         createdAt: serverTimestamp(),
@@ -174,10 +171,13 @@ export default function BuyerDashboard() {
       setPaymentModalVisible(false);
       setBuyingItem(null);
       setPaymentMethod('');
-      setCardDetails({ name: '', number: '', expiry: '', cvv: '' });
 
-      if (method === 'card' && cardInfo) {
-        Alert.alert("Payment Successful!", 'Rs ' + orderData.totalPrice + ' charged to card ending in ' + orderData.paymentLast4);
+      if (method === 'card') {
+        Alert.alert(
+          "Payment Successful!",
+          'Rs ' + orderData.totalPrice + ' charged to card' +
+            (orderData.paymentLast4 ? ' ending in ' + orderData.paymentLast4 : '') + '.'
+        );
       } else {
         Alert.alert("Order Placed!", 'Pay Rs ' + orderData.totalPrice + ' in cash when seller delivers.');
       }
@@ -190,36 +190,56 @@ export default function BuyerDashboard() {
     }
   };
 
-  const handleCardPayment = () => {
-    const { name, number, expiry, cvv } = cardDetails;
-    if (!name || !number || !expiry || !cvv) {
-      Alert.alert("Missing Info", "Please fill in all card details.");
-      return;
-    }
-    if (number.length !== 16) {
-      Alert.alert("Invalid Card", "Card number must be exactly 16 digits.");
-      return;
-    }
-    if (cvv.length !== 3) {
-      Alert.alert("Invalid CVV", "CVV must be exactly 3 digits.");
-      return;
-    }
+  // Real card payment: a Cloud Function creates a Stripe Checkout Session
+  // (test mode) server-side — the secret key never touches the client —
+  // and the browser redirects back into the app via a custom-scheme URL, so
+  // no native Stripe SDK/dev build is needed; this works in Expo Go too.
+  const handleCardPayment = async () => {
+    if (!buyingItem) return;
 
     setPurchaseLoading(true);
-    setTimeout(() => {
-      confirmPurchase('card', cardDetails);
-    }, 2000);
+    try {
+      const createCheckoutSession = httpsCallable(functions, 'createCheckoutSession');
+      const { data } = await createCheckoutSession({
+        amount: buyingItem.totalPrice,
+        wasteType: buyingItem.wasteType,
+        listingId: buyingItem.id,
+      }) as { data: { url: string; sessionId: string } };
+
+      const redirectUrl = Linking.createURL('payment-complete');
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+
+      if (result.type !== 'success' || !result.url) {
+        return; // user cancelled/dismissed the checkout page
+      }
+
+      const { queryParams } = Linking.parse(result.url);
+      if (queryParams?.status !== 'success' || !queryParams?.session_id) {
+        Alert.alert('Payment cancelled', 'The payment was not completed.');
+        return;
+      }
+
+      const verifyCheckoutSession = httpsCallable(functions, 'verifyCheckoutSession');
+      const { data: verification } = await verifyCheckoutSession({
+        sessionId: queryParams.session_id,
+      }) as { data: { paid: boolean; last4: string | null } };
+
+      if (!verification.paid) {
+        Alert.alert('Payment not confirmed', 'Please try again.');
+        return;
+      }
+
+      await confirmPurchase('card', verification.last4);
+    } catch (error: unknown) {
+      Alert.alert('Payment failed', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setPurchaseLoading(false);
+    }
   };
 
   const handleConfirmOrder = () => {
     if (paymentMethod === 'cash') confirmPurchase('cash');
     else if (paymentMethod === 'card') handleCardPayment();
-  };
-
-  const getCardType = (number: string) => {
-    if (number.startsWith('4')) return 'VISA';
-    if (number.startsWith('5')) return 'Mastercard';
-    return null;
   };
 
   const openRouteMap = async (item: MarketplaceItem) => {
@@ -470,7 +490,6 @@ export default function BuyerDashboard() {
         onClose={() => {
           setPaymentModalVisible(false);
           setPaymentMethod('');
-          setCardDetails({ name: '', number: '', expiry: '', cvv: '' });
         }}
         scrollable
       >
@@ -512,49 +531,13 @@ export default function BuyerDashboard() {
           })}
         </View>
 
-        {/* Card Form */}
+        {/* Stripe Checkout notice */}
         {paymentMethod === 'card' && (
           <View style={styles.cardForm}>
-            <View style={styles.cardFormHeader}>
-              <Text style={Type.caption}>CARD DETAILS</Text>
-              {getCardType(cardDetails.number) && (
-                <Badge label={getCardType(cardDetails.number)!} tone="info" />
-              )}
-            </View>
-
-            <TextField
-              placeholder="Cardholder name"
-              value={cardDetails.name}
-              onChangeText={(t) => setCardDetails({ ...cardDetails, name: t })}
-            />
-            <TextField
-              placeholder="Card number (16 digits)"
-              keyboardType="numeric"
-              maxLength={16}
-              value={cardDetails.number}
-              onChangeText={(t) => setCardDetails({ ...cardDetails, number: t.replace(/\D/g, '') })}
-            />
-            <View style={styles.cardRow}>
-              <TextField
-                placeholder="MM/YY"
-                maxLength={5}
-                value={cardDetails.expiry}
-                onChangeText={(t) => setCardDetails({ ...cardDetails, expiry: t })}
-                containerStyle={styles.flex}
-              />
-              <TextField
-                placeholder="CVV"
-                keyboardType="numeric"
-                maxLength={3}
-                secureTextEntry
-                value={cardDetails.cvv}
-                onChangeText={(t) => setCardDetails({ ...cardDetails, cvv: t })}
-                containerStyle={styles.flex}
-              />
-            </View>
-
+            <Text style={Type.caption}>SECURE CHECKOUT</Text>
             <Text style={styles.demoNote}>
-              Demo checkout — no real payment is processed and card numbers are not stored.
+              You’ll be taken to Stripe’s secure payment page to enter your card details.
+              Card numbers are never seen or stored by this app. (Test mode — no real charge.)
             </Text>
           </View>
         )}
@@ -658,13 +641,6 @@ const styles = StyleSheet.create({
   payTitle: { textAlign: 'center' },
   paySub: { ...Type.caption, textAlign: 'center', color: Palette.ink[300] },
 
-  cardForm: { marginBottom: Space.sm },
-  cardFormHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Space.md,
-  },
-  cardRow: { flexDirection: 'row', gap: Space.md },
+  cardForm: { marginBottom: Space.sm, gap: Space.xs },
   demoNote: { ...Type.caption, color: Palette.ink[300], marginBottom: Space.lg },
 });

@@ -1,0 +1,17 @@
+{
+  "name": "functions",
+  "description": "Cloud Functions for SmartWaste Pro — Stripe Checkout backend",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.1.1",
+    "stripe": "^17.4.0"
+  },
+  "private": true
+}
