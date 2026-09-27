@@ -11,7 +11,13 @@ WebBrowser.maybeCompleteAuthSession();
  * user, or null if the user cancelled or the flow otherwise didn't succeed.
  */
 export function useGoogleSignIn() {
+  // `clientId` is the generic per-platform fallback expo-auth-session checks
+  // when there's no dedicated iosClientId/androidClientId (those need a
+  // native OAuth client tied to a bundle id/package + SHA-1, which only
+  // matters for a standalone/production build). Using the web client ID
+  // here works for Expo Go and web testing on every platform.
   const [request, , promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
   });
 
