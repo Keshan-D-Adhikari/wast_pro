@@ -1,37 +1,51 @@
 # ===============================
 # SmartWaste Pro - Backend Requirements
 # ===============================
+# This file used to describe a planned Node.js/Express/MongoDB backend.
+# That backend was never built — the project uses Firebase (Auth,
+# Firestore, Storage, Realtime Database) as its backend instead. This
+# reflects the actual setup.
 
 # 1. Node.js
 Node.js >= 18.x
 
-# 2. MongoDB
-MongoDB Community Server
-OR
-MongoDB Atlas (Cloud)
+# 2. Backend platform
+Firebase (Google Cloud) — no separate database server to install.
+Two Firebase projects are used:
+  - Main app project ("wast-pro"): Authentication, Firestore
+    (users/marketplace/orders/notifications), Storage.
+  - IoT project ("smartwastepro-1085e"): Realtime Database only, fed by
+    the ESP32 smart bin firmware.
 
-# 3. Environment Variables (Create .env locally)
-MONGO_URI=mongodb://localhost:27017/smartwaste
-JWT_SECRET=your_jwt_secret
-PORT=5000
+# 3. Environment Variables
+# admin/.env (Vite) and mobile/.env (Expo) each need the main project's
+# client config plus the IoT project's client config. See
+# admin/.env.example and mobile/.env.example for the exact variable
+# names. These are client-side config values (not secrets) — access is
+# enforced by Firestore/Realtime Database Security Rules
+# (mobile/firestore.rules), not by keeping them private.
+#
+# Never put a Realtime Database legacy secret in any .env file or
+# anywhere in the app — it grants full admin access to the database.
 
-# 4. Backend Dependencies (npm install will handle)
-express
-mongoose
-bcryptjs
-jsonwebtoken
-cors
-dotenv
+# 4. Firebase CLI (for deploying Firestore rules)
+npm install -g firebase-tools
+firebase login
+firebase deploy --only firestore:rules --project wast-pro
 
-# 5. How to Run Backend
-cd backend
-npm install
-npm run start
+# 5. How to run each app
+cd admin && npm install && npm run dev      # admin dashboard (Vite)
+cd mobile && npm install && npm run web     # mobile app (Expo, web target)
+cd mobile && npm run start                  # mobile app (Expo Go / device)
 
-# 6. API Endpoints
-POST /api/auth/login
-POST /api/auth/register
+# 6. Auth model
+Firebase Authentication (email/password) is used directly by the
+mobile app and admin dashboard — there is no custom /api/auth/login or
+/api/auth/register endpoint; sign-in and sign-up call the Firebase
+client SDK, and a matching profile document is written to
+Firestore's users/{uid} collection.
 
 # NOTE:
-# Do NOT upload .env file to GitHub.
-# Each developer must create their own .env file locally.
+# Do NOT upload any .env file to GitHub.
+# Each developer must create their own admin/.env and mobile/.env
+# locally, using the matching .env.example as a template.
