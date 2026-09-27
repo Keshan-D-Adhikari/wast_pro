@@ -9,6 +9,7 @@ export interface BinCompartment {
   level?: number;
   weight?: number;
   moisture?: number;
+  /** Firmware-computed status: EMPTY | LOW | HALF | '75%' | FULL | ERROR — see constants/bin-status.ts. */
   status?: string;
   overweight?: boolean;
   timestamp?: string;

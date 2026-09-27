@@ -19,6 +19,7 @@ import { iotDb, BIN_ID } from "../../../iotConfig";
 import { ref as dbRef, onValue } from "firebase/database";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
+import { binStatusColor, binStatusLabel, isBinFull } from "@/constants/bin-status";
 import { Screen } from "@/components/ui/screen";
 import { Card, SectionTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -111,17 +112,27 @@ export default function SellerDashboard() {
     };
   }, [user]);
 
-  // Automated Bin Full Notifications
+  // Automated Bin Full Notifications — driven by the firmware's own `status`
+  // and `overweight` fields (see constants/bin-status.ts) rather than a
+  // level percentage re-derived in the app, so the alert matches exactly
+  // what the ESP32 itself decided.
   useEffect(() => {
     if (!user) return;
 
-    const checkAndNotify = async (type: WasteType, level: number) => {
-      if (level > 80 && !notifiedBinsRef.current.includes(type)) {
+    const checkAndNotify = async (
+      type: WasteType,
+      status: string | undefined,
+      overweight: boolean | undefined
+    ) => {
+      const shouldAlert = isBinFull(status) || !!overweight;
+
+      if (shouldAlert && !notifiedBinsRef.current.includes(type)) {
         try {
+          const reason = overweight ? 'is overweight' : 'is full';
           await addDoc(collection(db, "notifications"), {
             toUid: user.uid,
             type: "bin_full",
-            message: `${type.charAt(0).toUpperCase() + type.slice(1)} bin is over 80% full`,
+            message: `${type.charAt(0).toUpperCase() + type.slice(1)} bin ${reason}`,
             read: false,
             createdAt: serverTimestamp(),
           });
@@ -129,15 +140,15 @@ export default function SellerDashboard() {
         } catch (error) {
           console.error("Error sending bin notification:", error);
         }
-      } else if (level <= 80 && notifiedBinsRef.current.includes(type)) {
-        // Reset notification state if it drops below threshold
+      } else if (!shouldAlert && notifiedBinsRef.current.includes(type)) {
+        // Reset notification state once the firmware clears the condition
         notifiedBinsRef.current = notifiedBinsRef.current.filter(t => t !== type);
       }
     };
 
-    checkAndNotify("plastic", binData.plastic?.level ?? 0);
-    checkAndNotify("food", binData.food?.level ?? 0);
-    checkAndNotify("metal", binData.metal?.level ?? 0);
+    checkAndNotify("plastic", binData.plastic?.status, binData.plastic?.overweight);
+    checkAndNotify("food", binData.food?.status, binData.food?.overweight);
+    checkAndNotify("metal", binData.metal?.status, binData.metal?.overweight);
   }, [binData, user]);
 
   const handleReportSubmit = () => {
@@ -173,7 +184,8 @@ export default function SellerDashboard() {
     const weight = compartment.weight || 0;
     const moisture = compartment.moisture;
     const accent = wasteAccent(type);
-    const isFull = level > 80;
+    const alert = isBinFull(compartment.status) || !!compartment.overweight;
+    const statusColor = binStatusColor(compartment.status);
 
     return (
       <View style={styles.binCard}>
@@ -181,7 +193,7 @@ export default function SellerDashboard() {
           <View style={[styles.binIcon, { backgroundColor: accent.tint }]}>
             <Ionicons name={icon} size={16} color={accent.base} />
           </View>
-          {isFull && (
+          {alert && (
             <View style={styles.fullDot}>
               <Ionicons name="alert" size={10} color={Palette.white} />
             </View>
@@ -200,7 +212,16 @@ export default function SellerDashboard() {
           />
         </View>
 
+        <View style={[styles.statusPill, { backgroundColor: statusColor.tint }]}>
+          <Text style={[styles.statusPillText, { color: statusColor.base }]}>
+            {binStatusLabel(compartment.status)}
+          </Text>
+        </View>
+
         <Text style={styles.binWeight}>{weight} kg</Text>
+        {compartment.overweight && (
+          <Text style={styles.binOverweight}>⚠ Overweight</Text>
+        )}
         {moisture !== undefined && (
           <Text style={[styles.binMoisture, moisture > 70 && styles.binMoistureHigh]}>
             💧 {moisture}%
@@ -468,7 +489,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: 5, borderRadius: Radius.pill },
+  statusPill: {
+    alignSelf: 'flex-start',
+    marginTop: Space.sm,
+    paddingHorizontal: Space.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  statusPillText: { ...Type.caption, fontWeight: '700' },
   binWeight: { ...Type.smallStrong, marginTop: Space.sm },
+  binOverweight: { ...Type.caption, color: Palette.status.danger.base, fontWeight: '700', marginTop: 2 },
   binMoisture: { ...Type.caption, marginTop: 2 },
   binMoistureHigh: { color: Palette.status.warning.base, fontWeight: '700' },
 

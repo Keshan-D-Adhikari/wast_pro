@@ -4,11 +4,28 @@ import { iotDb, BIN_ID } from "../iotConfig";
 
 const COMPARTMENTS = ["plastic", "food", "metal"];
 
-function levelClass(level) {
-  if (level == null) return "";
-  if (level > 80) return "level-critical";
-  if (level > 50) return "level-warning";
-  return "level-ok";
+// The ESP32 firmware computes and uploads this exact status string per
+// compartment — EMPTY / LOW / HALF / 75% / FULL / ERROR — rather than the
+// app re-deriving a status from `level`. Keep this in sync with the
+// firmware's status enum (see Sensor_Algorithms / System_Logic docs).
+function levelClass(status) {
+  switch ((status || "").toUpperCase()) {
+    case "FULL":
+    case "ERROR":
+      return "level-critical";
+    case "HALF":
+    case "75%":
+      return "level-warning";
+    default:
+      return "level-ok";
+  }
+}
+
+function statusLabel(status) {
+  if (!status) return "No data";
+  const upper = status.toUpperCase();
+  if (upper === "75%") return "75% full";
+  return upper.charAt(0) + upper.slice(1).toLowerCase();
 }
 
 export default function BinStatus() {
@@ -43,18 +60,22 @@ export default function BinStatus() {
             return (
               <div className="card" key={type}>
                 <h3>{type}</h3>
-                <p className={`level ${levelClass(c.level)}`}>
+                <p className={`level ${levelClass(c.status)}`}>
                   {c.level != null ? `${c.level}%` : "—"}
                 </p>
+                <span className={`badge ${levelClass(c.status) === "level-critical" ? "status-cancelled" : levelClass(c.status) === "level-warning" ? "status-pending" : "status-completed"}`}>
+                  {statusLabel(c.status)}
+                </span>
+                {c.overweight && <p className="overweight-alert">⚠ Overweight</p>}
                 <dl>
                   <dt>Weight</dt>
                   <dd>{c.weight != null ? `${c.weight} kg` : "—"}</dd>
-                  <dt>Moisture</dt>
-                  <dd>{c.moisture != null ? `${c.moisture}%` : "—"}</dd>
-                  <dt>Overweight</dt>
-                  <dd>{c.overweight ? "Yes" : "No"}</dd>
-                  <dt>Status</dt>
-                  <dd>{c.status || "—"}</dd>
+                  {c.moisture != null && (
+                    <>
+                      <dt>Moisture</dt>
+                      <dd>{c.moisture}%</dd>
+                    </>
+                  )}
                   <dt>Last reading</dt>
                   <dd>{c.timestamp || "—"}</dd>
                 </dl>
