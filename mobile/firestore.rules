@@ -18,6 +18,16 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // True if the caller and toUid are exactly the buyer and seller (in
+    // either direction) on orders/{orderId}. Used to stop a signed-in user
+    // from spoofing an order_placed/order_cancelled notification to an
+    // arbitrary real user.
+    function isOrderParty(orderId, toUid) {
+      let order = get(/databases/$(database)/documents/orders/$(orderId)).data;
+      return (order.buyerUid == request.auth.uid && order.sellerUid == toUid) ||
+        (order.sellerUid == request.auth.uid && order.buyerUid == toUid);
+    }
+
     // users/{uid} - profile doc, keyed by the account's own auth uid.
     // Any signed-in user can read a profile (buyer/seller names are shown to each other),
     // but only the account owner can create/update their own doc, and role can't be changed after signup.
@@ -69,18 +79,26 @@ service cloud.firestore {
 
     // notifications/{id} - only the recipient can read or mark their own notification.
     // The app writes these for two cases: a self-notification ("bin_full", toUid == the
-    // creator's own uid) and an order event sent to the other party (toUid == that party's uid,
-    // no orderId/fromUid stored on the doc today). Full sender/recipient relationship checks
-    // aren't possible without that data, so creation is narrowed to the known notification
-    // shapes and a real recipient, which blocks arbitrary spam/garbage docs even though it
-    // can't yet prove the sender was actually involved in the order.
+    // creator's own uid) and an order event sent to the other party, carrying an `orderId`
+    // so isOrderParty() can confirm the sender and recipient are actually the buyer/seller
+    // on that order — this blocks a signed-in user from spoofing a notification to an
+    // arbitrary real user.
     match /notifications/{notifId} {
       allow read: if isSignedIn() && (resource.data.toUid == request.auth.uid || isAdmin());
       allow create: if isSignedIn() &&
-        request.resource.data.type in ['bin_full', 'order_placed', 'order_cancelled'] &&
-        request.resource.data.keys().hasOnly(['toUid', 'type', 'message', 'read', 'createdAt']) &&
+        request.resource.data.keys().hasAll(['toUid', 'type', 'message', 'read', 'createdAt']) &&
+        request.resource.data.keys().hasOnly(['toUid', 'type', 'message', 'read', 'createdAt', 'orderId']) &&
         request.resource.data.read == false &&
-        exists(/databases/$(database)/documents/users/$(request.resource.data.toUid));
+        exists(/databases/$(database)/documents/users/$(request.resource.data.toUid)) &&
+        (
+          (request.resource.data.type == 'bin_full' && request.resource.data.toUid == request.auth.uid) ||
+          (
+            request.resource.data.type in ['order_placed', 'order_cancelled'] &&
+            'orderId' in request.resource.data &&
+            exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId)) &&
+            isOrderParty(request.resource.data.orderId, request.resource.data.toUid)
+          )
+        );
       allow update: if isSignedIn() && resource.data.toUid == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.toUid == request.auth.uid;
     }

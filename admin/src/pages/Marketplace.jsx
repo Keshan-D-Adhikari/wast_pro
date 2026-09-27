@@ -1,30 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-} from "firebase/firestore";
+import { useMemo, useState } from "react";
+import { deleteDoc, doc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { filterListings } from "../lib/filters";
+import { usePaginatedCollection } from "../lib/usePaginatedCollection";
 
 export default function Marketplace() {
-  const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { docs: listings, loading, hasMore, loadMore } = usePaginatedCollection("marketplace");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-
-  useEffect(() => {
-    return onSnapshot(
-      collection(db, "marketplace"),
-      (snapshot) => {
-        setListings(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      },
-      () => setLoading(false)
-    );
-  }, []);
 
   const filtered = useMemo(
     () => filterListings(listings, { search, status: statusFilter, wasteType: typeFilter }),
@@ -100,6 +84,12 @@ export default function Marketplace() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {!loading && hasMore && (
+        <button type="button" className="load-more" onClick={loadMore}>
+          Load more
+        </button>
       )}
     </section>
   );

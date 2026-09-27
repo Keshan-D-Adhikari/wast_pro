@@ -149,7 +149,7 @@ export default function BuyerDashboard() {
         cancelledAt: null
       };
 
-      await addDoc(collection(db, "orders"), orderData);
+      const orderRef = await addDoc(collection(db, "orders"), orderData);
 
       await updateDoc(doc(db, "marketplace", buyingItem.id), {
         status: "sold"
@@ -160,12 +160,15 @@ export default function BuyerDashboard() {
         + buyingItem.totalPrice
         + (method === 'card' ? ' (PAID)' : ' (Cash on Delivery)');
 
+      // orderId lets Firestore rules verify the sender/recipient are
+      // actually the two parties on this order (see firestore.rules).
       await addDoc(collection(db, "notifications"), {
         toUid: buyingItem.sellerUid,
         type: "order_placed",
         message: notificationMsg,
         read: false,
         createdAt: serverTimestamp(),
+        orderId: orderRef.id,
       });
 
       setPaymentModalVisible(false);

@@ -106,7 +106,8 @@ export default function BuyerOrders() {
                 });
               }
 
-              // Notify seller
+              // Notify seller. orderId lets Firestore rules verify the
+              // sender/recipient are actually the two parties on this order.
               await addDoc(
                 collection(db, 'notifications'), {
                 toUid: order.sellerUid,
@@ -115,7 +116,8 @@ export default function BuyerOrders() {
                   + ' cancelled the order for '
                   + order.wasteType + ' waste.',
                 read: false,
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
+                orderId: order.id,
               });
 
               Alert.alert(

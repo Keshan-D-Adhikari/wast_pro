@@ -1,24 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { useMemo, useState } from "react";
+import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { filterUsers } from "../lib/filters";
+import { usePaginatedCollection } from "../lib/usePaginatedCollection";
 
 export default function Users() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { docs: users, loading, hasMore, loadMore } = usePaginatedCollection("users");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-
-  useEffect(() => {
-    return onSnapshot(
-      collection(db, "users"),
-      (snapshot) => {
-        setUsers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      },
-      () => setLoading(false)
-    );
-  }, []);
 
   const filtered = useMemo(
     () => filterUsers(users, { search, role: roleFilter }),
@@ -97,6 +86,12 @@ export default function Users() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {!loading && hasMore && (
+        <button type="button" className="load-more" onClick={loadMore}>
+          Load more
+        </button>
       )}
     </section>
   );

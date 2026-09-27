@@ -230,6 +230,22 @@ table {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
+.load-more {
+  display: block;
+  margin: 1rem auto 0;
+  background: #fff;
+  border: 1px solid #d9e1d6;
+  border-radius: 6px;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.85rem;
+  color: #1f3d31;
+  cursor: pointer;
+}
+
+.load-more:hover {
+  background: #f1f7ed;
+}
+
 th,
 td {
   text-align: left;

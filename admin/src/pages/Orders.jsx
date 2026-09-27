@@ -1,30 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { useMemo, useState } from "react";
+import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { filterOrders } from "../lib/filters";
+import { usePaginatedCollection } from "../lib/usePaginatedCollection";
 
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
 
 export default function Orders() {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { docs: rawOrders, loading, hasMore, loadMore } = usePaginatedCollection("orders");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  useEffect(() => {
-    return onSnapshot(
-      collection(db, "orders"),
-      (snapshot) => {
-        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        list.sort(
-          (a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)
-        );
-        setOrders(list);
-        setLoading(false);
-      },
-      () => setLoading(false)
-    );
-  }, []);
+  const orders = useMemo(
+    () =>
+      [...rawOrders].sort(
+        (a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)
+      ),
+    [rawOrders]
+  );
 
   const filtered = useMemo(
     () => filterOrders(orders, { search, status: statusFilter }),
@@ -101,6 +94,12 @@ export default function Orders() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {!loading && hasMore && (
+        <button type="button" className="load-more" onClick={loadMore}>
+          Load more
+        </button>
       )}
     </section>
   );
