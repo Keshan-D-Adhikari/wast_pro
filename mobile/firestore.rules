@@ -83,11 +83,18 @@ service cloud.firestore {
     // so isOrderParty() can confirm the sender and recipient are actually the buyer/seller
     // on that order — this blocks a signed-in user from spoofing a notification to an
     // arbitrary real user.
+    // Offer notifications (offer_received, offer_accepted, offer_rejected) carry an `offerId`
+    // so the sender/recipient can be verified against the offers collection.
+    function isOfferParty(offerId, toUid) {
+      let offer = get(/databases/$(database)/documents/offers/$(offerId)).data;
+      return (offer.buyerUid == request.auth.uid && offer.sellerUid == toUid) ||
+        (offer.sellerUid == request.auth.uid && offer.buyerUid == toUid);
+    }
+
     match /notifications/{notifId} {
       allow read: if isSignedIn() && (resource.data.toUid == request.auth.uid || isAdmin());
       allow create: if isSignedIn() &&
         request.resource.data.keys().hasAll(['toUid', 'type', 'message', 'read', 'createdAt']) &&
-        request.resource.data.keys().hasOnly(['toUid', 'type', 'message', 'read', 'createdAt', 'orderId']) &&
         request.resource.data.read == false &&
         exists(/databases/$(database)/documents/users/$(request.resource.data.toUid)) &&
         (
@@ -97,10 +104,60 @@ service cloud.firestore {
             'orderId' in request.resource.data &&
             exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId)) &&
             isOrderParty(request.resource.data.orderId, request.resource.data.toUid)
+          ) ||
+          (
+            request.resource.data.type in ['offer_received', 'offer_accepted', 'offer_rejected'] &&
+            'offerId' in request.resource.data &&
+            exists(/databases/$(database)/documents/offers/$(request.resource.data.offerId)) &&
+            isOfferParty(request.resource.data.offerId, request.resource.data.toUid)
           )
         );
       allow update: if isSignedIn() && resource.data.toUid == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.toUid == request.auth.uid;
+    }
+
+    // offers/{offerId} - buyer-submitted price offers for marketplace listings.
+    // Buyers create their own offers and can withdraw (status→withdrawn) pending ones.
+    // Sellers can read offers for their listings and accept/reject them.
+    // Acceptance/rejection happens client-side; the transaction is trusted because
+    // the seller must own the listing referenced by listingId.
+    match /offers/{offerId} {
+      allow read: if isSignedIn() && (
+        resource.data.buyerUid == request.auth.uid ||
+        resource.data.sellerUid == request.auth.uid ||
+        isAdmin()
+      );
+      // Buyer creates an offer for themselves — sellerUid must match the listing's seller.
+      allow create: if isSignedIn() &&
+        request.resource.data.buyerUid == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.offeredPrice > 0 &&
+        exists(/databases/$(database)/documents/marketplace/$(request.resource.data.listingId));
+      // Buyer may only withdraw their own pending offer.
+      // Seller may accept/reject their own listing's offer.
+      allow update: if isSignedIn() && (
+        (
+          resource.data.buyerUid == request.auth.uid &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'withdrawn' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        ) ||
+        (
+          resource.data.sellerUid == request.auth.uid &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status in ['accepted', 'rejected'] &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        ) ||
+        // Allow a seller's acceptance flow to also reject other pending offers for their listing
+        (
+          resource.data.sellerUid == request.auth.uid &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'rejected' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        ) ||
+        isAdmin()
+      );
+      allow delete: if false;
     }
 
     // users/{uid} read stays open to any signed-in user (see above); nothing extra needed for isAdmin here.

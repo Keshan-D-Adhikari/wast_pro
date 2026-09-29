@@ -8,6 +8,7 @@ import { collection, query, where, orderBy, onSnapshot } from "firebase/firestor
 import { Palette, Space, Radius, Type, wasteAccent } from "@/constants/design";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { Card, SectionTitle, Divider, DetailRow } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
@@ -82,7 +83,20 @@ export default function SellerOrders() {
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
-        <ScreenHeader title="My orders" subtitle="Purchases buyers made from you" back />
+        <ScreenHeader
+          title="My orders"
+          subtitle="Purchases buyers made from you"
+          back
+          right={
+            <Button
+              label="Offers"
+              icon="pricetag-outline"
+              variant="secondary"
+              onPress={() => router.push("/(tabs)/seller/SellerOffers")}
+              style={{ paddingHorizontal: Space.md }}
+            />
+          }
+        />
 
         {!loading && orders.length > 0 && (
           <Card tone="brand" elevation={0} style={styles.summaryCard}>

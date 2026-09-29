@@ -8,7 +8,7 @@ import {
   TextInput,
 } from "react-native";
 import { PieChart } from "react-native-chart-kit";
-import MapView, { Marker, PROVIDER_GOOGLE } from "../../../components/platform-map";
+import MapView, { Marker, APP_MAP_PROVIDER } from "../../../components/platform-map";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
 
@@ -330,7 +330,7 @@ export default function SellerDashboard() {
         <SectionTitle meta={binLocation ? undefined : 'Not set'}>Smart bin location</SectionTitle>
         <Card style={styles.mapCard} elevation={1}>
           <MapView
-            provider={PROVIDER_GOOGLE}
+            provider={APP_MAP_PROVIDER}
             style={styles.map}
             initialRegion={{
               latitude: binLocation?.latitude ?? 6.9271,

@@ -82,3 +82,20 @@ export interface UserLocation {
   latitude: number;
   longitude: number;
 }
+
+export interface Offer {
+  id: string;
+  listingId: string;
+  buyerUid: string;
+  buyerName: string;
+  sellerUid: string;
+  sellerName: string;
+  wasteType: string;
+  weightKg: number;
+  askingPrice: number;
+  offeredPrice: number;
+  /** pending | accepted | rejected | withdrawn */
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  createdAt: Timestamp;
+  updatedAt?: Timestamp | null;
+}

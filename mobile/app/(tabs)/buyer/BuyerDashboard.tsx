@@ -26,8 +26,8 @@ import {
   getDoc
 } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from "../../../components/platform-map";
-import { MarketplaceItem, UserLocation } from "../../../types";
+import MapView, { Marker, Polyline, APP_MAP_PROVIDER, Callout } from "../../../components/platform-map";
+import { MarketplaceItem, UserLocation, Offer } from "../../../types";
 import { calculateDistance } from "../../../utils/distance";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
@@ -68,6 +68,13 @@ export default function BuyerDashboard() {
   // (react-native-maps) and web (placeholder) halves of platform-map, and this
   // ref is only ever passed straight through to <MapView ref={mapRef} />.
   const mapRef = useRef<any>(null);
+
+  // ── Make an Offer state ──────────────────────────────────────────────────
+  const [offerItem, setOfferItem] = useState<MarketplaceItem | null>(null);
+  const [offerModalVisible, setOfferModalVisible] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerAmountError, setOfferAmountError] = useState('');
+  const [offerLoading, setOfferLoading] = useState(false);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -114,6 +121,75 @@ export default function BuyerDashboard() {
       userLocation.latitude, userLocation.longitude,
       sellerLoc.latitude, sellerLoc.longitude
     ).toFixed(1);
+  };
+
+  const handleMakeOffer = (item: MarketplaceItem) => {
+    setOfferItem(item);
+    setOfferAmount('');
+    setOfferAmountError('');
+    setOfferModalVisible(true);
+  };
+
+  const handleSubmitOffer = async () => {
+    if (!auth.currentUser || !offerItem) return;
+
+    const parsed = parseFloat(offerAmount);
+    if (!offerAmount || isNaN(parsed) || parsed <= 0) {
+      setOfferAmountError('Please enter a valid offer amount greater than 0.');
+      return;
+    }
+
+    setOfferLoading(true);
+    try {
+      const buyerDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      const buyerName = buyerDoc.exists()
+        ? (buyerDoc.data()?.fullName || 'Buyer')
+        : 'Buyer';
+
+      // Re-check the listing is still available before submitting
+      const listingSnap = await getDoc(doc(db, 'marketplace', offerItem.id));
+      if (!listingSnap.exists() || listingSnap.data().status !== 'available') {
+        Alert.alert('Listing unavailable', 'This listing has already been sold.');
+        setOfferModalVisible(false);
+        return;
+      }
+
+      const offerData: Omit<Offer, 'id'> = {
+        listingId: offerItem.id,
+        buyerUid: auth.currentUser.uid,
+        buyerName,
+        sellerUid: offerItem.sellerUid,
+        sellerName: offerItem.sellerName,
+        wasteType: offerItem.wasteType,
+        weightKg: offerItem.weightKg,
+        askingPrice: offerItem.totalPrice,
+        offeredPrice: parsed,
+        status: 'pending',
+        createdAt: serverTimestamp() as any,
+        updatedAt: null,
+      };
+
+      const offerRef = await addDoc(collection(db, 'offers'), offerData);
+
+      // Notify seller
+      await addDoc(collection(db, 'notifications'), {
+        toUid: offerItem.sellerUid,
+        type: 'offer_received',
+        message: `${buyerName} made an offer of Rs ${parsed} for your ${offerItem.wasteType} waste (asking Rs ${offerItem.totalPrice}).`,
+        read: false,
+        createdAt: serverTimestamp(),
+        offerId: offerRef.id,
+      });
+
+      setOfferModalVisible(false);
+      setOfferItem(null);
+      setOfferAmount('');
+      Alert.alert('Offer submitted!', `Your offer of Rs ${parsed} has been sent to ${offerItem.sellerName}. Check My Offers for updates.`);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Could not submit offer. Please try again.');
+    } finally {
+      setOfferLoading(false);
+    }
   };
 
   const handleBuyNow = (item: MarketplaceItem) => {
@@ -338,6 +414,13 @@ export default function BuyerDashboard() {
             style={styles.actionFlex}
           />
         </View>
+        <Button
+          label="Make an Offer"
+          icon="pricetag-outline"
+          variant="secondary"
+          onPress={() => handleMakeOffer(item)}
+          style={styles.offerBtn}
+        />
       </Card>
     );
   };
@@ -408,7 +491,7 @@ export default function BuyerDashboard() {
 
           <MapView
             ref={mapRef}
-            provider={PROVIDER_GOOGLE}
+            provider={APP_MAP_PROVIDER}
             style={styles.flex}
             initialRegion={userLocation && selectedItem ? {
               latitude: (userLocation.latitude + selectedItem.location.latitude) / 2,
@@ -553,6 +636,47 @@ export default function BuyerDashboard() {
         />
       </Sheet>
 
+      {/* Make an Offer Sheet */}
+      <Sheet
+        visible={offerModalVisible}
+        title="Make an offer"
+        onClose={() => {
+          setOfferModalVisible(false);
+          setOfferAmount('');
+          setOfferAmountError('');
+        }}
+        scrollable
+      >
+        <Card tone="brand" elevation={0} style={styles.summaryCard}>
+          <DetailRow label="Waste type" value={offerItem?.wasteType ?? '—'} />
+          <DetailRow label="Weight" value={`${offerItem?.weightKg ?? 0} kg`} />
+          <DetailRow label="Seller" value={offerItem?.sellerName ?? '—'} />
+          <Divider />
+          <DetailRow label="Asking price" value={`Rs ${offerItem?.totalPrice ?? 0}`} emphasis />
+        </Card>
+
+        <TextField
+          label="Your offer (Rs)"
+          icon="pricetag-outline"
+          value={offerAmount}
+          onChangeText={(t) => {
+            setOfferAmount(t.replace(/[^0-9.]/g, ''));
+            setOfferAmountError('');
+          }}
+          keyboardType="decimal-pad"
+          placeholder="e.g. 400"
+          error={offerAmountError}
+        />
+
+        <Button
+          label="Submit offer"
+          icon="checkmark-outline"
+          onPress={handleSubmitOffer}
+          loading={offerLoading}
+          style={{ marginTop: Space.sm }}
+        />
+      </Sheet>
+
       <BottomNav role="buyer" active="home" />
     </View>
   );
@@ -567,6 +691,7 @@ const styles = StyleSheet.create({
   search: { marginBottom: Space.md },
 
   listingCard: { marginBottom: Space.lg },
+  offerBtn: { marginTop: Space.sm },
   listingHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   listingIcon: {
     width: 48,

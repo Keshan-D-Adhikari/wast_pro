@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Alert, Image } from "react-native";
+import { View, Text, StyleSheet, Alert, Image, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
@@ -6,8 +6,8 @@ import { db, auth } from "../../../firebaseConfig";
 import { signOut } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 
-import { Palette, Space, Radius, Type } from "@/constants/design";
-import { Screen } from "@/components/ui/screen";
+import { Palette, Space, Radius, Type, Shadow } from "@/constants/design";
+import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { Card, SectionTitle } from "@/components/ui/card";
 import { ListOption, StatTile } from "@/components/ui/list-option";
 import { LoadingState } from "@/components/ui/empty-state";
@@ -92,7 +92,20 @@ export default function BuyerProfile() {
 
   return (
     <View style={styles.root}>
-      <Screen withBottomNav contentStyle={styles.content}>
+      <Screen withBottomNav>
+        <ScreenHeader
+          title="Profile"
+          right={
+            <TouchableOpacity
+              style={styles.settingsBtn}
+              hitSlop={8}
+              accessibilityLabel="Settings"
+              onPress={() => router.push("/(tabs)/buyer/EditProfile")}
+            >
+              <Ionicons name="settings-outline" size={22} color={Palette.brand[700]} />
+            </TouchableOpacity>
+          }
+        />
         {/* Identity card */}
         <Card style={styles.identityCard} elevation={2}>
           <View style={styles.avatar}>
@@ -195,7 +208,15 @@ export default function BuyerProfile() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Palette.background },
-  content: { paddingTop: Space['3xl'] },
+  settingsBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow[1],
+  },
 
   identityCard: { alignItems: 'center', paddingVertical: Space['2xl'], gap: Space.xs },
   avatar: {

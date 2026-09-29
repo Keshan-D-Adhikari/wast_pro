@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../../../firebaseConfig';
 import * as Location from 'expo-location';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../../../components/platform-map';
+import MapView, { Marker, Polyline, APP_MAP_PROVIDER } from '../../../components/platform-map';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from "react";
@@ -253,7 +253,20 @@ export default function BuyerOrders() {
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
-        <ScreenHeader title="My purchases" subtitle="Orders you placed with sellers" back />
+        <ScreenHeader
+          title="My purchases"
+          subtitle="Orders you placed with sellers"
+          back
+          right={
+            <Button
+              label="Offers"
+              icon="pricetag-outline"
+              variant="secondary"
+              onPress={() => router.push("/(tabs)/buyer/BuyerOffers")}
+              style={{ paddingHorizontal: Space.md }}
+            />
+          }
+        />
 
         {!loading && orders.length > 0 && (
           <Card tone="brand" elevation={0} style={styles.summaryCard}>
@@ -312,7 +325,7 @@ export default function BuyerOrders() {
           </View>
 
           <MapView
-            provider={PROVIDER_GOOGLE}
+            provider={APP_MAP_PROVIDER}
             style={styles.flex}
             initialRegion={buyerLocation && sellerLocation ? {
               latitude: (buyerLocation.latitude + sellerLocation.latitude) / 2,

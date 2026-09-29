@@ -13,6 +13,56 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 
+const SRI_LANKAN_LOCATIONS = [
+  'Colombo', 'Colombo 01 – Fort', 'Colombo 02 – Slave Island', 'Colombo 03 – Kollupitiya',
+  'Colombo 04 – Bambalapitiya', 'Colombo 05 – Havelock Town', 'Colombo 06 – Wellawatte',
+  'Colombo 07 – Cinnamon Gardens', 'Colombo 08 – Borella', 'Colombo 09 – Dematagoda',
+  'Colombo 10 – Maradana', 'Colombo 12 – Hulftsdorp', 'Colombo 13 – Kotahena',
+  'Colombo 14 – Grandpass', 'Colombo 15 – Mattakkuliya', 'Dehiwala-Mount Lavinia',
+  'Sri Jayawardenepura Kotte', 'Moratuwa', 'Negombo', 'Wattala', 'Maharagama', 'Nugegoda',
+  'Kaduwela', 'Homagama', 'Piliyandala', 'Panadura', 'Kalutara', 'Kandy', 'Peradeniya',
+  'Katugastota', 'Kundasale', 'Gampola', 'Nuwara Eliya', 'Hatton', 'Matale', 'Galle',
+  'Matara', 'Hambantota', 'Hikkaduwa', 'Unawatuna', 'Ambalangoda', 'Jaffna', 'Kilinochchi',
+  'Mannar', 'Vavuniya', 'Trincomalee', 'Batticaloa', 'Ampara', 'Kalmunai', 'Kurunegala',
+  'Puttalam', 'Chilaw', 'Kuliyapitiya', 'Anuradhapura', 'Polonnaruwa', 'Badulla',
+  'Bandarawela', 'Ella', 'Monaragala', 'Ratnapura', 'Kegalle'
+];
+
+const normalizePhone = (p: string) => {
+  let cleaned = p.replace(/[^\d+]/g, '');
+  if (cleaned.startsWith('07')) {
+    cleaned = '+94' + cleaned.slice(1);
+  } else if (cleaned.startsWith('94')) {
+    cleaned = '+' + cleaned;
+  }
+  return cleaned;
+};
+
+const formatSriLankanPhone = (value: string) => {
+  let cleaned = value.replace(/[^\d+]/g, '');
+  
+  if (cleaned.startsWith('07')) {
+    cleaned = '+94' + cleaned.slice(1);
+  } else if (cleaned.startsWith('94')) {
+    cleaned = '+' + cleaned;
+  }
+  
+  if (cleaned.startsWith('+94')) {
+    const country = cleaned.slice(0, 3);
+    const network = cleaned.slice(3, 5);
+    const mid = cleaned.slice(5, 8);
+    const end = cleaned.slice(8, 12);
+    
+    let formatted = country;
+    if (network) formatted += ' ' + network;
+    if (mid) formatted += ' ' + mid;
+    if (end) formatted += ' ' + end;
+    
+    return formatted.trim();
+  }
+  return cleaned;
+};
+
 /**
  * Shared profile editor for both roles. The seller and buyer routes render this
  * with a different `variant`; only the name label and success copy differ.
@@ -28,6 +78,8 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [photoURL, setPhotoURL] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -38,7 +90,7 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
           const data = userDoc.data();
           setName(data.fullName || '');
           setEmail(data.email || '');
-          setPhone(data.phone || '');
+          setPhone(data.phone ? formatSriLankanPhone(data.phone) : '');
           setLocation(data.location || '');
           if (data.photoURL) setPhotoURL(data.photoURL);
         }
@@ -48,6 +100,20 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     };
     fetchUserData();
   }, []);
+
+  const handlePhoneChange = (text: string) => {
+    setPhone(formatSriLankanPhone(text));
+    setPhoneError('');
+  };
+
+  const handleLocationChange = (text: string) => {
+    setLocation(text);
+    setShowSuggestions(true);
+  };
+
+  const suggestions = location.trim().length > 0
+    ? SRI_LANKAN_LOCATIONS.filter(loc => loc.toLowerCase().includes(location.trim().toLowerCase())).slice(0, 6)
+    : [];
 
   const handlePickImage = async () => {
     Alert.alert('Profile Photo', 'Choose an option', [
@@ -140,12 +206,23 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
 
   const handleSave = async () => {
     if (!auth.currentUser) return;
+    
+    let normalizedPhone = '';
+    if (phone.trim()) {
+      normalizedPhone = normalizePhone(phone);
+      const regex = /^\+947\d{8}$/;
+      if (!regex.test(normalizedPhone)) {
+        setPhoneError('Please enter a valid Sri Lankan mobile number (e.g. 0712345678)');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       await updateDoc(doc(db, 'users', auth.currentUser.uid), {
         fullName: name,
-        phone: phone,
-        location: location,
+        phone: normalizedPhone,
+        location: location.trim(),
         updatedAt: serverTimestamp(),
       });
       Alert.alert(
@@ -210,16 +287,41 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
           label="Phone Number"
           icon="call-outline"
           value={phone}
-          onChangeText={setPhone}
+          onChangeText={handlePhoneChange}
           keyboardType="phone-pad"
+          error={phoneError}
         />
 
-        <TextField
-          label="Location / Address"
-          icon="location-outline"
-          value={location}
-          onChangeText={setLocation}
-        />
+        <View style={{ zIndex: 1 }}>
+          <TextField
+            label="Location / Address"
+            icon="location-outline"
+            value={location}
+            onChangeText={handleLocationChange}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              // Delay hiding to allow tap on suggestion to register
+              setTimeout(() => setShowSuggestions(false), 200);
+            }}
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <Card style={styles.suggestionsCard} elevation={2}>
+              {suggestions.map((s, i) => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.suggestionItem, i < suggestions.length - 1 && styles.suggestionBorder]}
+                  onPress={() => {
+                    setLocation(s);
+                    setShowSuggestions(false);
+                  }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <Text style={Type.body}>{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </Card>
+          )}
+        </View>
 
         <Button label="Save changes" onPress={handleSave} loading={loading} />
       </Card>
@@ -262,5 +364,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Space.md,
     marginBottom: Space['2xl'],
+  },
+  suggestionsCard: {
+    position: 'absolute',
+    top: 70, // Just below TextField (which is ~52px tall + label)
+    left: 0,
+    right: 0,
+    padding: 0,
+    zIndex: 10,
+  },
+  suggestionItem: {
+    padding: Space.lg,
+  },
+  suggestionBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.ink[100],
   },
 });
