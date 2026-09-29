@@ -19,9 +19,29 @@ const iotApp = getApps().find(app => app.name === 'iot')
 
 export const iotDb = getDatabase(iotApp);
 
+// Attempt anonymous sign-in so the IoT RTDB rules can use request.auth.
+// This is OPTIONAL — if the IoT project has Anonymous Auth disabled or has
+// open read rules (".read": true for the bins path), sensor data will still
+// load correctly without it.
+//
+// If you see auth/configuration-not-found:
+//   Firebase Console → [IoT project] → Authentication → Sign-in method
+//   → Anonymous → Enable
+//
+// If you prefer not to enable Anonymous Auth, open your IoT RTDB rules and
+// allow unauthenticated reads for the bins path:
+//   { "rules": { "bins": { ".read": true, ".write": false } } }
 const iotAuth = getAuth(iotApp);
 signInAnonymously(iotAuth).catch(error => {
-  console.warn('IoT project anonymous sign-in failed:', error);
+  if (error.code === 'auth/configuration-not-found') {
+    console.warn(
+      '[IoT] Anonymous Auth is disabled in the IoT Firebase project. ' +
+      'Enable it at: Firebase Console → IoT project → Authentication → Sign-in method → Anonymous. ' +
+      'Sensor data will still load if RTDB rules allow unauthenticated reads.'
+    );
+  } else {
+    console.warn('[IoT] Anonymous sign-in failed:', error.code, error.message);
+  }
 });
 
 // The firmware docs describe a single physical prototype bin at this path
