@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { db, auth } from '../../../firebaseConfig';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { iotDb, BIN_ID } from '../../../iotConfig';
+import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL } from '../../../iotConfig';
 import { ref as dbRef, onValue } from 'firebase/database';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,7 +75,13 @@ export default function AddWaste() {
     fetchUser();
 
     // Live sensor readings come from the ESP32 firmware's own Realtime
-    // Database project (see iotConfig.js), not this app's Firestore.
+    // Database project (see iotConfig.js), or mock telemetry in dev mode.
+    if (USE_MOCK_IOT) {
+      setBinData(MOCK_BIN_DATA_NORMAL as BinData);
+      setBinExists(true);
+      return;
+    }
+
     const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
     const unsubscribe = onValue(binNodeRef, (snapshot) => {
       if (snapshot.exists()) {

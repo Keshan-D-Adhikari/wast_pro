@@ -15,7 +15,7 @@ import { useState, useEffect, useRef } from "react";
 // Firebase Imports
 import { db, auth } from "../../../firebaseConfig";
 import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { iotDb, BIN_ID } from "../../../iotConfig";
+import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../../../iotConfig";
 import { ref as dbRef, onValue } from "firebase/database";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
@@ -47,11 +47,16 @@ export default function SellerDashboard() {
   const [sellerData, setSellerData] = useState<UserProfile | null>(null);
 
   //Data for compartment 3 according to objective 1 of the proposal [citation: 38]
-  const [binData, setBinData] = useState<BinData>({
-    plastic: { level: 0, weight: 0 },
-    food: { level: 0, weight: 0, moisture: 0 },
-    metal: { level: 0, weight: 0 },
-  });
+  const [mockPreset, setMockPreset] = useState<'normal' | 'alert'>('normal');
+  const [binData, setBinData] = useState<BinData>(
+    USE_MOCK_IOT
+      ? MOCK_BIN_DATA_NORMAL
+      : {
+          plastic: { level: 0, weight: 0 },
+          food: { level: 0, weight: 0, moisture: 0 },
+          metal: { level: 0, weight: 0 },
+        }
+  );
   // The ESP32 firmware doesn't upload GPS coordinates (see iotConfig.js),
   // and users.location is a free-text address, so there's currently no
   // source for a live bin location — the map below always shows "Not set".
@@ -64,6 +69,14 @@ export default function SellerDashboard() {
   // keeping it out of state avoids re-running the notify effect on every change.
   const notifiedBinsRef = useRef<WasteType[]>([]);
 
+  // Update mock bin data when mock preset changes
+  useEffect(() => {
+    if (USE_MOCK_IOT) {
+      setBinData(mockPreset === 'alert' ? MOCK_BIN_DATA_ALERT : MOCK_BIN_DATA_NORMAL);
+      setLoading(false);
+    }
+  }, [mockPreset]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -75,18 +88,23 @@ export default function SellerDashboard() {
       }
     }, (error) => console.log("User Fetch Error:", error));
 
-    // 2. Sensor data (Fill Level, Weight, Moisture) — lives in the ESP32
-    // firmware's own Realtime Database project, not this app's Firestore.
-    const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
-    const unsubscribeBins = onValue(binNodeRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setBinData(snapshot.val() as BinData);
-      }
+    // 2. Sensor data (Fill Level, Weight, Moisture)
+    let unsubscribeBins = () => {};
+    if (USE_MOCK_IOT) {
+      setBinData(mockPreset === 'alert' ? MOCK_BIN_DATA_ALERT : MOCK_BIN_DATA_NORMAL);
       setLoading(false);
-    }, (error) => {
-      console.log("Bin Fetch Error:", error);
-      setLoading(false);
-    });
+    } else {
+      const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
+      unsubscribeBins = onValue(binNodeRef, (snapshot) => {
+        if (snapshot.exists()) {
+          setBinData(snapshot.val() as BinData);
+        }
+        setLoading(false);
+      }, (error) => {
+        console.log("Bin Fetch Error:", error);
+        setLoading(false);
+      });
+    }
 
     // 3. Notifications List (Sorted client-side to avoid index error)
     const q = query(
@@ -110,7 +128,7 @@ export default function SellerDashboard() {
       unsubscribeBins();
       unsubscribeNotifs();
     };
-  }, [user]);
+  }, [user, mockPreset]);
 
   // Automated Bin Full Notifications — driven by the firmware's own `status`
   // and `overweight` fields (see constants/bin-status.ts) rather than a
@@ -287,8 +305,43 @@ export default function SellerDashboard() {
           </View>
         </Card>
 
+        {/* Demo / Mock Telemetry Mode Banner */}
+        {USE_MOCK_IOT && (
+          <View style={styles.demoBanner}>
+            <View style={styles.demoBannerHeader}>
+              <Ionicons name="flask-outline" size={16} color={Palette.status.warning.base} />
+              <Text style={styles.demoBannerTitle}>DEMO / MOCK TELEMETRY MODE</Text>
+            </View>
+            <Text style={styles.demoBannerSubtitle}>
+              Hardware simulation active. Toggle preset to test fill levels & alerts:
+            </Text>
+            <View style={styles.demoToggleRow}>
+              <TouchableOpacity
+                style={[styles.demoToggleBtn, mockPreset === 'normal' && styles.demoToggleBtnActive]}
+                onPress={() => setMockPreset('normal')}
+                accessibilityRole="button"
+                accessibilityLabel="Set mock preset to normal"
+              >
+                <Text style={[styles.demoToggleText, mockPreset === 'normal' && styles.demoToggleTextActive]}>
+                  Preset: Normal (Low/Half)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.demoToggleBtn, mockPreset === 'alert' && styles.demoToggleBtnActiveAlert]}
+                onPress={() => setMockPreset('alert')}
+                accessibilityRole="button"
+                accessibilityLabel="Set mock preset to alert"
+              >
+                <Text style={[styles.demoToggleText, mockPreset === 'alert' && styles.demoToggleTextActiveAlert]}>
+                  Preset: Alert (Full/Overweight)
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Bin Monitoring Section [cite: 38] */}
-        <SectionTitle meta="Live">Smart bin monitoring</SectionTitle>
+        <SectionTitle meta={USE_MOCK_IOT ? "DEMO / MOCK" : "Live"}>Smart bin monitoring</SectionTitle>
         <View style={styles.binRow}>
           {COMPARTMENTS.map((c) => (
             <BinCard key={c.type} type={c.type} label={c.label} icon={c.icon} />
@@ -545,5 +598,69 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: Radius.pill,
     backgroundColor: Palette.brand[600],
+  },
+
+  demoBanner: {
+    backgroundColor: Palette.status.warning.tint,
+    borderWidth: 1,
+    borderColor: 'rgba(180, 83, 9, 0.25)',
+    borderRadius: Radius.lg,
+    padding: Space.lg,
+    marginTop: Space.lg,
+    marginBottom: Space.sm,
+  },
+  demoBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    marginBottom: 4,
+  },
+  demoBannerTitle: {
+    ...Type.caption,
+    color: Palette.status.warning.base,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  demoBannerSubtitle: {
+    ...Type.small,
+    color: Palette.ink[700],
+    marginBottom: Space.md,
+  },
+  demoToggleRow: {
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
+  demoToggleBtn: {
+    flex: 1,
+    paddingVertical: Space.sm,
+    paddingHorizontal: Space.sm,
+    borderRadius: Radius.sm,
+    backgroundColor: Palette.surface,
+    borderWidth: 1.5,
+    borderColor: Palette.ink[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoToggleBtnActive: {
+    backgroundColor: Palette.brand[50],
+    borderColor: Palette.brand[600],
+  },
+  demoToggleBtnActiveAlert: {
+    backgroundColor: Palette.status.danger.tint,
+    borderColor: Palette.status.danger.base,
+  },
+  demoToggleText: {
+    ...Type.caption,
+    fontWeight: '600',
+    color: Palette.ink[700],
+    textAlign: 'center',
+  },
+  demoToggleTextActive: {
+    color: Palette.brand[700],
+    fontWeight: '700',
+  },
+  demoToggleTextActiveAlert: {
+    color: Palette.status.danger.base,
+    fontWeight: '700',
   },
 });
