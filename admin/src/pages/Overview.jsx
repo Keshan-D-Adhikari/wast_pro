@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { IconUsers, IconMarketplace, IconOrders, IconLeaf } from "../components/Icons";
 
 export default function Overview() {
   const [users, setUsers] = useState([]);
@@ -36,27 +37,37 @@ export default function Overview() {
   ).length;
 
   const stats = [
-    { label: "Total users", value: users.length },
-    { label: "Sellers", value: sellers },
-    { label: "Buyers", value: buyers },
-    { label: "Active listings", value: activeListings },
-    { label: "Total orders", value: orders.length },
-    { label: "Pending / confirmed orders", value: pendingOrders },
-    { label: "Completed orders", value: completedOrders.length },
-    { label: "Revenue (completed)", value: `Rs. ${revenue.toLocaleString()}` },
+    { label: "Total registered users", value: users.length, icon: <IconUsers size={22} />, category: "users" },
+    { label: "Active sellers", value: sellers, icon: <IconUsers size={22} />, category: "users" },
+    { label: "Active buyers", value: buyers, icon: <IconUsers size={22} />, category: "users" },
+    { label: "Available listings", value: activeListings, icon: <IconMarketplace size={22} />, category: "market" },
+    { label: "Total orders placed", value: orders.length, icon: <IconOrders size={22} />, category: "orders" },
+    { label: "Pending / confirmed orders", value: pendingOrders, icon: <IconOrders size={22} />, category: "orders" },
+    { label: "Completed orders", value: completedOrders.length, icon: <IconOrders size={22} />, category: "orders" },
+    { label: "Completed revenue", value: `Rs. ${revenue.toLocaleString()}`, icon: <IconLeaf size={22} />, category: "revenue" },
   ];
 
   return (
     <section>
-      <h1>Overview</h1>
-      <p className="subtitle">Snapshot across users, marketplace, and orders</p>
+      <div className="page-header">
+        <div>
+          <h1>Platform Overview</h1>
+          <p className="subtitle">Real-time statistics across users, marketplace activity, and completed transactions</p>
+        </div>
+      </div>
 
       {loading ? (
-        <p>Loading…</p>
+        <div className="empty-state-box">
+          <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
+          <p>Loading real-time overview metrics…</p>
+        </div>
       ) : (
         <div className="stat-grid">
           {stats.map((s) => (
-            <div className="stat-card" key={s.label}>
+            <div className={`stat-card ${s.category}`} key={s.label}>
+              <div className="stat-card-top">
+                <div className="stat-icon-wrapper">{s.icon}</div>
+              </div>
               <p className="stat-value">{s.value}</p>
               <p className="stat-label">{s.label}</p>
             </div>
