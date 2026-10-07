@@ -77,15 +77,45 @@ service cloud.firestore {
       allow write: if isOwner(uid);
     }
 
+    // True if this update is a buyer buying the listing: available -> sold, in the same write
+    // (batch/transaction) that creates their own order for it. `soldOrderId` records which order
+    // bought it, so a later cancel can be tied back to that order.
+    function isBuyingListing(listingId) {
+      let orderPath = /databases/$(database)/documents/orders/$(request.resource.data.soldOrderId);
+      return resource.data.status == 'available' &&
+        request.resource.data.status == 'sold' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldOrderId']) &&
+        !exists(orderPath) &&
+        existsAfter(orderPath) &&
+        getAfter(orderPath).data.buyerUid == request.auth.uid &&
+        getAfter(orderPath).data.listingId == listingId;
+    }
+
+    // True if this update puts a sold listing back on the market because its buyer cancelled the
+    // order that bought it, in the same write that marks that order cancelled.
+    function isRestoringListing(listingId) {
+      let orderPath = /databases/$(database)/documents/orders/$(resource.data.soldOrderId);
+      return resource.data.status == 'sold' &&
+        request.resource.data.status == 'available' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldOrderId']) &&
+        !('soldOrderId' in request.resource.data) &&
+        get(orderPath).data.status != 'cancelled' &&
+        getAfter(orderPath).data.status == 'cancelled' &&
+        getAfter(orderPath).data.buyerUid == request.auth.uid &&
+        getAfter(orderPath).data.listingId == listingId;
+    }
+
     // marketplace/{listingId} - waste listings. Any signed-in user can browse them.
-    // Only the seller who created a listing can create/edit/delete it, except a buyer is allowed
-    // to flip `status` alone (available <-> sold) when buying or cancelling an order.
+    // The seller who created a listing can create/edit/delete it. A buyer can only change a
+    // listing as part of buying it or cancelling that purchase (see the two functions above) -
+    // they can no longer flip anyone's listing to sold on their own.
     match /marketplace/{listingId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.sellerUid == request.auth.uid;
       allow update: if isSignedIn() && (
         resource.data.sellerUid == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        isBuyingListing(listingId) ||
+        isRestoringListing(listingId)
       );
       allow delete: if isSignedIn() && (resource.data.sellerUid == request.auth.uid || isAdmin());
     }

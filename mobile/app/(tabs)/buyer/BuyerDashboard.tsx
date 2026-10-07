@@ -14,16 +14,17 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { db, auth, functions } from "../../../firebaseConfig";
 import { httpsCallable } from "firebase/functions";
+import { FirebaseError } from "firebase/app";
 import {
   collection,
   onSnapshot,
   query,
   where,
   addDoc,
-  updateDoc,
   doc,
   serverTimestamp,
-  getDoc
+  getDoc,
+  writeBatch
 } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, APP_MAP_PROVIDER, Callout } from "../../../components/platform-map";
@@ -225,11 +226,25 @@ export default function BuyerDashboard() {
         cancelledAt: null
       };
 
-      const orderRef = await addDoc(collection(db, "orders"), orderData);
-
-      await updateDoc(doc(db, "marketplace", buyingItem.id), {
-        status: "sold"
+      // Create the order and flip the listing to sold in ONE atomic batch.
+      // Firestore rules require the listing to still be 'available' at commit
+      // time, so if another buyer got there first this whole batch is rejected
+      // (no order is created) instead of both buyers "buying" the same listing.
+      const orderRef = doc(collection(db, "orders"));
+      const batch = writeBatch(db);
+      batch.set(orderRef, orderData);
+      batch.update(doc(db, "marketplace", buyingItem.id), {
+        status: "sold",
+        soldOrderId: orderRef.id,
       });
+      try {
+        await batch.commit();
+      } catch (e) {
+        if (e instanceof FirebaseError && e.code === 'permission-denied') {
+          throw new Error('Sorry, this listing was just bought by someone else or is no longer available.');
+        }
+        throw e;
+      }
 
       const notificationMsg = buyerName + ' placed an order for your '
         + buyingItem.wasteType + ' waste - Rs '

@@ -15,6 +15,9 @@ import {
   updateDoc,
   addDoc,
   doc,
+  getDoc,
+  writeBatch,
+  deleteField,
   serverTimestamp
 } from 'firebase/firestore';
 import { auth, db, functions } from '../../../firebaseConfig';
@@ -139,20 +142,20 @@ export default function BuyerOrders() {
               // Mark cancelled rather than deleting the order doc, so the
               // order stays in history (visible to the seller/admin) instead
               // of erasing evidence of what happened.
-              await updateDoc(
-                doc(db, 'orders', order.id), {
+              // Cancel the order and put the listing back on the market in one
+              // atomic batch. The listing is only restored if THIS order is the
+              // one that bought it (soldOrderId); rules enforce the same.
+              const listingRef = doc(db, 'marketplace', order.listingId);
+              const listingSnap = await getDoc(listingRef);
+              const batch = writeBatch(db);
+              batch.update(doc(db, 'orders', order.id), {
                 status: 'cancelled',
                 cancelledAt: serverTimestamp(),
               });
-
-              // Restore listing to marketplace
-              if (order.listingId) {
-                await updateDoc(
-                  doc(db, 'marketplace',
-                    order.listingId), {
-                  status: 'available'
-                });
+              if (listingSnap.exists() && listingSnap.data().soldOrderId === order.id) {
+                batch.update(listingRef, { status: 'available', soldOrderId: deleteField() });
               }
+              await batch.commit();
 
               // Notify seller. orderId lets Firestore rules verify the
               // sender/recipient are actually the two parties on this order.

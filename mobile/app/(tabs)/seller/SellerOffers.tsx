@@ -117,7 +117,7 @@ export default function SellerOffers() {
                 // Mark offer accepted
                 tx.update(offerRef, { status: 'accepted', updatedAt: serverTimestamp() });
                 // Mark listing sold
-                tx.update(listingRef, { status: 'sold' });
+                tx.update(listingRef, { status: 'sold', soldOrderId: orderRef.id });
                 // Create order
                 tx.set(orderRef, orderData);
               });

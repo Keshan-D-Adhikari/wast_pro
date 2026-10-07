@@ -53,6 +53,8 @@ export interface MarketplaceItem {
     longitude: number;
   };
   status: 'available' | 'sold';
+  /** Set while sold: the order that bought it (lets rules tie a cancel back to it). */
+  soldOrderId?: string;
   createdAt?: Timestamp;
 }
 
