@@ -26,28 +26,30 @@ function statusLabel(status) {
 }
 
 export default function BinStatus() {
-  const [bin, setBin] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [liveBin, setLiveBin] = useState(null);
+  const [liveLoading, setLiveLoading] = useState(true);
   const [mockPreset, setMockPreset] = useState("normal");
 
+  // In mock mode the bin data is derived from the selected preset during
+  // render, rather than copied into state from an effect.
+  const bin = USE_MOCK_IOT
+    ? (mockPreset === "alert" ? MOCK_BIN_DATA_ALERT : MOCK_BIN_DATA_NORMAL)
+    : liveBin;
+  const loading = USE_MOCK_IOT ? false : liveLoading;
+
   useEffect(() => {
-    if (USE_MOCK_IOT) {
-      setBin(mockPreset === "alert" ? MOCK_BIN_DATA_ALERT : MOCK_BIN_DATA_NORMAL);
-      setLoading(false);
-      return;
-    }
+    if (USE_MOCK_IOT) return;
 
     const binNodeRef = ref(iotDb, `bins/${BIN_ID}`);
-    const unsubscribe = onValue(
+    return onValue(
       binNodeRef,
       (snapshot) => {
-        setBin(snapshot.val());
-        setLoading(false);
+        setLiveBin(snapshot.val());
+        setLiveLoading(false);
       },
-      () => setLoading(false)
+      () => setLiveLoading(false)
     );
-    return unsubscribe;
-  }, [mockPreset]);
+  }, []);
 
   return (
     <section>
