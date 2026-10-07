@@ -43,14 +43,29 @@ service cloud.firestore {
         order.paymentStatus == 'pending';
     }
 
+    // True if `order` is a plain purchase of an available listing at the listing's own seller and price.
+    function isDirectPurchaseOfListing(order) {
+      let listing = get(/databases/$(database)/documents/marketplace/$(order.listingId)).data;
+      return listing.status == 'available' &&
+        order.sellerUid == listing.sellerUid &&
+        order.totalPrice == listing.totalPrice;
+    }
+
     // users/{uid} - profile doc, keyed by the account's own auth uid.
-    // Any signed-in user can read a profile (buyer/seller names are shown to each other),
-    // but only the account owner can create/update their own doc, and role can't be changed after signup.
+    // Private: only the owner and admins can read it (it holds email/phone/address). Buyer and
+    // seller names shown to each other come from the names copied onto listings, offers and orders.
+    // Sign-up may only create a seller or buyer profile (an admin is made by hand in the console),
+    // and the owner can only edit their own contact details, never role, points or `disabled`.
     match /users/{uid} {
-      allow read: if isSignedIn();
-      allow create: if isOwner(uid);
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) &&
+        request.resource.data.role in ['seller', 'buyer'] &&
+        !('disabled' in request.resource.data) &&
+        !('points' in request.resource.data);
       allow update: if
-        (isOwner(uid) && request.resource.data.role == resource.data.role) ||
+        (isOwner(uid) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['fullName', 'phone', 'location', 'photoURL', 'updatedAt'])) ||
         (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
       allow delete: if false;
     }
@@ -87,17 +102,54 @@ service cloud.firestore {
       // accepting a buyer's offer (SellerOffers.tsx). The seller path is only allowed when
       // the order mirrors an offer that this same transaction flips to 'accepted' (getAfter),
       // so a seller can't invent an order for an arbitrary buyer or price.
+      // A direct purchase must match the real listing: its seller, its price, and still available.
       allow create: if isSignedIn() && (
-        request.resource.data.buyerUid == request.auth.uid ||
+        (
+          request.resource.data.buyerUid == request.auth.uid &&
+          !('offerId' in request.resource.data) &&
+          isDirectPurchaseOfListing(request.resource.data)
+        ) ||
         (
           request.resource.data.sellerUid == request.auth.uid &&
           'offerId' in request.resource.data &&
           isAcceptedOfferOrder(request.resource.data)
         )
       );
+      // Updates are limited to specific transitions, and never touch price, parties or listing:
+      //  - buyer cancels their own unpaid, not-yet-completed order
+      //  - buyer pays an accepted-offer order by card (payment fields only)
+      //  - seller moves the order status forward, or marks a cash order paid when collected
+      //  - admin changes status only
       allow update: if isSignedIn() && (
-        resource.data.buyerUid == request.auth.uid ||
-        resource.data.sellerUid == request.auth.uid ||
+        (
+          resource.data.buyerUid == request.auth.uid &&
+          resource.data.status in ['pending', 'confirmed'] &&
+          resource.data.paymentStatus == 'pending' &&
+          request.resource.data.status == 'cancelled' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
+        ) ||
+        (
+          resource.data.buyerUid == request.auth.uid &&
+          'offerId' in resource.data &&
+          resource.data.paymentStatus == 'pending' &&
+          request.resource.data.paymentMethod == 'card' &&
+          request.resource.data.paymentStatus == 'paid' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['paymentMethod', 'paymentStatus', 'paymentLast4'])
+        ) ||
+        (
+          resource.data.sellerUid == request.auth.uid &&
+          resource.data.status != 'cancelled' &&
+          request.resource.data.status in ['confirmed', 'completed', 'cancelled'] &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
+        ) ||
+        (
+          resource.data.sellerUid == request.auth.uid &&
+          resource.data.paymentMethod == 'cash' &&
+          resource.data.paymentStatus == 'pending' &&
+          request.resource.data.paymentStatus == 'paid' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentStatus'])
+        ) ||
         (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
       );
       allow delete: if false;
