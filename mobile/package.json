@@ -9,7 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest"
+    "test": "jest",
+    "test:rules": "npx --yes firebase-tools emulators:exec --only firestore --project demo-wastpro \"node tests/rules/run.mjs\""
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -48,6 +49,7 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@testing-library/react-native": "^14.0.1",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.4",
@@ -61,8 +63,9 @@
   "jest": {
     "preset": "jest-expo",
     "testPathIgnorePatterns": [
+      "/.expo/",
       "/node_modules/",
-      "/.expo/"
+      "/tests/rules/"
     ]
   }
 }

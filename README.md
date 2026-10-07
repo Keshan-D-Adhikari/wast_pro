@@ -253,12 +253,14 @@ Put a `serviceAccountKey.json` in `mobile/scripts/` (never commit it), then `nod
 |---------|---------|-----------|
 | `mobile/` | `npm test` | 18 Jest unit tests (distance, status colours, bin status, design tokens) |
 | `admin/` | `npm test` | 11 Vitest unit tests (table filters) |
+| `mobile/` | `npm run test:rules` | 49 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
 - **admin:** lint, test, build
 - **mobile:** lint, test
+- **firestore-rules:** the 49 security-rule tests on the Firebase Emulator
 
-The Firestore rules for offers, orders and user profiles were also checked against the Firebase Emulator during development. Those checks are not yet part of the automated suite. Automated coverage is currently limited to logic helpers, not full screens, payments or Cloud Functions.
+The rule tests (`mobile/tests/rules/`) cover user privacy and sign-up, offer acceptance, order updates, and buying/cancelling listings, including attempts to tamper with prices, double-buy a listing or promote yourself to admin. Automated coverage of the screens, the payment flow and the Cloud Functions is still limited.
 
 ---
 
@@ -274,6 +276,7 @@ wast-pro/
 │   ├── components/ui/        Shared UI (button, card, badge, chip, bottom-nav, ...)
 │   ├── constants/            Design tokens, bin-status helpers
 │   ├── functions/            Cloud Functions (Stripe Checkout)
+│   ├── tests/rules/          Firestore security-rule tests (Firebase Emulator)
 │   ├── firestore.rules       Security rules
 │   ├── firebaseConfig.js     Main Firebase project
 │   ├── iotConfig.js          IoT Realtime Database + mock mode
@@ -309,7 +312,7 @@ wast-pro/
 - Map "routes" are straight lines, not road directions.
 - Automatic listing at 70% is not implemented.
 - Email verification, password reset and Firebase App Check are not yet set up.
-- Automated test coverage is thin (see Testing and CI).
+- Automated tests cover logic helpers and the security rules, but not full screens, payments or Cloud Functions (see Testing and CI).
 - The `users` collection is private, but marketplace listings, offers and orders still carry the seller and buyer names.
 
 ---
