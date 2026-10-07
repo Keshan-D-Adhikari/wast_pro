@@ -314,7 +314,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
                     setLocation(s);
                     setShowSuggestions(false);
                   }}
-                  keyboardShouldPersistTaps="handled"
                 >
                   <Text style={Type.body}>{s}</Text>
                 </TouchableOpacity>

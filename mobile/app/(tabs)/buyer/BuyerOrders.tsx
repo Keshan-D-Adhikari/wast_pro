@@ -17,7 +17,10 @@ import {
   doc,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db } from '../../../firebaseConfig';
+import { auth, db, functions } from '../../../firebaseConfig';
+import { httpsCallable } from 'firebase/functions';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import MapView, { Marker, Polyline, APP_MAP_PROVIDER } from '../../../components/platform-map';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +47,51 @@ export default function BuyerOrders() {
   const [sellerLocation, setSellerLocation] = useState<UserLocation | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
+
+  // Pay by card for an order that was created unpaid (an accepted offer):
+  // same Stripe Checkout flow as a direct purchase in BuyerDashboard.tsx.
+  const handlePayOrder = async (order: Order) => {
+    setPayingId(order.id);
+    try {
+      const createCheckoutSession = httpsCallable(functions, 'createCheckoutSession');
+      const { data } = await createCheckoutSession({
+        amount: order.totalPrice,
+        wasteType: order.wasteType,
+        listingId: order.listingId,
+      }) as { data: { url: string; sessionId: string } };
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, Linking.createURL('payment-complete'));
+      if (result.type !== 'success' || !result.url) return;
+
+      const { queryParams } = Linking.parse(result.url);
+      if (queryParams?.status !== 'success' || !queryParams?.session_id) {
+        Alert.alert('Payment cancelled', 'The payment was not completed.');
+        return;
+      }
+
+      const verifyCheckoutSession = httpsCallable(functions, 'verifyCheckoutSession');
+      const { data: verification } = await verifyCheckoutSession({
+        sessionId: queryParams.session_id,
+      }) as { data: { paid: boolean; last4: string | null } };
+
+      if (!verification.paid) {
+        Alert.alert('Payment not confirmed', 'Please try again.');
+        return;
+      }
+
+      await updateDoc(doc(db, 'orders', order.id), {
+        paymentMethod: 'card',
+        paymentStatus: 'paid',
+        paymentLast4: verification.last4 ?? null,
+      });
+      Alert.alert('Payment successful', `Rs ${order.totalPrice} paid.`);
+    } catch (error: unknown) {
+      Alert.alert('Payment failed', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setPayingId(null);
+    }
+  };
 
   // Load buyer orders in real time from Firestore
   // Filters by buyerUid and sorts newest first
@@ -228,6 +276,16 @@ export default function BuyerOrders() {
           {order.paymentStatus === 'paid' && <Badge label="Paid" tone="success" />}
         </View>
 
+        {order.offerId && order.paymentStatus === 'pending' && order.status === 'confirmed' && (
+          <Button
+            label="Pay by card"
+            icon="card-outline"
+            onPress={() => handlePayOrder(order)}
+            loading={payingId === order.id}
+            style={styles.payBtn}
+          />
+        )}
+
         <View style={styles.actions}>
           {order.status === 'pending' && (
             <Button
@@ -409,6 +467,7 @@ const styles = StyleSheet.create({
   typeText: { flex: 1, textTransform: 'capitalize' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm, marginTop: Space.sm },
   actions: { flexDirection: 'row', gap: Space.md, marginTop: Space.lg },
+  payBtn: { marginTop: Space.lg },
   actionFlex: { flex: 1 },
 
   // Map Modal

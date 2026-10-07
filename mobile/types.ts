@@ -76,6 +76,8 @@ export interface Order {
   };
   createdAt: Timestamp;
   cancelledAt: Timestamp | null;
+  /** Set when the order was created by a seller accepting this buyer offer. */
+  offerId?: string;
 }
 
 export interface UserLocation {

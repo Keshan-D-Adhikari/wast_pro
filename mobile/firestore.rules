@@ -28,6 +28,21 @@ service cloud.firestore {
         (order.sellerUid == request.auth.uid && order.buyerUid == toUid);
     }
 
+    // True if `order` matches offers/{order.offerId} as it will be after this write/transaction:
+    // offer accepted, same buyer/seller/listing, and the order price is the offered price
+    // with payment still pending.
+    function isAcceptedOfferOrder(order) {
+      let before = get(/databases/$(database)/documents/offers/$(order.offerId)).data;
+      let after = getAfter(/databases/$(database)/documents/offers/$(order.offerId)).data;
+      return before.status == 'pending' &&
+        after.status == 'accepted' &&
+        after.sellerUid == request.auth.uid &&
+        after.buyerUid == order.buyerUid &&
+        after.listingId == order.listingId &&
+        order.totalPrice == after.offeredPrice &&
+        order.paymentStatus == 'pending';
+    }
+
     // users/{uid} - profile doc, keyed by the account's own auth uid.
     // Any signed-in user can read a profile (buyer/seller names are shown to each other),
     // but only the account owner can create/update their own doc, and role can't be changed after signup.
@@ -68,7 +83,18 @@ service cloud.firestore {
       allow read: if isSignedIn() && (
         resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid || isAdmin()
       );
-      allow create: if isSignedIn() && request.resource.data.buyerUid == request.auth.uid;
+      // Either the buyer places a direct purchase, or the seller creates the order while
+      // accepting a buyer's offer (SellerOffers.tsx). The seller path is only allowed when
+      // the order mirrors an offer that this same transaction flips to 'accepted' (getAfter),
+      // so a seller can't invent an order for an arbitrary buyer or price.
+      allow create: if isSignedIn() && (
+        request.resource.data.buyerUid == request.auth.uid ||
+        (
+          request.resource.data.sellerUid == request.auth.uid &&
+          'offerId' in request.resource.data &&
+          isAcceptedOfferOrder(request.resource.data)
+        )
+      );
       allow update: if isSignedIn() && (
         resource.data.buyerUid == request.auth.uid ||
         resource.data.sellerUid == request.auth.uid ||
@@ -131,8 +157,12 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
         request.resource.data.buyerUid == request.auth.uid &&
         request.resource.data.status == 'pending' &&
+        request.resource.data.offeredPrice is number &&
         request.resource.data.offeredPrice > 0 &&
-        exists(/databases/$(database)/documents/marketplace/$(request.resource.data.listingId));
+        exists(/databases/$(database)/documents/marketplace/$(request.resource.data.listingId)) &&
+        get(/databases/$(database)/documents/marketplace/$(request.resource.data.listingId)).data.sellerUid ==
+          request.resource.data.sellerUid &&
+        get(/databases/$(database)/documents/marketplace/$(request.resource.data.listingId)).data.status == 'available';
       // Buyer may only withdraw their own pending offer.
       // Seller may accept/reject their own listing's offer.
       allow update: if isSignedIn() && (

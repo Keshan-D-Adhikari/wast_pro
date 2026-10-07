@@ -48,8 +48,12 @@ interface WasteItem {
 
 export default function AddWaste() {
   const [loading, setLoading] = useState(false);
-  const [binData, setBinData] = useState<BinData | null>(null);
-  const [binExists, setBinExists] = useState<boolean | null>(null);
+  // In mock mode the initial state already holds the mock telemetry, so the
+  // effect below doesn't need to set it.
+  const [binData, setBinData] = useState<BinData | null>(
+    USE_MOCK_IOT ? (MOCK_BIN_DATA_NORMAL as BinData) : null
+  );
+  const [binExists, setBinExists] = useState<boolean | null>(USE_MOCK_IOT ? true : null);
   const [sellerName, setSellerName] = useState('');
   const [sellerBinLocation, setSellerBinLocation] = useState<UserLocation | null>(null);
 
@@ -76,11 +80,7 @@ export default function AddWaste() {
 
     // Live sensor readings come from the ESP32 firmware's own Realtime
     // Database project (see iotConfig.js), or mock telemetry in dev mode.
-    if (USE_MOCK_IOT) {
-      setBinData(MOCK_BIN_DATA_NORMAL as BinData);
-      setBinExists(true);
-      return;
-    }
+    if (USE_MOCK_IOT) return;
 
     const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
     const unsubscribe = onValue(binNodeRef, (snapshot) => {

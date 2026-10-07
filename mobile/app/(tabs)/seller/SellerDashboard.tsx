@@ -48,15 +48,16 @@ export default function SellerDashboard() {
 
   //Data for compartment 3 according to objective 1 of the proposal [citation: 38]
   const [mockPreset, setMockPreset] = useState<'normal' | 'alert'>('normal');
-  const [binData, setBinData] = useState<BinData>(
-    USE_MOCK_IOT
-      ? MOCK_BIN_DATA_NORMAL
-      : {
-          plastic: { level: 0, weight: 0 },
-          food: { level: 0, weight: 0, moisture: 0 },
-          metal: { level: 0, weight: 0 },
-        }
-  );
+  const [liveBinData, setBinData] = useState<BinData>({
+    plastic: { level: 0, weight: 0 },
+    food: { level: 0, weight: 0, moisture: 0 },
+    metal: { level: 0, weight: 0 },
+  });
+  // In mock mode the bin data is derived from the selected preset during
+  // render, rather than copied into state from an effect.
+  const binData: BinData = USE_MOCK_IOT
+    ? (mockPreset === 'alert' ? MOCK_BIN_DATA_ALERT : MOCK_BIN_DATA_NORMAL)
+    : liveBinData;
   // The ESP32 firmware doesn't upload GPS coordinates (see iotConfig.js),
   // and users.location is a free-text address, so there's currently no
   // source for a live bin location — the map below always shows "Not set".
@@ -68,14 +69,6 @@ export default function SellerDashboard() {
   // A ref (not state) because it's pure bookkeeping — never rendered — and
   // keeping it out of state avoids re-running the notify effect on every change.
   const notifiedBinsRef = useRef<WasteType[]>([]);
-
-  // Update mock bin data when mock preset changes
-  useEffect(() => {
-    if (USE_MOCK_IOT) {
-      setBinData(mockPreset === 'alert' ? MOCK_BIN_DATA_ALERT : MOCK_BIN_DATA_NORMAL);
-      setLoading(false);
-    }
-  }, [mockPreset]);
 
   useEffect(() => {
     if (!user) return;
@@ -90,10 +83,7 @@ export default function SellerDashboard() {
 
     // 2. Sensor data (Fill Level, Weight, Moisture)
     let unsubscribeBins = () => {};
-    if (USE_MOCK_IOT) {
-      setBinData(mockPreset === 'alert' ? MOCK_BIN_DATA_ALERT : MOCK_BIN_DATA_NORMAL);
-      setLoading(false);
-    } else {
+    if (!USE_MOCK_IOT) {
       const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
       unsubscribeBins = onValue(binNodeRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -128,7 +118,7 @@ export default function SellerDashboard() {
       unsubscribeBins();
       unsubscribeNotifs();
     };
-  }, [user, mockPreset]);
+  }, [user]);
 
   // Automated Bin Full Notifications — driven by the firmware's own `status`
   // and `overweight` fields (see constants/bin-status.ts) rather than a
@@ -249,7 +239,7 @@ export default function SellerDashboard() {
     );
   };
 
-  if (loading) {
+  if (loading && !USE_MOCK_IOT) {
     return (
       <Screen>
         <LoadingState message="Reading smart bin sensors…" />

@@ -109,6 +109,9 @@ export default function SellerOffers() {
                   location: listing.location,
                   createdAt: serverTimestamp() as any,
                   cancelledAt: null,
+                  // Lets firestore.rules verify this seller-created order
+                  // matches the offer being accepted in this transaction.
+                  offerId: offer.id,
                 };
 
                 // Mark offer accepted
@@ -300,7 +303,7 @@ const styles = StyleSheet.create({
   card: { marginBottom: Space.md },
   topOfferCard: {
     borderWidth: 2,
-    borderColor: Palette.brand[400],
+    borderColor: Palette.brand[500],
   },
   topBadgeRow: { marginBottom: Space.md },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
