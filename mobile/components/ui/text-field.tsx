@@ -1,4 +1,5 @@
-import { View, Text, TextInput, StyleSheet, TextInputProps, StyleProp, ViewStyle } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TextInput, StyleSheet, TextInputProps, StyleProp, ViewStyle, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Space, Radius, Type } from '@/constants/design';
 
@@ -11,6 +12,8 @@ type TextFieldProps = TextInputProps & {
   suffix?: string;
   /** Red border + message below the field. */
   error?: string;
+  /** Adds a show/hide eye button and makes the field a password field. */
+  passwordToggle?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 };
 
@@ -20,10 +23,13 @@ export function TextField({
   icon,
   suffix,
   error,
+  passwordToggle = false,
   containerStyle,
   style,
   ...inputProps
 }: TextFieldProps) {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+
   return (
     <View style={[styles.wrapper, containerStyle]}>
       {!!label && <Text style={[Type.caption, styles.label]}>{label}</Text>}
@@ -33,7 +39,22 @@ export function TextField({
           placeholderTextColor={Palette.ink[300]}
           style={[styles.input, style]}
           {...inputProps}
+          secureTextEntry={passwordToggle ? !passwordVisible : inputProps.secureTextEntry}
         />
+        {passwordToggle && (
+          <TouchableOpacity
+            onPress={() => setPasswordVisible((v) => !v)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+          >
+            <Ionicons
+              name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+              size={20}
+              color={Palette.ink[500]}
+            />
+          </TouchableOpacity>
+        )}
         {!!suffix && <Text style={Type.smallStrong}>{suffix}</Text>}
       </View>
       {!!error && <Text style={[Type.caption, styles.errorText]}>{error}</Text>}

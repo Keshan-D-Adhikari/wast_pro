@@ -30,7 +30,6 @@ export default function Login() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   /* ================= FIREBASE LOGIN FUNCTION ================= */
@@ -134,7 +133,7 @@ export default function Login() {
               label="Password"
               icon="lock-closed-outline"
               placeholder="Your password"
-              secureTextEntry={!showPassword}
+              passwordToggle
               value={password}
               onChangeText={setPassword}
               autoCapitalize="none"
@@ -142,15 +141,6 @@ export default function Login() {
               returnKeyType="go"
             />
 
-            <TouchableOpacity
-              onPress={() => setShowPassword((v) => !v)}
-              style={styles.toggle}
-              hitSlop={8}
-            >
-              <Text style={styles.toggleText}>
-                {showPassword ? 'Hide password' : 'Show password'}
-              </Text>
-            </TouchableOpacity>
 
             <Button label="Log In" onPress={handleLogin} loading={loading} />
 
@@ -197,8 +187,6 @@ const styles = StyleSheet.create({
     ...Shadow[3],
   },
   cardSubtitle: { marginTop: Space.xs, marginBottom: Space['2xl'] },
-  toggle: { alignSelf: 'flex-end', marginTop: -Space.sm, marginBottom: Space.xl },
-  toggleText: { ...Type.caption, color: Palette.brand[600] },
   signupRow: { alignItems: 'center', marginTop: Space.xl },
   signupLink: { ...Type.smallStrong, color: Palette.brand[600], fontWeight: '700' },
 });

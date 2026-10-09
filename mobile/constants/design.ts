@@ -24,7 +24,7 @@ export const Palette = {
     900: '#14261A', // headings
     700: '#33443A', // body
     500: '#5E6B60', // muted labels
-    300: '#93A08F', // placeholders, disabled
+    300: '#687565', // placeholders, disabled (4.5:1 on the page background, WCAG AA)
     200: '#D9E1D6', // borders
     100: '#EDF2EA', // dividers, track fills
   },

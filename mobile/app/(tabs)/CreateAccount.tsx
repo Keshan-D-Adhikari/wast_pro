@@ -180,7 +180,7 @@ export default function CreateAccount() {
               label="Password"
               icon="lock-closed-outline"
               placeholder="At least 6 characters"
-              secureTextEntry
+              passwordToggle
               value={password}
               onChangeText={setPassword}
               autoCapitalize="none"
@@ -190,7 +190,7 @@ export default function CreateAccount() {
               label="Confirm Password"
               icon="lock-closed-outline"
               placeholder="Re-enter your password"
-              secureTextEntry
+              passwordToggle
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               autoCapitalize="none"

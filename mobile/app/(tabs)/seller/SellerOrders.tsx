@@ -1,9 +1,11 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { db, auth } from "../../../firebaseConfig";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import {
+  collection, query, where, orderBy, onSnapshot, doc, getDoc, updateDoc, writeBatch, deleteField, serverTimestamp,
+} from "firebase/firestore";
 
 import { Palette, Space, Radius, Type, wasteAccent } from "@/constants/design";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
@@ -13,6 +15,7 @@ import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { Order } from "../../../types";
+import { sellerActionsFor, completingCollectsCash } from "../../../utils/orderActions";
 
 export default function SellerOrders() {
   const router = useRouter();
@@ -39,6 +42,72 @@ export default function SellerOrders() {
 
     return () => unsubscribe();
   }, []);
+
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const run = async (order: Order, work: () => Promise<void>, failMessage: string) => {
+    setBusyId(order.id);
+    try {
+      await work();
+    } catch (error) {
+      console.error(failMessage, error);
+      Alert.alert('Error', failMessage);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleConfirm = (order: Order) =>
+    run(order, () => updateDoc(doc(db, 'orders', order.id), { status: 'confirmed' }), 'Could not confirm this order.');
+
+  const handleComplete = (order: Order) => {
+    const collectsCash = completingCollectsCash(order);
+    Alert.alert(
+      'Mark as completed?',
+      collectsCash
+        ? `Confirm you have received Rs ${order.totalPrice} in cash and handed over the ${order.wasteType} waste.`
+        : `Confirm the ${order.wasteType} waste has been handed over.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark completed',
+          onPress: () =>
+            run(order, async () => {
+              // Cash on delivery: the cash is collected at hand-over, so record the payment first.
+              if (collectsCash) await updateDoc(doc(db, 'orders', order.id), { paymentStatus: 'paid' });
+              await updateDoc(doc(db, 'orders', order.id), { status: 'completed' });
+            }, 'Could not complete this order.'),
+        },
+      ]
+    );
+  };
+
+  const handleDecline = (order: Order) => {
+    Alert.alert(
+      'Decline this order?',
+      'The buyer will see it as cancelled and the listing goes back on the marketplace.',
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Decline',
+          style: 'destructive',
+          onPress: () =>
+            run(order, async () => {
+              // Cancel the order and relist the waste in one atomic batch. The listing is only
+              // restored if this order is the one that bought it.
+              const listingRef = doc(db, 'marketplace', order.listingId);
+              const listingSnap = await getDoc(listingRef);
+              const batch = writeBatch(db);
+              batch.update(doc(db, 'orders', order.id), { status: 'cancelled', cancelledAt: serverTimestamp() });
+              if (listingSnap.exists() && listingSnap.data().soldOrderId === order.id) {
+                batch.update(listingRef, { status: 'available', soldOrderId: deleteField() });
+              }
+              await batch.commit();
+            }, 'Could not decline this order.'),
+        },
+      ]
+    );
+  };
 
   const totalEarned = orders
     .filter((o) => o.status === 'completed')
@@ -75,7 +144,41 @@ export default function SellerOrders() {
             tone={order.paymentMethod === 'card' ? 'info' : 'warning'}
             icon={order.paymentMethod === 'card' ? 'card-outline' : 'cash-outline'}
           />
+          {order.paymentStatus === 'paid' && <Badge label="Paid" tone="success" />}
         </View>
+
+        {sellerActionsFor(order).length > 0 && (
+          <View style={styles.actions}>
+            {sellerActionsFor(order).includes('decline') && (
+              <Button
+                label="Decline"
+                icon="close-circle-outline"
+                variant="danger"
+                onPress={() => handleDecline(order)}
+                disabled={busyId === order.id}
+                style={styles.actionFlex}
+              />
+            )}
+            {sellerActionsFor(order).includes('confirm') && (
+              <Button
+                label="Confirm order"
+                icon="checkmark-circle-outline"
+                onPress={() => handleConfirm(order)}
+                loading={busyId === order.id}
+                style={styles.actionFlex}
+              />
+            )}
+            {sellerActionsFor(order).includes('complete') && (
+              <Button
+                label="Mark completed"
+                icon="checkmark-done-outline"
+                onPress={() => handleComplete(order)}
+                loading={busyId === order.id}
+                style={styles.actionFlex}
+              />
+            )}
+          </View>
+        )}
       </Card>
     );
   };
@@ -157,5 +260,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   typeText: { flex: 1, textTransform: 'capitalize' },
-  paymentRow: { marginTop: Space.sm },
+  paymentRow: { marginTop: Space.sm, flexDirection: 'row', gap: Space.sm, flexWrap: 'wrap' },
+  actions: { flexDirection: 'row', gap: Space.md, marginTop: Space.lg },
+  actionFlex: { flex: 1 },
 });
