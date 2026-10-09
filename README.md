@@ -250,7 +250,7 @@ npx firebase-tools deploy --only functions --project <your-project-id>
 Use Stripe's test card `4242 4242 4242 4242` with any future expiry and CVC. No real money is charged. Until the functions are deployed, only cash on delivery works.
 
 ### Mock IoT telemetry (development)
-When the ESP32 is offline you can show simulated bin data: set `EXPO_PUBLIC_USE_MOCK_IOT=true` in `mobile/.env`, and `VITE_USE_MOCK_IOT=true` in `admin/.env`. Do not enable it in a real deployment.
+When the ESP32 is offline you can show simulated bin data: set `EXPO_PUBLIC_USE_MOCK_IOT=true` in `mobile/.env`, and `VITE_USE_MOCK_IOT=true` in `admin/.env`. It only works in development builds (`__DEV__` on mobile, the dev server on admin); a production build always shows the real bin.
 
 ### Seed mock data (optional)
 Put a `serviceAccountKey.json` in `mobile/scripts/` (never commit it), then `node scripts/seedMockData.js`.
@@ -263,14 +263,14 @@ Put a `serviceAccountKey.json` in `mobile/scripts/` (never commit it), then `nod
 |---------|---------|-----------|
 | `mobile/` | `npm test` | 29 Jest unit tests (distance, status colours, bin status, bin telemetry parsing, design tokens) |
 | `admin/` | `npm test` | 19 Vitest unit tests (table filters, bin telemetry parsing) |
-| `mobile/` | `npm run test:rules` | 49 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
+| `mobile/` | `npm run test:rules` | 65 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
 - **admin:** lint, test, build
 - **mobile:** lint, test
-- **firestore-rules:** the 49 security-rule tests on the Firebase Emulator
+- **firestore-rules:** the 65 security-rule tests on the Firebase Emulator
 
-The rule tests (`mobile/tests/rules/`) cover user privacy and sign-up, offer acceptance, order updates, and buying/cancelling listings, including attempts to tamper with prices, double-buy a listing or promote yourself to admin. Automated coverage of the screens, the payment flow and the Cloud Functions is still limited.
+The rule tests (`mobile/tests/rules/`) cover user privacy and sign-up, offer acceptance, order updates, listing validation, and buying/cancelling listings, including attempts to tamper with prices, double-buy a listing, post a malformed listing or promote yourself to admin. Automated coverage of the screens, the payment flow and the Cloud Functions is still limited.
 
 ---
 

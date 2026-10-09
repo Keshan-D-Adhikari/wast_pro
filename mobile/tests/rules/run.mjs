@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const files = ['offers.test.mjs', 'users-and-orders.test.mjs', 'listings.test.mjs'];
+const files = ['offers.test.mjs', 'users-and-orders.test.mjs', 'listings.test.mjs', 'validation.test.mjs'];
 let failed = false;
 
 for (const f of files) {

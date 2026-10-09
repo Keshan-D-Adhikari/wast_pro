@@ -120,7 +120,7 @@ export default function BuyerOrders() {
       setOrders(ordersList);
       setLoading(false);
     }, (error) => {
-      console.log("Error fetching buyer orders:", error);
+      console.error("Error fetching buyer orders:", error);
       setLoading(false);
     });
 
@@ -177,7 +177,7 @@ export default function BuyerOrders() {
               );
 
             } catch (error) {
-              console.log('Cancel error:', error);
+              console.error('Cancel error:', error);
               Alert.alert(
                 'Error',
                 'Could not cancel order.'
@@ -238,7 +238,7 @@ export default function BuyerOrders() {
       setOrderMapVisible(true);
 
     } catch (error) {
-      console.log('Map error:', error);
+      console.warn('Map error:', error);
       Alert.alert('Error', 'Could not open map');
     }
   };

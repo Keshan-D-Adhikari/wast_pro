@@ -33,7 +33,7 @@ export default function SellerOrders() {
       setOrders(ordersList);
       setLoading(false);
     }, (error) => {
-      console.log("Error fetching seller orders:", error);
+      console.error("Error fetching seller orders:", error);
       setLoading(false);
     });
 

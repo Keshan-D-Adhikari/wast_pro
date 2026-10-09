@@ -1,50 +1,85 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  getCountFromServer,
+  getDocs,
+  limit,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { IconUsers, IconMarketplace, IconOrders, IconLeaf } from "../components/Icons";
 
+const REFRESH_MS = 30000;
+// Revenue is summed from at most this many completed orders, so the cost of
+// this page stays bounded as the data grows.
+const REVENUE_ORDER_CAP = 500;
+
+const count = async (q) => (await getCountFromServer(q)).data().count;
+
+async function loadOverview() {
+  const users = collection(db, "users");
+  const listings = collection(db, "marketplace");
+  const orders = collection(db, "orders");
+
+  const [
+    totalUsers, sellers, buyers, activeListings,
+    totalOrders, pendingOrders, completedOrders, completedDocs,
+  ] = await Promise.all([
+    count(users),
+    count(query(users, where("role", "==", "seller"))),
+    count(query(users, where("role", "==", "buyer"))),
+    count(query(listings, where("status", "==", "available"))),
+    count(orders),
+    count(query(orders, where("status", "in", ["pending", "confirmed"]))),
+    count(query(orders, where("status", "==", "completed"))),
+    getDocs(query(orders, where("status", "==", "completed"), limit(REVENUE_ORDER_CAP))),
+  ]);
+
+  const revenue = completedDocs.docs.reduce((sum, d) => sum + (d.data().totalPrice || 0), 0);
+  return { totalUsers, sellers, buyers, activeListings, totalOrders, pendingOrders, completedOrders, revenue };
+}
+
 export default function Overview() {
-  const [users, setUsers] = useState([]);
-  const [listings, setListings] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Counts are fetched with server-side count queries (not by streaming every
+  // document), then refreshed on a timer.
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "users"), (s) =>
-      setUsers(s.docs.map((d) => d.data()))
-    );
-    const unsubListings = onSnapshot(collection(db, "marketplace"), (s) =>
-      setListings(s.docs.map((d) => d.data()))
-    );
-    const unsubOrders = onSnapshot(collection(db, "orders"), (s) => {
-      setOrders(s.docs.map((d) => d.data()));
-      setLoading(false);
-    });
+    let cancelled = false;
+    async function refresh() {
+      try {
+        const next = await loadOverview();
+        if (!cancelled) setData(next);
+      } catch (err) {
+        console.error("Overview load failed:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    refresh();
+    const id = setInterval(refresh, REFRESH_MS);
     return () => {
-      unsubUsers();
-      unsubListings();
-      unsubOrders();
+      cancelled = true;
+      clearInterval(id);
     };
   }, []);
 
-  const sellers = users.filter((u) => u.role === "seller").length;
-  const buyers = users.filter((u) => u.role === "buyer").length;
-  const activeListings = listings.filter((l) => l.status === "available").length;
-  const completedOrders = orders.filter((o) => o.status === "completed");
-  const revenue = completedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-  const pendingOrders = orders.filter(
-    (o) => o.status === "pending" || o.status === "confirmed"
-  ).length;
+  const d = data ?? {
+    totalUsers: 0, sellers: 0, buyers: 0, activeListings: 0,
+    totalOrders: 0, pendingOrders: 0, completedOrders: 0, revenue: 0,
+  };
 
   const stats = [
-    { label: "Total registered users", value: users.length, icon: <IconUsers size={22} />, category: "users" },
-    { label: "Active sellers", value: sellers, icon: <IconUsers size={22} />, category: "users" },
-    { label: "Active buyers", value: buyers, icon: <IconUsers size={22} />, category: "users" },
-    { label: "Available listings", value: activeListings, icon: <IconMarketplace size={22} />, category: "market" },
-    { label: "Total orders placed", value: orders.length, icon: <IconOrders size={22} />, category: "orders" },
-    { label: "Pending / confirmed orders", value: pendingOrders, icon: <IconOrders size={22} />, category: "orders" },
-    { label: "Completed orders", value: completedOrders.length, icon: <IconOrders size={22} />, category: "orders" },
-    { label: "Completed revenue", value: `Rs. ${revenue.toLocaleString()}`, icon: <IconLeaf size={22} />, category: "revenue" },
+    { label: "Total registered users", value: d.totalUsers, icon: <IconUsers size={22} />, category: "users" },
+    { label: "Active sellers", value: d.sellers, icon: <IconUsers size={22} />, category: "users" },
+    { label: "Active buyers", value: d.buyers, icon: <IconUsers size={22} />, category: "users" },
+    { label: "Available listings", value: d.activeListings, icon: <IconMarketplace size={22} />, category: "market" },
+    { label: "Total orders placed", value: d.totalOrders, icon: <IconOrders size={22} />, category: "orders" },
+    { label: "Pending / confirmed orders", value: d.pendingOrders, icon: <IconOrders size={22} />, category: "orders" },
+    { label: "Completed orders", value: d.completedOrders, icon: <IconOrders size={22} />, category: "orders" },
+    { label: "Completed revenue", value: `Rs. ${d.revenue.toLocaleString()}`, icon: <IconLeaf size={22} />, category: "revenue" },
   ];
 
   return (
@@ -52,14 +87,14 @@ export default function Overview() {
       <div className="page-header">
         <div>
           <h1>Platform Overview</h1>
-          <p className="subtitle">Real-time statistics across users, marketplace activity, and completed transactions</p>
+          <p className="subtitle">Platform statistics across users, marketplace activity, and completed transactions (refreshes every 30 seconds)</p>
         </div>
       </div>
 
       {loading ? (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
-          <p>Loading real-time overview metrics…</p>
+          <p>Loading overview metrics…</p>
         </div>
       ) : (
         <div className="stat-grid">

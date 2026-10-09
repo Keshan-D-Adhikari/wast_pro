@@ -5,7 +5,8 @@ import { getDatabase } from 'firebase/database';
 // ── Development Mock IoT Telemetry ──────────────────────────────────────────
 // Set EXPO_PUBLIC_USE_MOCK_IOT=true in .env to simulate ESP32 smart bin telemetry
 // when physical hardware is offline.
-export const USE_MOCK_IOT = process.env.EXPO_PUBLIC_USE_MOCK_IOT === 'true';
+// __DEV__ guard: a production build can never show simulated data, even if the variable is set.
+export const USE_MOCK_IOT = __DEV__ && process.env.EXPO_PUBLIC_USE_MOCK_IOT === 'true';
 
 export const MOCK_BIN_DATA_NORMAL = {
   plastic: {

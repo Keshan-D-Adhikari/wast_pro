@@ -105,15 +105,43 @@ service cloud.firestore {
         getAfter(orderPath).data.listingId == listingId;
     }
 
+    function isPositiveNumber(v) {
+      return v is number && v > 0;
+    }
+
+    // A new listing must be well-formed: a known waste type, a positive weight and price within
+    // sane limits, a map location, and it starts available (never pre-marked sold).
+    function isValidNewListing(d) {
+      return d.wasteType in ['plastic', 'food', 'metal'] &&
+        isPositiveNumber(d.weightKg) && d.weightKg <= 10000 &&
+        isPositiveNumber(d.totalPrice) && d.totalPrice <= 10000000 &&
+        d.status == 'available' &&
+        !('soldOrderId' in d) &&
+        d.sellerName is string &&
+        d.location.latitude is number && d.location.longitude is number;
+    }
+
+    // When the seller edits their own listing, the owner can't change, status must stay a known
+    // value, and a changed weight/price must still be a sane positive number.
+    function isValidListingEdit() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return request.resource.data.sellerUid == resource.data.sellerUid &&
+        request.resource.data.status in ['available', 'sold'] &&
+        (!changed.hasAny(['weightKg']) || (isPositiveNumber(request.resource.data.weightKg) && request.resource.data.weightKg <= 10000)) &&
+        (!changed.hasAny(['totalPrice']) || (isPositiveNumber(request.resource.data.totalPrice) && request.resource.data.totalPrice <= 10000000)) &&
+        (!changed.hasAny(['wasteType']) || request.resource.data.wasteType in ['plastic', 'food', 'metal']);
+    }
+
     // marketplace/{listingId} - waste listings. Any signed-in user can browse them.
     // The seller who created a listing can create/edit/delete it. A buyer can only change a
     // listing as part of buying it or cancelling that purchase (see the two functions above) -
     // they can no longer flip anyone's listing to sold on their own.
     match /marketplace/{listingId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.sellerUid == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.sellerUid == request.auth.uid &&
+        isValidNewListing(request.resource.data);
       allow update: if isSignedIn() && (
-        resource.data.sellerUid == request.auth.uid ||
+        (resource.data.sellerUid == request.auth.uid && isValidListingEdit()) ||
         isBuyingListing(listingId) ||
         isRestoringListing(listingId)
       );

@@ -3,11 +3,14 @@ import { getAuth, signInAnonymously } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 
 // ── Development Mock IoT Telemetry ──────────────────────────────────────────
-// Set VITE_USE_MOCK_IOT=true in .env or localStorage to simulate ESP32 smart bin
+// In development, set VITE_USE_MOCK_IOT=true in .env or localStorage to simulate ESP32 smart bin
 // telemetry in the Admin dashboard when physical hardware is offline.
+// Only a development server can show simulated data (the localStorage switch is ignored in
+// a production build), so a deployed dashboard always shows the real bin.
 export const USE_MOCK_IOT =
-  import.meta.env.VITE_USE_MOCK_IOT === "true" ||
-  (typeof window !== "undefined" && window.localStorage?.getItem("use_mock_iot") === "true");
+  import.meta.env.DEV &&
+  (import.meta.env.VITE_USE_MOCK_IOT === "true" ||
+    (typeof window !== "undefined" && window.localStorage?.getItem("use_mock_iot") === "true"));
 
 export const MOCK_BIN_DATA_NORMAL = {
   plastic: {

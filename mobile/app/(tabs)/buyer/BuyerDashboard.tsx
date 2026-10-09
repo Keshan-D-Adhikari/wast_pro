@@ -87,7 +87,7 @@ export default function BuyerDashboard() {
           let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
           setUserLocation(loc.coords);
         }
-      } catch (err) { console.log(err); }
+      } catch (err) { console.warn('Location unavailable:', err); }
 
       const q = query(collection(db, "marketplace"), where("status", "==", "available"));
       unsubscribe = onSnapshot(q, (snapshot) => {
@@ -365,7 +365,7 @@ export default function BuyerDashboard() {
 
       setMapModalVisible(true);
     } catch (error) {
-      console.log('Map error:', error);
+      console.warn('Map error:', error);
       Alert.alert('Error', 'Could not open map');
     }
   };

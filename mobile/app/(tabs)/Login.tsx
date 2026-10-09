@@ -42,13 +42,10 @@ export default function Login() {
 
     try {
       setLoading(true);
-      console.log('Attempting Firebase Login...');
 
       // 1. Login via Firebase Auth (Server unreachable error does not appear here)
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
-      console.log('Login Auth Success:', user.uid);
 
       // 2. Reading this User's Role (Seller/Buyer) from Firestore
       const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -65,8 +62,6 @@ export default function Login() {
           return;
         }
 
-        console.log('User Role found:', userRole);
-
         // 3. Sending to the relevant Dashboard according to the role
         if (userRole === 'seller') {
           router.replace('/(tabs)/seller/SellerDashboard');
@@ -78,7 +73,7 @@ export default function Login() {
       }
 
     } catch (err: unknown) {
-      console.log('Login Error:', err instanceof FirebaseError ? err.code : err);
+      console.warn('Login error:', err instanceof FirebaseError ? err.code : err);
       // The error that appears if you provide incorrect details.
       Alert.alert('Login Failed', 'Invalid email or password. Please check your credentials.');
     } finally {

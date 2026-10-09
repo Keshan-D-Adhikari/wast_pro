@@ -91,7 +91,7 @@ export default function SellerDashboard() {
       if (docSnap.exists()) {
         setSellerData(docSnap.data() as UserProfile);
       }
-    }, (error) => console.log("User Fetch Error:", error));
+    }, (error) => console.error("User fetch error:", error));
 
     // 2. Sensor data (Fill Level, Weight, Moisture)
     let unsubscribeBins = () => {};
@@ -104,7 +104,7 @@ export default function SellerDashboard() {
         }
         setLoading(false);
       }, (error) => {
-        console.log("Bin Fetch Error:", error);
+        console.error("Bin fetch error:", error);
         setLoading(false);
       });
     }
