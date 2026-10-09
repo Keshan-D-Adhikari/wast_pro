@@ -26,6 +26,7 @@ export function binStatusTone(status?: string): StatusTone {
 export function binStatusLabel(status?: string): string {
   if (!status) return 'No data';
   const upper = status.toUpperCase();
+  if (upper === 'ERROR') return 'Sensor error';
   if (upper === '75%') return '75% full';
   return upper.charAt(0) + upper.slice(1).toLowerCase();
 }

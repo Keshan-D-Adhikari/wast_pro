@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database";
 import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../iotConfig";
 import { IconBin, IconAlert, IconPulse, IconLeaf } from "../components/Icons";
+import { normalizeBin, describeFreshness } from "../lib/binTelemetry";
 
 const COMPARTMENTS = ["plastic", "food", "metal"];
 
@@ -37,6 +38,17 @@ export default function BinStatus() {
     : liveBin;
   const loading = USE_MOCK_IOT ? false : liveLoading;
 
+  // Re-check "live vs offline" periodically so the badge turns Offline by
+  // itself if the firmware stops uploading.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(id);
+  }, []);
+  const freshness = USE_MOCK_IOT
+    ? { live: true, label: "Demo data" }
+    : describeFreshness(bin?.lastUpdated, now);
+
   useEffect(() => {
     if (USE_MOCK_IOT) return;
 
@@ -44,7 +56,7 @@ export default function BinStatus() {
     return onValue(
       binNodeRef,
       (snapshot) => {
-        setLiveBin(snapshot.val());
+        setLiveBin(snapshot.exists() ? normalizeBin(snapshot.val()) : null);
         setLiveLoading(false);
       },
       () => setLiveLoading(false)
@@ -118,17 +130,25 @@ export default function BinStatus() {
         </div>
 
         <div className="system-status-pill" style={{
-          backgroundColor: USE_MOCK_IOT ? "var(--status-warning-tint)" : "var(--status-success-tint)",
-          color: USE_MOCK_IOT ? "var(--status-warning)" : "var(--status-success)",
-          borderColor: USE_MOCK_IOT ? "rgba(180, 83, 9, 0.2)" : "rgba(46, 125, 50, 0.2)"
+          backgroundColor: USE_MOCK_IOT || !freshness.live ? "var(--status-warning-tint)" : "var(--status-success-tint)",
+          color: USE_MOCK_IOT || !freshness.live ? "var(--status-warning)" : "var(--status-success)",
+          borderColor: USE_MOCK_IOT || !freshness.live ? "rgba(180, 83, 9, 0.2)" : "rgba(46, 125, 50, 0.2)"
         }}>
           <span className="status-dot" style={{
-            backgroundColor: USE_MOCK_IOT ? "var(--status-warning)" : "var(--status-success)"
+            backgroundColor: USE_MOCK_IOT || !freshness.live ? "var(--status-warning)" : "var(--status-success)"
           }} />
           {USE_MOCK_IOT ? <IconLeaf size={14} /> : <IconPulse size={14} />}
-          <span>{USE_MOCK_IOT ? "Simulated Mock Data" : "Realtime Database Stream"}</span>
+          <span>{USE_MOCK_IOT ? "Simulated Mock Data" : freshness.live ? "Live" : "Bin offline - last known reading"}</span>
         </div>
       </div>
+
+      {bin && (
+        <p className="subtitle" style={{ margin: "0.25rem 0 1rem" }}>
+          {freshness.label}
+          {bin.lastUpdated ? ` · ${new Date(bin.lastUpdated).toLocaleString()}` : ""}
+          {bin.location ? ` · ${bin.location}` : ""}
+        </p>
+      )}
 
       {loading && (
         <div className="empty-state-box">
@@ -193,7 +213,7 @@ export default function BinStatus() {
                     </>
                   )}
                   <dt>Last Reading</dt>
-                  <dd>{c.timestamp || "Just now"}</dd>
+                  <dd>{bin.lastUpdated ? new Date(bin.lastUpdated).toLocaleTimeString() : c.timestamp || "—"}</dd>
                 </dl>
               </div>
             );

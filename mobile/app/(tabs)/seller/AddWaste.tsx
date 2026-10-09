@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { db, auth } from '../../../firebaseConfig';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL } from '../../../iotConfig';
+import { normalizeBin } from '../../../utils/binTelemetry';
 import { ref as dbRef, onValue } from 'firebase/database';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,8 +85,9 @@ export default function AddWaste() {
 
     const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
     const unsubscribe = onValue(binNodeRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setBinData(snapshot.val() as BinData);
+      const normalized = snapshot.exists() ? normalizeBin(snapshot.val()) : null;
+      if (normalized) {
+        setBinData(normalized);
         setBinExists(true);
       } else {
         // No smart bin reporting data yet

@@ -27,7 +27,7 @@ The repo has three parts:
 
 ### Seller
 - Live smart-bin monitoring for the Plastic, Food and Metal compartments (fill level, weight, moisture)
-- Bin status shown exactly as the firmware reports it (`EMPTY`, `LOW`, `HALF`, `75%`, `FULL`, `ERROR`) plus an overweight warning
+- Bin status from the firmware (`EMPTY`, `LOW`, `HALF`, `75%`, `FULL`, `ERROR` for a failed sensor), weight in kg, last-updated time, and a Live/Offline indicator
 - Automatic in-app alert when a compartment is full or overweight
 - List waste for sale (price = weight x rate per kg), capped by the sensor-reported weight
 - **Offers:** review price offers from buyers, accept or reject them; accepting creates an order at the offered price and rejects the other pending offers
@@ -62,7 +62,7 @@ There are **two separate Firebase projects**: one only for live sensor data, one
                       |
                       | Wi-Fi
                       v
-  Firebase project "IoT"  ->  Realtime Database  bins/Bin001/{plastic,food,metal}
+  Firebase project "IoT"  ->  Realtime Database  bins/bin001/compartments/{plastic,food,metal}
                       |
           read-only live listeners
                       |
@@ -137,14 +137,24 @@ React ^19.2, Vite ^7, react-router-dom ^7, Firebase JS SDK ^12, Vitest for tests
 | `notifications` | In-app alerts |
 
 ### Realtime Database (IoT project)
+What the ESP32 firmware writes (keys are case-sensitive):
 ```
 bins/
-  Bin001/
-    plastic/ { level, weight, status, overweight, timestamp }
-    food/    { level, weight, moisture, status, overweight, timestamp }
-    metal/   { level, weight, status, overweight, timestamp }
+  bin001/
+    compartments/
+      plastic/ { level, weight }
+      food/    { level, weight }
+      metal/   { level, weight }
+    lastUpdated      (epoch milliseconds)
+    location         ("Horizon Campus" - free text, not GPS)
+    owner
 ```
-The prototype is a single bin, `Bin001`.
+- `level` is text: `EMPTY`, `50%`, `75%`, `FULL`, or `ERROR` when a sensor fails.
+- `weight` is read as **grams** and shown in kg. If a known weight reads 1000x off, change `WEIGHT_UNIT_DIVISOR` in `mobile/utils/binTelemetry.ts` and `admin/src/lib/binTelemetry.js`.
+- The apps turn this into a numeric level, a status (`EMPTY`, `LOW`, `HALF`, `75%`, `FULL`, `ERROR`) and kg weights in one place (`binTelemetry`), with unit tests.
+- **Live vs offline:** if `lastUpdated` is older than 2 minutes the bin is shown as **Offline** with the last known reading, and no "bin full" notifications are raised from stale data.
+- The firmware does not send moisture or an overweight flag, so those are not shown for the live bin.
+The prototype is a single bin, `bin001`.
 
 ---
 
@@ -251,8 +261,8 @@ Put a `serviceAccountKey.json` in `mobile/scripts/` (never commit it), then `nod
 
 | Project | Command | What runs |
 |---------|---------|-----------|
-| `mobile/` | `npm test` | 18 Jest unit tests (distance, status colours, bin status, design tokens) |
-| `admin/` | `npm test` | 11 Vitest unit tests (table filters) |
+| `mobile/` | `npm test` | 29 Jest unit tests (distance, status colours, bin status, bin telemetry parsing, design tokens) |
+| `admin/` | `npm test` | 19 Vitest unit tests (table filters, bin telemetry parsing) |
 | `mobile/` | `npm run test:rules` | 49 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
@@ -300,6 +310,7 @@ wast-pro/
   - Orders and users are never deleted.
 - The Stripe secret key lives in a Cloud Functions secret, not in the app.
 - Never put a Realtime Database legacy secret in the app or in the repo.
+- The IoT Realtime Database must not be publicly writable. Writes should come only from the ESP32; the apps only read.
 
 ---
 

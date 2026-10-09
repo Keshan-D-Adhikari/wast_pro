@@ -82,5 +82,7 @@ if (!USE_MOCK_IOT) {
   });
 }
 
-// Prototype bin identifier in RTDB: bins/Bin001/{plastic,food,metal}
-export const BIN_ID = "Bin001";
+// Prototype bin in RTDB. Keys are case-sensitive: the firmware writes
+// bins/bin001/compartments/{plastic,food,metal}/{level,weight} and bins/bin001/lastUpdated
+// (parsed in lib/binTelemetry.js).
+export const BIN_ID = "bin001";

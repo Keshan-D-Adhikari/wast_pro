@@ -16,6 +16,7 @@ import { useState, useEffect, useRef } from "react";
 import { db, auth } from "../../../firebaseConfig";
 import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../../../iotConfig";
+import { normalizeBin, describeFreshness } from "../../../utils/binTelemetry";
 import { ref as dbRef, onValue } from "firebase/database";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
@@ -58,6 +59,17 @@ export default function SellerDashboard() {
   const binData: BinData = USE_MOCK_IOT
     ? (mockPreset === 'alert' ? MOCK_BIN_DATA_ALERT : MOCK_BIN_DATA_NORMAL)
     : liveBinData;
+
+  // Re-evaluate "live vs offline" periodically so the badge turns Offline on
+  // its own if the firmware stops uploading.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(id);
+  }, []);
+  const freshness = USE_MOCK_IOT
+    ? { live: true, label: 'Demo data' }
+    : describeFreshness(binData.lastUpdated, now);
   // The ESP32 firmware doesn't upload GPS coordinates (see iotConfig.js),
   // and users.location is a free-text address, so there's currently no
   // source for a live bin location — the map below always shows "Not set".
@@ -86,8 +98,9 @@ export default function SellerDashboard() {
     if (!USE_MOCK_IOT) {
       const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
       unsubscribeBins = onValue(binNodeRef, (snapshot) => {
-        if (snapshot.exists()) {
-          setBinData(snapshot.val() as BinData);
+        const normalized = snapshot.exists() ? normalizeBin(snapshot.val()) : null;
+        if (normalized) {
+          setBinData(normalized);
         }
         setLoading(false);
       }, (error) => {
@@ -125,7 +138,9 @@ export default function SellerDashboard() {
   // level percentage re-derived in the app, so the alert matches exactly
   // what the ESP32 itself decided.
   useEffect(() => {
-    if (!user) return;
+    // Never alert from stale data: an old FULL reading from an offline bin
+    // would otherwise raise a "bin is full" notification right now.
+    if (!user || !freshness.live) return;
 
     const checkAndNotify = async (
       type: WasteType,
@@ -157,7 +172,7 @@ export default function SellerDashboard() {
     checkAndNotify("plastic", binData.plastic?.status, binData.plastic?.overweight);
     checkAndNotify("food", binData.food?.status, binData.food?.overweight);
     checkAndNotify("metal", binData.metal?.status, binData.metal?.overweight);
-  }, [binData, user]);
+  }, [binData, user, freshness.live]);
 
   const handleReportSubmit = () => {
     if (issueDescription.trim() === "") {
@@ -331,12 +346,23 @@ export default function SellerDashboard() {
         )}
 
         {/* Bin Monitoring Section [cite: 38] */}
-        <SectionTitle meta={USE_MOCK_IOT ? "DEMO / MOCK" : "Live"}>Smart bin monitoring</SectionTitle>
+        <SectionTitle meta={USE_MOCK_IOT ? "DEMO / MOCK" : freshness.live ? "Live" : "Offline"}>Smart bin monitoring</SectionTitle>
         <View style={styles.binRow}>
           {COMPARTMENTS.map((c) => (
             <BinCard key={c.type} type={c.type} label={c.label} icon={c.icon} />
           ))}
         </View>
+        <Text style={styles.lastUpdated}>
+          {freshness.label}
+          {binData.lastUpdated ? ` · ${new Date(binData.lastUpdated).toLocaleString()}` : ''}
+          {binData.location ? ` · ${binData.location}` : ''}
+        </Text>
+        {!freshness.live && (
+          <Notice
+            icon="cloud-offline-outline"
+            text="The smart bin hasn't sent data recently, so these are the last known readings and no new alerts are raised."
+          />
+        )}
 
         {/* High Moisture Warning [cite: research proposal moisture sensor] */}
         {(binData.food?.moisture ?? 0) > 70 && (
@@ -532,6 +558,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: 5, borderRadius: Radius.pill },
+  lastUpdated: { ...Type.caption, color: Palette.ink[500], marginTop: Space.sm, marginBottom: Space.md },
   statusPill: {
     alignSelf: 'flex-start',
     marginTop: Space.sm,

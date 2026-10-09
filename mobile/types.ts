@@ -19,6 +19,10 @@ export interface BinData {
   plastic: BinCompartment;
   food: BinCompartment;
   metal: BinCompartment;
+  /** When the firmware last wrote, as epoch milliseconds (from bins/<id>/lastUpdated). */
+  lastUpdated?: number | null;
+  /** Free-text location the firmware reports, e.g. "Horizon Campus" (not GPS). */
+  location?: string;
 }
 
 export interface AppNotification {
