@@ -4,10 +4,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  Dimensions,
   TextInput,
 } from "react-native";
-import { PieChart } from "react-native-chart-kit";
 import * as Location from "expo-location";
 import MapView, { Marker, APP_MAP_PROVIDER } from "../../../components/platform-map";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,9 +28,8 @@ import { Notice } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { Sheet } from "@/components/ui/sheet";
+import { DonutChart } from "@/components/ui/donut-chart";
 import { AppNotification, BinData, UserProfile, WasteType } from "../../../types";
-
-const screenWidth = Dimensions.get("window").width;
 
 const COMPARTMENTS: { type: WasteType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { type: "plastic", label: "Plastic", icon: "cube-outline" },
@@ -401,23 +398,12 @@ export default function SellerDashboard() {
         {/* Analytics Chart Section */}
         <SectionTitle>Waste weight distribution</SectionTitle>
         <Card>
-          <PieChart
-            data={COMPARTMENTS.map((c) => ({
-              name: c.label,
-              population: binData[c.type]?.weight || 0.1,
+          <DonutChart
+            items={COMPARTMENTS.map((c) => ({
+              label: c.label,
+              value: binData[c.type]?.weight || 0,
               color: wasteAccent(c.type).base,
-              legendFontColor: Palette.ink[700],
-              legendFontSize: 12,
             }))}
-            width={screenWidth - Space.xl * 2 - Space.lg * 2}
-            height={180}
-            accessor="population"
-            backgroundColor="transparent"
-            paddingLeft="0"
-            absolute // To display numbers directly
-            chartConfig={{
-              color: (opacity = 1) => `rgba(20, 38, 26, ${opacity})`,
-            }}
           />
         </Card>
 

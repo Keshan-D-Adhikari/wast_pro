@@ -99,7 +99,7 @@ Live sensor readings never go through Firestore. They are read straight from the
 | Firebase JS SDK | ^12.11 | Auth, Firestore, Storage, Functions, Realtime DB |
 | react-native-maps | 1.27.2 | Maps |
 | expo-location | ~57.0 | GPS |
-| react-native-chart-kit | ^6.12 | Charts |
+| react-native-svg | 15.15 | Donut chart for bin weights |
 | expo-web-browser / expo-linking | ~57 | Stripe Checkout redirect |
 | Jest + jest-expo | - | Unit tests |
 
@@ -262,7 +262,7 @@ Put a `serviceAccountKey.json` in `mobile/scripts/` (never commit it), then `nod
 
 | Project | Command | What runs |
 |---------|---------|-----------|
-| `mobile/` | `npm test` | 37 Jest unit tests (distance, status colours, bin status and telemetry parsing, order actions, colour contrast, password field) |
+| `mobile/` | `npm test` | 41 Jest unit tests (donut chart maths, distance, status colours, bin status and telemetry parsing, order actions, colour contrast, password field) |
 | `admin/` | `npm test` | 19 Vitest unit tests (table filters, bin telemetry parsing) |
 | `mobile/` | `npm run test:rules` | 84 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
 
