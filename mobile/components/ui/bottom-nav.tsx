@@ -37,39 +37,47 @@ export function BottomNav({ role, active }: { role: 'seller' | 'buyer'; active: 
   const tabs = role === 'seller' ? SELLER_TABS : BUYER_TABS;
 
   return (
-    <View style={[styles.wrap, { bottom: Space.lg + insets.bottom }]} pointerEvents="box-none">
-      <View style={[styles.bar, { height: BOTTOM_NAV_HEIGHT }]}>
-        {tabs.map((tab) => {
-          const isActive = tab.key === active;
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={styles.item}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isActive }}
-              accessibilityLabel={tab.label}
-              onPress={() => {
-                if (!isActive) router.push(tab.route);
-              }}
-            >
-              <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-                <Ionicons
-                  name={isActive ? tab.activeIcon : tab.icon}
-                  size={20}
-                  color={isActive ? Palette.white : Palette.ink[300]}
-                />
-              </View>
-              <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
+    <>
+      {/* Solid strip under the floating bar so scrolled content doesn't show through the gap around it */}
+      <View
+        pointerEvents="none"
+        style={[styles.backdrop, { height: Space.lg + insets.bottom + BOTTOM_NAV_HEIGHT / 2 }]}
+      />
+      <View style={[styles.wrap, { bottom: Space.lg + insets.bottom }]} pointerEvents="box-none">
+        <View style={[styles.bar, { height: BOTTOM_NAV_HEIGHT }]}>
+          {tabs.map((tab) => {
+            const isActive = tab.key === active;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={styles.item}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={tab.label}
+                onPress={() => {
+                  if (!isActive) router.push(tab.route);
+                }}
+              >
+                <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
+                  <Ionicons
+                    name={isActive ? tab.activeIcon : tab.icon}
+                    size={20}
+                    color={isActive ? Palette.white : Palette.ink[300]}
+                  />
+                </View>
+                <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  backdrop: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: Palette.background },
   wrap: {
     position: 'absolute',
     left: Space.lg,
