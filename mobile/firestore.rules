@@ -262,6 +262,14 @@ service cloud.firestore {
         (
           (request.resource.data.type == 'bin_full' && request.resource.data.toUid == request.auth.uid) ||
           (
+            // Confirmed / completed notices can only come from the order's seller.
+            request.resource.data.type in ['order_confirmed', 'order_completed'] &&
+            'orderId' in request.resource.data &&
+            exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId)) &&
+            get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.sellerUid == request.auth.uid &&
+            isOrderParty(request.resource.data.orderId, request.resource.data.toUid)
+          ) ||
+          (
             request.resource.data.type in ['order_placed', 'order_cancelled'] &&
             'orderId' in request.resource.data &&
             exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId)) &&

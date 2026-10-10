@@ -88,5 +88,27 @@ await t('rating cannot be combined with other changes', async () => {
   await assertFails(updateDoc(doc(as('buyer1'), 'orders/O1'), { rating: 5, totalPrice: 1 }));
 });
 
+// Notifications to the buyer ---------------------------------------------------
+const notif = (type, extra = {}) => ({ toUid: 'buyer1', type, message: 'm', read: false, createdAt: new Date(), orderId: 'O1', ...extra });
+await seed(order());
+await t('seller notifies the buyer: confirmed, completed, declined', async () => {
+  const db = as('seller1');
+  for (const type of ['order_confirmed', 'order_completed', 'order_cancelled'])
+    await assertSucceeds(setDoc(doc(db, 'notifications/' + type), notif(type)));
+});
+await t('buyer cannot send a "confirmed" or "completed" notice to the seller', async () => {
+  const db = as('buyer1');
+  for (const type of ['order_confirmed', 'order_completed'])
+    await assertFails(setDoc(doc(db, 'notifications/x' + type), notif(type, { toUid: 'seller1' })));
+});
+await t("another seller cannot send a confirmed notice about someone else's order", () =>
+  assertFails(setDoc(doc(as('seller2'), 'notifications/y'), notif('order_confirmed'))));
+await t('a confirmed notice must point at an order, and at its buyer', async () => {
+  const { orderId, ...noOrder } = notif('order_confirmed');
+  await assertFails(setDoc(doc(as('seller1'), 'notifications/z'), noOrder));
+  await assertFails(setDoc(doc(as('seller1'), 'notifications/w'), notif('order_confirmed', { toUid: 'seller2' })));
+});
+
+console.log(res.join(String.fromCharCode(10)));
 await env.cleanup();
 process.exit(res.some((r) => r.startsWith('FAIL')) ? 1 : 0);

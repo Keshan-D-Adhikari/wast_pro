@@ -41,6 +41,7 @@ import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { TextField } from "@/components/ui/text-field";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { Sheet } from "@/components/ui/sheet";
+import { NotificationBell } from "@/components/ui/notification-bell";
 import { ChipGroup } from "@/components/ui/chip";
 
 const TYPE_FILTERS = [
@@ -448,7 +449,7 @@ export default function BuyerDashboard() {
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
-        <ScreenHeader title="Browse waste" subtitle="Find recyclable waste near you" />
+        <ScreenHeader title="Browse waste" subtitle="Find recyclable waste near you" right={<NotificationBell />} />
 
         <TextField
           icon="search-outline"

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { db } from "../../../firebaseConfig";
 import { useAuthUser } from "../../../hooks/useAuthUser";
 import {
-  collection, query, where, orderBy, onSnapshot, doc, getDoc, updateDoc, writeBatch, deleteField, serverTimestamp,
+  collection, addDoc, query, where, orderBy, onSnapshot, doc, getDoc, updateDoc, writeBatch, deleteField, serverTimestamp,
 } from "firebase/firestore";
 
 import { Palette, Space, Radius, Type, wasteAccent } from "@/constants/design";
@@ -20,6 +20,7 @@ import { OrderTabs } from "@/components/ui/order-tabs";
 import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
 import { Order } from "../../../types";
 import { sellerActionsFor, completingCollectsCash } from "../../../utils/orderActions";
+import { buyerNotificationFor, SellerOrderEvent } from "../../../utils/orderNotifications";
 
 const EMPTY_TAB_TEXT: Record<OrderTab, string> = {
   ongoing: "No ongoing orders",
@@ -69,8 +70,28 @@ export default function SellerOrders() {
     }
   };
 
+  // Tell the buyer what happened. Best effort: a failed notification must not undo the order change.
+  const notifyBuyer = async (order: Order, event: SellerOrderEvent) => {
+    try {
+      const { type, message } = buyerNotificationFor(event, order);
+      await addDoc(collection(db, 'notifications'), {
+        toUid: order.buyerUid,
+        type,
+        message,
+        read: false,
+        createdAt: serverTimestamp(),
+        orderId: order.id,
+      });
+    } catch (error) {
+      console.error('Could not notify buyer:', error);
+    }
+  };
+
   const handleConfirm = (order: Order) =>
-    run(order, () => updateDoc(doc(db, 'orders', order.id), { status: 'confirmed' }), 'Could not confirm this order.');
+    run(order, async () => {
+      await updateDoc(doc(db, 'orders', order.id), { status: 'confirmed' });
+      await notifyBuyer(order, 'confirmed');
+    }, 'Could not confirm this order.');
 
   const handleComplete = (order: Order) => {
     const collectsCash = completingCollectsCash(order);
@@ -88,6 +109,7 @@ export default function SellerOrders() {
               // Cash on delivery: the cash is collected at hand-over, so record the payment first.
               if (collectsCash) await updateDoc(doc(db, 'orders', order.id), { paymentStatus: 'paid' });
               await updateDoc(doc(db, 'orders', order.id), { status: 'completed' });
+              await notifyBuyer(order, 'completed');
             }, 'Could not complete this order.'),
         },
       ]
@@ -115,6 +137,7 @@ export default function SellerOrders() {
                 batch.update(listingRef, { status: 'available', soldOrderId: deleteField() });
               }
               await batch.commit();
+              await notifyBuyer(order, 'declined');
             }, 'Could not decline this order.'),
         },
       ]
