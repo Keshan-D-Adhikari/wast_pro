@@ -289,6 +289,7 @@ wast-pro/
 │   ├── functions/            Cloud Functions (Stripe Checkout)
 │   ├── tests/rules/          Firestore security-rule tests (Firebase Emulator)
 │   ├── firestore.rules       Security rules
+│   ├── firestore.indexes.json  Composite indexes (orders, offers lists)
 │   ├── firebaseConfig.js     Main Firebase project
 │   ├── iotConfig.js          IoT Realtime Database + mock mode
 │   └── types.ts              TypeScript interfaces
