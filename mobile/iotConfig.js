@@ -103,4 +103,4 @@ if (!USE_MOCK_IOT) {
 // Prototype bin in RTDB. Realtime Database keys are case-sensitive: the firmware
 // writes to bins/bin001/compartments/{plastic,food,metal}/{level,weight} and
 // bins/bin001/lastUpdated (see utils/binTelemetry.ts for how it is parsed).
-export const BIN_ID = 'bin001';
+export const DEFAULT_BIN_ID = 'bin001';

@@ -27,7 +27,7 @@ The repo has three parts:
 
 ### Seller
 - Live smart-bin monitoring for the Plastic, Food and Metal compartments (fill level, weight, moisture)
-- Bin status from the firmware (`EMPTY`, `LOW`, `HALF`, `75%`, `FULL`, `ERROR` for a failed sensor), weight in kg, last-updated time, and a Live/Offline indicator
+- Bin status from the firmware (`EMPTY`, `LOW`, `HALF`, `75%`, `FULL`, `ERROR` for a failed sensor), weight in kg, last-updated time, and a **Bin ON / Bin OFF** indicator (live vs offline)
 - Automatic in-app alert when a compartment is full or overweight
 - List waste for sale (price = weight x rate per kg), capped by the sensor-reported weight
 - **Offers:** review price offers from buyers, accept or reject them; accepting creates an order at the offered price and rejects the other pending offers
@@ -155,7 +155,7 @@ bins/
 - The apps turn this into a numeric level, a status (`EMPTY`, `LOW`, `HALF`, `75%`, `FULL`, `ERROR`) and kg weights in one place (`binTelemetry`), with unit tests.
 - **Live vs offline:** if `lastUpdated` is older than 2 minutes the bin is shown as **Offline** with the last known reading, and no "bin full" notifications are raised from stale data.
 - The firmware does not send moisture or an overweight flag, so those are not shown for the live bin.
-The prototype is a single bin, `bin001`.
+The prototype is a single bin, `bin001`. A seller sees `bin001` by default; an admin can link a seller to a different bin from the **Users** page (**Set bin** stores `binId` on the seller's profile).
 
 ---
 
@@ -264,12 +264,12 @@ Put a `serviceAccountKey.json` in `mobile/scripts/` (never commit it), then `nod
 |---------|---------|-----------|
 | `mobile/` | `npm test` | 37 Jest unit tests (distance, status colours, bin status and telemetry parsing, order actions, colour contrast, password field) |
 | `admin/` | `npm test` | 19 Vitest unit tests (table filters, bin telemetry parsing) |
-| `mobile/` | `npm run test:rules` | 74 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
+| `mobile/` | `npm run test:rules` | 79 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
 - **admin:** lint, test, build
 - **mobile:** lint, test
-- **firestore-rules:** the 74 security-rule tests on the Firebase Emulator
+- **firestore-rules:** the 79 security-rule tests on the Firebase Emulator
 
 The rule tests (`mobile/tests/rules/`) cover user privacy and sign-up, offer acceptance, order updates, listing validation, and buying/cancelling listings, including attempts to tamper with prices, double-buy a listing, post a malformed listing or promote yourself to admin. Automated coverage of the screens, the payment flow and the Cloud Functions is still limited.
 

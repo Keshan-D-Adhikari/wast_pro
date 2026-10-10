@@ -45,6 +45,11 @@ await t('owner cannot raise own points', () => assertFails(updateDoc(doc(as('sel
 await t('owner cannot change own role', () => assertFails(updateDoc(doc(as('seller1'), 'users/seller1'), { role: 'admin' })));
 await t('owner cannot clear disabled flag', () => assertFails(updateDoc(doc(as('seller1'), 'users/seller1'), { disabled: false })));
 await t('admin can disable a user', () => assertSucceeds(updateDoc(doc(as('admin1'), 'users/buyer1'), { disabled: true })));
+await t('admin can assign a seller a smart bin', () => assertSucceeds(updateDoc(doc(as('admin1'), 'users/seller1'), { binId: 'bin001' })));
+await t('admin cannot assign a malformed bin id', () => assertFails(updateDoc(doc(as('admin1'), 'users/seller1'), { binId: '../secrets' })));
+await t('admin cannot assign a non-text bin id', () => assertFails(updateDoc(doc(as('admin1'), 'users/seller1'), { binId: 123 })));
+await t('a seller cannot assign themselves a bin', () => assertFails(updateDoc(doc(as('seller1'), 'users/seller1'), { binId: 'bin002' })));
+await t('a buyer cannot assign someone a bin', () => assertFails(updateDoc(doc(as('buyer1'), 'users/seller1'), { binId: 'bin002' })));
 
 // ---- orders: create ----
 await seed();

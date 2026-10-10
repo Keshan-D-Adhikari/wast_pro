@@ -55,7 +55,8 @@ service cloud.firestore {
     // Private: only the owner and admins can read it (it holds email/phone/address). Buyer and
     // seller names shown to each other come from the names copied onto listings, offers and orders.
     // Sign-up may only create a seller or buyer profile (an admin is made by hand in the console),
-    // and the owner can only edit their own contact details, never role, points or `disabled`.
+    // and the owner can only edit their own contact details, never role, points, `disabled` or `binId`
+    // (an admin assigns which smart bin a seller sees).
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid) &&
@@ -66,7 +67,10 @@ service cloud.firestore {
         (isOwner(uid) &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['fullName', 'phone', 'location', 'photoURL', 'updatedAt'])) ||
-        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
+        (isAdmin() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled', 'binId']) &&
+          (!('binId' in request.resource.data) ||
+            (request.resource.data.binId is string && request.resource.data.binId.matches('^[A-Za-z0-9_-]{1,32}$'))));
       allow delete: if false;
     }
 

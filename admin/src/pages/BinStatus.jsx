@@ -138,7 +138,7 @@ export default function BinStatus() {
             backgroundColor: USE_MOCK_IOT || !freshness.live ? "var(--status-warning)" : "var(--status-success)"
           }} />
           {USE_MOCK_IOT ? <IconLeaf size={14} /> : <IconPulse size={14} />}
-          <span>{USE_MOCK_IOT ? "Simulated Mock Data" : freshness.live ? "Live" : "Bin offline - last known reading"}</span>
+          <span>{USE_MOCK_IOT ? "Simulated Mock Data" : freshness.live ? "Bin ON · Live" : "Bin OFF · last known reading"}</span>
         </div>
       </div>
 

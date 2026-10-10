@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { db, auth } from '../../../firebaseConfig';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL } from '../../../iotConfig';
+import { iotDb, DEFAULT_BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL } from '../../../iotConfig';
 import { normalizeBin } from '../../../utils/binTelemetry';
 import { ref as dbRef, onValue } from 'firebase/database';
 import * as Location from 'expo-location';
@@ -56,6 +56,8 @@ export default function AddWaste() {
   );
   const [binExists, setBinExists] = useState<boolean | null>(USE_MOCK_IOT ? true : null);
   const [sellerName, setSellerName] = useState('');
+  // The bin this seller is linked to; falls back to the default prototype bin.
+  const [binId, setBinId] = useState(DEFAULT_BIN_ID);
   const [sellerBinLocation, setSellerBinLocation] = useState<UserLocation | null>(null);
 
   const [wasteItems, setWasteItems] = useState<Record<WasteType, WasteItem>>({
@@ -72,18 +74,21 @@ export default function AddWaste() {
         const userDoc = await getDoc(doc(db, "users", auth.currentUser!.uid));
         if (userDoc.exists()) {
           setSellerName(userDoc.data().fullName);
+          setBinId(userDoc.data().binId || DEFAULT_BIN_ID);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
       }
     };
     fetchUser();
+  }, []);
 
-    // Live sensor readings come from the ESP32 firmware's own Realtime
-    // Database project (see iotConfig.js), or mock telemetry in dev mode.
+  // Live sensor readings come from the ESP32 firmware's own Realtime
+  // Database project (see iotConfig.js), or mock telemetry in dev mode.
+  useEffect(() => {
     if (USE_MOCK_IOT) return;
 
-    const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
+    const binNodeRef = dbRef(iotDb, `bins/${binId}`);
     const unsubscribe = onValue(binNodeRef, (snapshot) => {
       const normalized = snapshot.exists() ? normalizeBin(snapshot.val()) : null;
       if (normalized) {
@@ -100,7 +105,7 @@ export default function AddWaste() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [binId]);
 
   // The firmware doesn't report the bin's GPS location, so capture the
   // seller's current device location at listing time instead — buyers need

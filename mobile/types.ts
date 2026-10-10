@@ -43,6 +43,8 @@ export interface UserProfile {
   photoURL?: string;
   location?: string;
   points?: number;
+  /** The smart bin this seller sees (a key under bins/ in the IoT database). Set by an admin; defaults to bin001. */
+  binId?: string;
 }
 
 export interface MarketplaceItem {

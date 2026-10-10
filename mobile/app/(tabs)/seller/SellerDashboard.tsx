@@ -16,7 +16,7 @@ import { useState, useEffect, useRef } from "react";
 import { db } from "../../../firebaseConfig";
 import { useAuthUser } from "../../../hooks/useAuthUser";
 import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../../../iotConfig";
+import { iotDb, DEFAULT_BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../../../iotConfig";
 import { normalizeBin, describeFreshness } from "../../../utils/binTelemetry";
 import { ref as dbRef, onValue } from "firebase/database";
 
@@ -39,6 +39,12 @@ const COMPARTMENTS: { type: WasteType; label: string; icon: keyof typeof Ionicon
   { type: "metal", label: "Metal", icon: "construct-outline" },
 ];
 
+const EMPTY_BIN: BinData = {
+  plastic: { level: 0, weight: 0 },
+  food: { level: 0, weight: 0, moisture: 0 },
+  metal: { level: 0, weight: 0 },
+};
+
 export default function SellerDashboard() {
   const user = useAuthUser();
 
@@ -50,11 +56,9 @@ export default function SellerDashboard() {
 
   //Data for compartment 3 according to objective 1 of the proposal [citation: 38]
   const [mockPreset, setMockPreset] = useState<'normal' | 'alert'>('normal');
-  const [liveBinData, setBinData] = useState<BinData>({
-    plastic: { level: 0, weight: 0 },
-    food: { level: 0, weight: 0, moisture: 0 },
-    metal: { level: 0, weight: 0 },
-  });
+  const [liveBinData, setBinData] = useState<BinData>(EMPTY_BIN);
+  // The bin this seller is linked to (set by an admin on their profile); everyone else sees the default prototype bin.
+  const binId = sellerData?.binId || DEFAULT_BIN_ID;
   // In mock mode the bin data is derived from the selected preset during
   // render, rather than copied into state from an effect.
   const binData: BinData = USE_MOCK_IOT
@@ -94,23 +98,7 @@ export default function SellerDashboard() {
       }
     }, (error) => console.error("User fetch error:", error));
 
-    // 2. Sensor data (Fill Level, Weight, Moisture)
-    let unsubscribeBins = () => {};
-    if (!USE_MOCK_IOT) {
-      const binNodeRef = dbRef(iotDb, `bins/${BIN_ID}`);
-      unsubscribeBins = onValue(binNodeRef, (snapshot) => {
-        const normalized = snapshot.exists() ? normalizeBin(snapshot.val()) : null;
-        if (normalized) {
-          setBinData(normalized);
-        }
-        setLoading(false);
-      }, (error) => {
-        console.error("Bin fetch error:", error);
-        setLoading(false);
-      });
-    }
-
-    // 3. Notifications List (Sorted client-side to avoid index error)
+    // 2. Notifications List (Sorted client-side to avoid index error)
     const q = query(
       collection(db, "notifications"),
       where("toUid", "==", user.uid)
@@ -129,10 +117,24 @@ export default function SellerDashboard() {
 
     return () => {
       unsubscribeUser();
-      unsubscribeBins();
       unsubscribeNotifs();
     };
   }, [user]);
+
+  // Live sensor data (fill level, weight) for this seller's bin, from the ESP32's Realtime Database.
+  useEffect(() => {
+    if (USE_MOCK_IOT) return;
+
+    return onValue(dbRef(iotDb, `bins/${binId}`), (snapshot) => {
+      const normalized = snapshot.exists() ? normalizeBin(snapshot.val()) : null;
+      // A bin with no data yet shows as empty/offline rather than keeping another bin's readings.
+      setBinData(normalized ?? EMPTY_BIN);
+      setLoading(false);
+    }, (error) => {
+      console.error("Bin fetch error:", error);
+      setLoading(false);
+    });
+  }, [binId]);
 
   // Automated Bin Full Notifications — driven by the firmware's own `status`
   // and `overweight` fields (see constants/bin-status.ts) rather than a
@@ -347,14 +349,14 @@ export default function SellerDashboard() {
         )}
 
         {/* Bin Monitoring Section [cite: 38] */}
-        <SectionTitle meta={USE_MOCK_IOT ? "DEMO / MOCK" : freshness.live ? "Live" : "Offline"}>Smart bin monitoring</SectionTitle>
+        <SectionTitle meta={USE_MOCK_IOT ? "DEMO / MOCK" : freshness.live ? "Bin ON" : "Bin OFF"}>Smart bin monitoring</SectionTitle>
         <View style={styles.binRow}>
           {COMPARTMENTS.map((c) => (
             <BinCard key={c.type} type={c.type} label={c.label} icon={c.icon} />
           ))}
         </View>
         <Text style={styles.lastUpdated}>
-          {freshness.label}
+          {binId} · {freshness.label}
           {binData.lastUpdated ? ` · ${new Date(binData.lastUpdated).toLocaleString()}` : ''}
           {binData.location ? ` · ${binData.location}` : ''}
         </Text>

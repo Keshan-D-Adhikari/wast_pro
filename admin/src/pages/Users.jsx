@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
-import { doc, updateDoc } from "firebase/firestore";
+import { deleteField, doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { filterUsers } from "../lib/filters";
 import { usePaginatedCollection } from "../lib/usePaginatedCollection";
 import { IconSearch, IconUsers } from "../components/Icons";
+
+// Sellers without an assigned bin see the default prototype bin.
+const DEFAULT_BIN = "bin001";
 
 export default function Users() {
   const { docs: users, loading, hasMore, loadMore } = usePaginatedCollection("users");
@@ -20,6 +23,21 @@ export default function Users() {
     if (!confirm(`${action === "disable" ? "Disable" : "Re-enable"} ${u.fullName || u.email}?`))
       return;
     await updateDoc(doc(db, "users", u.id), { disabled: !u.disabled });
+  };
+
+  // Link a seller to a smart bin (a key under bins/ in the IoT database). Empty = use the default bin.
+  const assignBin = async (u) => {
+    const next = window.prompt(
+      `Smart bin ID for ${u.fullName || u.email}\n(leave empty to use the default, ${DEFAULT_BIN})`,
+      u.binId || ""
+    );
+    if (next === null) return;
+    const id = next.trim();
+    if (id && !/^[A-Za-z0-9_-]{1,32}$/.test(id)) {
+      window.alert("Use only letters, numbers, - or _ (up to 32 characters).");
+      return;
+    }
+    await updateDoc(doc(db, "users", u.id), { binId: id || deleteField() });
   };
 
   return (
@@ -84,6 +102,7 @@ export default function Users() {
                   <th>Role</th>
                   <th>Phone Number</th>
                   <th>Location</th>
+                  <th>Smart Bin</th>
                   <th>Points</th>
                   <th>Account Status</th>
                   <th style={{ textAlign: "right" }}>Actions</th>
@@ -99,6 +118,19 @@ export default function Users() {
                     </td>
                     <td>{u.phone || "—"}</td>
                     <td>{u.location || "—"}</td>
+                    <td>
+                      {u.role === "seller" ? (
+                        <>
+                          <code>{u.binId || DEFAULT_BIN}</code>
+                          {!u.binId && <span style={{ color: "var(--ink-500)", fontSize: "0.75rem" }}> (default)</span>}{" "}
+                          <button type="button" className="btn-sm-success" onClick={() => assignBin(u)}>
+                            Set bin
+                          </button>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td>
                       <span style={{ fontWeight: 700, color: "var(--brand-700)" }}>
                         {u.points != null ? u.points : "0"}
