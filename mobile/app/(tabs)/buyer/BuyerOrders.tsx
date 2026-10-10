@@ -36,16 +36,25 @@ import { calculateDistance } from "../../../utils/distance";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
-import { Card, SectionTitle, Divider, DetailRow } from "@/components/ui/card";
+import { Card, Divider, DetailRow } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { OrderTabs } from "@/components/ui/order-tabs";
+import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
+
+const EMPTY_TAB_TEXT: Record<OrderTab, string> = {
+  ongoing: "No ongoing orders",
+  completed: "No completed orders yet",
+  cancelled: "No cancelled orders",
+};
 
 export default function BuyerOrders() {
   const authUser = useAuthUser();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [tab, setTab] = useState<OrderTab>("ongoing");
   const [loading, setLoading] = useState(true);
   const [orderMapVisible, setOrderMapVisible] = useState(false);
   const [buyerLocation, setBuyerLocation] = useState<UserLocation | null>(null);
@@ -357,10 +366,16 @@ export default function BuyerOrders() {
           />
         ) : (
           <>
-            <SectionTitle meta={`${orders.length} active`}>Your orders</SectionTitle>
-            {orders.map((order, index) => (
-              <OrderCard key={order.id} order={order} isLatest={index === 0} />
-            ))}
+            <OrderTabs value={tab} counts={countByTab(orders)} onChange={setTab} />
+            {orders.filter((o) => tabForOrder(o) === tab).length === 0 ? (
+              <Text style={styles.emptyTab}>{EMPTY_TAB_TEXT[tab]}</Text>
+            ) : (
+              orders
+                .filter((o) => tabForOrder(o) === tab)
+                .map((order, index) => (
+                  <OrderCard key={order.id} order={order} isLatest={tab === "ongoing" && index === 0} />
+                ))
+            )}
           </>
         )}
       </Screen>
@@ -451,6 +466,7 @@ export default function BuyerOrders() {
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
+  emptyTab: { ...Type.body, color: Palette.ink[500], textAlign: "center", paddingVertical: Space.xl },
   root: { flex: 1, backgroundColor: Palette.background },
   flex: { flex: 1 },
 

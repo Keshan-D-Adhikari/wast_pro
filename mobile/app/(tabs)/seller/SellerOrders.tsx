@@ -10,19 +10,28 @@ import {
 
 import { Palette, Space, Radius, Type, wasteAccent } from "@/constants/design";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
-import { Card, SectionTitle, Divider, DetailRow } from "@/components/ui/card";
+import { Card, Divider, DetailRow } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { OrderTabs } from "@/components/ui/order-tabs";
+import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
 import { Order } from "../../../types";
 import { sellerActionsFor, completingCollectsCash } from "../../../utils/orderActions";
+
+const EMPTY_TAB_TEXT: Record<OrderTab, string> = {
+  ongoing: "No ongoing orders",
+  completed: "No completed orders yet",
+  cancelled: "No cancelled orders",
+};
 
 export default function SellerOrders() {
   const authUser = useAuthUser();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<OrderTab>("ongoing");
 
   useEffect(() => {
     if (!authUser) return;
@@ -229,10 +238,14 @@ export default function SellerOrders() {
           />
         ) : (
           <>
-            <SectionTitle meta={`${orders.length} total`}>Recent transactions</SectionTitle>
-            {orders.map((order) => (
-              <OrderCard key={order.id} order={order} />
-            ))}
+            <OrderTabs value={tab} counts={countByTab(orders)} onChange={setTab} />
+            {orders.filter((o) => tabForOrder(o) === tab).length === 0 ? (
+              <Text style={styles.emptyTab}>{EMPTY_TAB_TEXT[tab]}</Text>
+            ) : (
+              orders
+                .filter((o) => tabForOrder(o) === tab)
+                .map((order) => <OrderCard key={order.id} order={order} />)
+            )}
           </>
         )}
       </Screen>
@@ -252,6 +265,7 @@ const styles = StyleSheet.create({
   summaryValue: { ...Type.h2, color: Palette.brand[900] },
   summaryRule: { width: 1, height: 34, backgroundColor: Palette.brand[200], marginHorizontal: Space.lg },
 
+  emptyTab: { ...Type.body, color: Palette.ink[500], textAlign: "center", paddingVertical: Space.xl },
   card: { marginBottom: Space.md },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   typeIcon: {
