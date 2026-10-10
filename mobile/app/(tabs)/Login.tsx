@@ -17,12 +17,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // firebase import
 import { auth, db } from '../../firebaseConfig';
 import { FirebaseError } from 'firebase/app';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
+import { passwordResetMessage } from '../../utils/passwordReset';
 
 export default function Login() {
   const router = useRouter();
@@ -77,6 +78,25 @@ export default function Login() {
       Alert.alert('Login Failed', 'Invalid email or password. Please check your credentials.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /* ================= PASSWORD RESET ================= */
+  const handleForgotPassword = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      Alert.alert('Enter your email', 'Type your email address above, then tap "Forgot password?" again.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, trimmed);
+      const { text } = passwordResetMessage();
+      Alert.alert('Check your email', text);
+    } catch (err: unknown) {
+      const code = err instanceof FirebaseError ? err.code : undefined;
+      console.warn('Password reset error:', code ?? err);
+      const { ok, text } = passwordResetMessage(code ?? 'unknown');
+      Alert.alert(ok ? 'Check your email' : 'Could not send email', text);
     }
   };
 
@@ -141,6 +161,15 @@ export default function Login() {
               returnKeyType="go"
             />
 
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              style={styles.forgotRow}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Forgot password"
+            >
+              <Text style={styles.signupLink}>Forgot password?</Text>
+            </TouchableOpacity>
 
             <Button label="Log In" onPress={handleLogin} loading={loading} />
 
@@ -187,6 +216,7 @@ const styles = StyleSheet.create({
     ...Shadow[3],
   },
   cardSubtitle: { marginTop: Space.xs, marginBottom: Space['2xl'] },
+  forgotRow: { alignSelf: 'flex-end', marginBottom: Space.lg },
   signupRow: { alignItems: 'center', marginTop: Space.xl },
   signupLink: { ...Type.smallStrong, color: Palette.brand[600], fontWeight: '700' },
 });

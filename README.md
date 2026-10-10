@@ -262,7 +262,7 @@ Put a `serviceAccountKey.json` in `mobile/scripts/` (never commit it), then `nod
 
 | Project | Command | What runs |
 |---------|---------|-----------|
-| `mobile/` | `npm test` | 44 Jest unit tests (donut chart maths, distance, status colours, bin status and telemetry parsing, order actions, colour contrast, password field) |
+| `mobile/` | `npm test` | 46 Jest unit tests (donut chart maths, distance, status colours, bin status and telemetry parsing, order actions, colour contrast, password field) |
 | `admin/` | `npm test` | 19 Vitest unit tests (table filters, bin telemetry parsing) |
 | `mobile/` | `npm run test:rules` | 90 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
 
