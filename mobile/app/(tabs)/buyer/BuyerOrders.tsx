@@ -20,7 +20,8 @@ import {
   deleteField,
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db, functions } from '../../../firebaseConfig';
+import { db, functions } from '../../../firebaseConfig';
+import { useAuthUser } from '../../../hooks/useAuthUser';
 import { httpsCallable } from 'firebase/functions';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -42,6 +43,7 @@ import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 
 export default function BuyerOrders() {
+  const authUser = useAuthUser();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,11 +102,11 @@ export default function BuyerOrders() {
   // Filters by buyerUid and sorts newest first
   // onSnapshot updates list automatically
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser) return;
 
     const q = query(
       collection(db, "orders"),
-      where("buyerUid", "==", auth.currentUser.uid),
+      where("buyerUid", "==", authUser.uid),
       orderBy("createdAt", "desc")
     );
 
@@ -125,7 +127,7 @@ export default function BuyerOrders() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [authUser]);
 
   const handleCancelOrder = async (order: Order) => {
     Alert.alert(

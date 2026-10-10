@@ -2,7 +2,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../../../firebaseConfig';
+import { db } from '../../../firebaseConfig';
+import { useAuthUser } from '../../../hooks/useAuthUser';
 import { Offer } from '../../../types';
 
 import { Palette, Space, Radius, Type, wasteAccent } from '@/constants/design';
@@ -21,16 +22,17 @@ const offerStatusTone = (s: Offer['status']): 'success' | 'warning' | 'danger' |
 };
 
 export default function BuyerOffers() {
+  const authUser = useAuthUser();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser) return;
 
     const q = query(
       collection(db, 'offers'),
-      where('buyerUid', '==', auth.currentUser.uid),
+      where('buyerUid', '==', authUser.uid),
       orderBy('createdAt', 'desc')
     );
 
@@ -43,7 +45,7 @@ export default function BuyerOffers() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [authUser]);
 
   const handleWithdraw = async (offer: Offer) => {
     setWithdrawingId(offer.id);

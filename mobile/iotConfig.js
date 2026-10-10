@@ -1,5 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getAuth, initializeAuth, getReactNativePersistence, signInAnonymously } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { getDatabase } from 'firebase/database';
 
 // ── Development Mock IoT Telemetry ──────────────────────────────────────────
@@ -74,7 +76,17 @@ const iotApp = getApps().find(app => app.name === 'iot')
 export const iotDb = getDatabase(iotApp);
 
 if (!USE_MOCK_IOT) {
-  const iotAuth = getAuth(iotApp);
+  // On native, give this second app's Auth the same AsyncStorage persistence as the main app
+  // (plain getAuth() falls back to memory persistence and logs a warning). initializeAuth
+  // throws if it already ran for this app (e.g. on a hot reload), so fall back to getAuth.
+  let iotAuth;
+  try {
+    iotAuth = Platform.OS === 'web'
+      ? getAuth(iotApp)
+      : initializeAuth(iotApp, { persistence: getReactNativePersistence(AsyncStorage) });
+  } catch {
+    iotAuth = getAuth(iotApp);
+  }
   signInAnonymously(iotAuth).catch(error => {
     if (error.code === 'auth/configuration-not-found') {
       console.warn(

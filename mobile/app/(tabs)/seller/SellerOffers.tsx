@@ -14,6 +14,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../../../firebaseConfig';
+import { useAuthUser } from '../../../hooks/useAuthUser';
 import { Offer, Order } from '../../../types';
 
 import { Palette, Space, Radius, Type, wasteAccent } from '@/constants/design';
@@ -32,16 +33,17 @@ const offerStatusTone = (s: Offer['status']): 'success' | 'warning' | 'danger' |
 };
 
 export default function SellerOffers() {
+  const authUser = useAuthUser();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser) return;
 
     const q = query(
       collection(db, 'offers'),
-      where('sellerUid', '==', auth.currentUser.uid)
+      where('sellerUid', '==', authUser.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -61,7 +63,7 @@ export default function SellerOffers() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [authUser]);
 
   const handleAccept = (offer: Offer) => {
     Alert.alert(

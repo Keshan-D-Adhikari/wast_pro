@@ -13,6 +13,7 @@ import * as Location from "expo-location";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { db, auth, functions } from "../../../firebaseConfig";
+import { useAuthUser } from '../../../hooks/useAuthUser';
 import { httpsCallable } from "firebase/functions";
 import { FirebaseError } from "firebase/app";
 import {
@@ -51,6 +52,7 @@ const TYPE_FILTERS = [
 type TypeFilterKey = typeof TYPE_FILTERS[number]['key'];
 
 export default function BuyerDashboard() {
+  const authUser = useAuthUser();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -78,6 +80,9 @@ export default function BuyerDashboard() {
   const [offerLoading, setOfferLoading] = useState(false);
 
   useEffect(() => {
+    // Wait for the saved session to be restored; querying while signed out is denied by the rules.
+    if (!authUser) return;
+
     let unsubscribe: (() => void) | undefined;
 
     (async () => {
@@ -106,7 +111,7 @@ export default function BuyerDashboard() {
     // Detach the listener on unmount — returning it from inside the async
     // IIFE above would never reach React
     return () => unsubscribe?.();
-  }, []);
+  }, [authUser]);
 
   // Derived from items + searchText — no effect needed, just recompute on render.
   const filteredItems = items.filter(item => {

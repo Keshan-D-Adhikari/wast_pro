@@ -13,7 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
 
 // Firebase Imports
-import { db, auth } from "../../../firebaseConfig";
+import { db } from "../../../firebaseConfig";
+import { useAuthUser } from "../../../hooks/useAuthUser";
 import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../../../iotConfig";
 import { normalizeBin, describeFreshness } from "../../../utils/binTelemetry";
@@ -39,7 +40,7 @@ const COMPARTMENTS: { type: WasteType; label: string; icon: keyof typeof Ionicon
 ];
 
 export default function SellerDashboard() {
-  const user = auth.currentUser;
+  const user = useAuthUser();
 
   // States
   const [loading, setLoading] = useState(true);

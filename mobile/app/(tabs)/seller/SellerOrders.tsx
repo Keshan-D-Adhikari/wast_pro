@@ -2,7 +2,8 @@ import { View, Text, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { db, auth } from "../../../firebaseConfig";
+import { db } from "../../../firebaseConfig";
+import { useAuthUser } from "../../../hooks/useAuthUser";
 import {
   collection, query, where, orderBy, onSnapshot, doc, getDoc, updateDoc, writeBatch, deleteField, serverTimestamp,
 } from "firebase/firestore";
@@ -18,16 +19,17 @@ import { Order } from "../../../types";
 import { sellerActionsFor, completingCollectsCash } from "../../../utils/orderActions";
 
 export default function SellerOrders() {
+  const authUser = useAuthUser();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!authUser) return;
 
     const q = query(
       collection(db, "orders"),
-      where("sellerUid", "==", auth.currentUser.uid),
+      where("sellerUid", "==", authUser.uid),
       orderBy("createdAt", "desc")
     );
 
@@ -41,7 +43,7 @@ export default function SellerOrders() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [authUser]);
 
   const [busyId, setBusyId] = useState<string | null>(null);
 
