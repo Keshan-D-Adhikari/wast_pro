@@ -41,6 +41,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { StarRating } from "@/components/ui/star-rating";
 import { OrderTabs } from "@/components/ui/order-tabs";
 import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
 
@@ -256,6 +257,15 @@ export default function BuyerOrders() {
 
   const totalSpent = orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
+  const handleRate = async (order: Order, rating: number) => {
+    try {
+      await updateDoc(doc(db, 'orders', order.id), { rating });
+    } catch (error) {
+      console.error('Could not save rating:', error);
+      Alert.alert('Error', 'Could not save your rating. Please try again.');
+    }
+  };
+
   const OrderCard = ({ order, isLatest }: { order: Order; isLatest: boolean }) => {
     const accent = wasteAccent(order.wasteType);
 
@@ -289,6 +299,13 @@ export default function BuyerOrders() {
           )}
           {order.paymentStatus === 'paid' && <Badge label="Paid" tone="success" />}
         </View>
+
+        {order.status === 'completed' && (
+          <View style={styles.ratingRow}>
+            <Text style={Type.small}>{order.rating ? 'Your rating' : 'Rate this order'}</Text>
+            <StarRating value={order.rating ?? 0} onRate={order.rating ? undefined : (n) => handleRate(order, n)} />
+          </View>
+        )}
 
         {order.offerId && order.paymentStatus === 'pending' && order.status === 'confirmed' && (
           <Button
@@ -356,19 +373,17 @@ export default function BuyerOrders() {
 
         {loading ? (
           <LoadingState message="Loading your purchases…" />
-        ) : orders.length === 0 ? (
-          <EmptyState
-            icon="cart-outline"
-            title="No purchases yet"
-            message="Browse the marketplace to buy recyclable waste from nearby sellers."
-            actionLabel="Start shopping"
-            onAction={() => router.push("/(tabs)/buyer/BuyerDashboard")}
-          />
         ) : (
           <>
             <OrderTabs value={tab} counts={countByTab(orders)} onChange={setTab} />
             {orders.filter((o) => tabForOrder(o) === tab).length === 0 ? (
-              <Text style={styles.emptyTab}>{EMPTY_TAB_TEXT[tab]}</Text>
+              <EmptyState
+                icon="cart-outline"
+                title={EMPTY_TAB_TEXT[tab]}
+                message={tab === "ongoing" ? "Browse the marketplace to buy recyclable waste from nearby sellers." : "Nothing here yet."}
+                actionLabel={tab === "ongoing" ? "Start shopping" : undefined}
+                onAction={() => router.push("/(tabs)/buyer/BuyerDashboard")}
+              />
             ) : (
               orders
                 .filter((o) => tabForOrder(o) === tab)
@@ -466,7 +481,7 @@ export default function BuyerOrders() {
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
-  emptyTab: { ...Type.body, color: Palette.ink[500], textAlign: "center", paddingVertical: Space.xl },
+  ratingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Space.md },
   root: { flex: 1, backgroundColor: Palette.background },
   flex: { flex: 1 },
 

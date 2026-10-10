@@ -193,6 +193,7 @@ service cloud.firestore {
       //  - buyer cancels their own unpaid, not-yet-completed order
       //  - buyer pays an accepted-offer order by card (payment fields only)
       //  - seller moves the order status forward, or marks a cash order paid when collected
+      //  - buyer rates a completed order once (rating only)
       //  - admin changes status only
       allow update: if isSignedIn() && (
         (
@@ -223,6 +224,15 @@ service cloud.firestore {
           resource.data.paymentStatus == 'pending' &&
           request.resource.data.paymentStatus == 'paid' &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentStatus'])
+        ) ||
+        (
+          // buyer rates a completed order once, 1-5 stars
+          resource.data.buyerUid == request.auth.uid &&
+          resource.data.status == 'completed' &&
+          !('rating' in resource.data) &&
+          request.resource.data.rating is int &&
+          request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating'])
         ) ||
         (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
       );

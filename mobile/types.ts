@@ -88,6 +88,8 @@ export interface Order {
   cancelledAt: Timestamp | null;
   /** Set when the order was created by a seller accepting this buyer offer. */
   offerId?: string;
+  /** 1-5 stars the buyer gave after the order was completed. */
+  rating?: number;
 }
 
 export interface UserLocation {

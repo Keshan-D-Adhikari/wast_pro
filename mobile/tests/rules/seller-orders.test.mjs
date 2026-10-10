@@ -68,5 +68,25 @@ await t('a cancelled order cannot be revived by the seller', async () => {
 });
 
 console.log(res.join('\n'));
+// Ratings --------------------------------------------------------------------
+await seed(order({ status: 'completed' }));
+await t('buyer rates a completed order 1-5', () => assertSucceeds(updateDoc(doc(as('buyer1'), 'orders/O1'), { rating: 4 })));
+await t('buyer cannot rate with 0, 6 or a decimal', async () => {
+  for (const r of [0, 6, 3.5]) await assertFails(updateDoc(doc(as('buyer1'), 'orders/O1'), { rating: r }));
+});
+await t('seller cannot rate their own order', () => assertFails(updateDoc(doc(as('seller1'), 'orders/O1'), { rating: 5 })));
+await t('buyer cannot change a rating once given', async () => {
+  await seed(order({ status: 'completed', rating: 2 }));
+  await assertFails(updateDoc(doc(as('buyer1'), 'orders/O1'), { rating: 5 }));
+});
+await t('buyer cannot rate an order that is not completed', async () => {
+  await seed(order({ status: 'confirmed' }));
+  await assertFails(updateDoc(doc(as('buyer1'), 'orders/O1'), { rating: 5 }));
+});
+await t('rating cannot be combined with other changes', async () => {
+  await seed(order({ status: 'completed' }));
+  await assertFails(updateDoc(doc(as('buyer1'), 'orders/O1'), { rating: 5, totalPrice: 1 }));
+});
+
 await env.cleanup();
 process.exit(res.some((r) => r.startsWith('FAIL')) ? 1 : 0);

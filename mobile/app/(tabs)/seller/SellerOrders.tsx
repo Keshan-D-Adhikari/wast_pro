@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { StarRating } from "@/components/ui/star-rating";
 import { OrderTabs } from "@/components/ui/order-tabs";
 import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
 import { Order } from "../../../types";
@@ -158,6 +159,13 @@ export default function SellerOrders() {
           {order.paymentStatus === 'paid' && <Badge label="Paid" tone="success" />}
         </View>
 
+        {order.status === 'completed' && (
+          <View style={styles.ratingRow}>
+            <Text style={Type.small}>Buyer rating</Text>
+            <StarRating value={order.rating ?? 0} size={20} />
+          </View>
+        )}
+
         {sellerActionsFor(order).length > 0 && (
           <View style={styles.actions}>
             {sellerActionsFor(order).includes('decline') && (
@@ -228,19 +236,17 @@ export default function SellerOrders() {
 
         {loading ? (
           <LoadingState message="Loading your orders…" />
-        ) : orders.length === 0 ? (
-          <EmptyState
-            icon="receipt-outline"
-            title="No orders yet"
-            message="When a buyer purchases one of your listings it will show up here."
-            actionLabel="Add a listing"
-            onAction={() => router.push("/(tabs)/seller/AddWaste")}
-          />
         ) : (
           <>
             <OrderTabs value={tab} counts={countByTab(orders)} onChange={setTab} />
             {orders.filter((o) => tabForOrder(o) === tab).length === 0 ? (
-              <Text style={styles.emptyTab}>{EMPTY_TAB_TEXT[tab]}</Text>
+              <EmptyState
+                icon="receipt-outline"
+                title={EMPTY_TAB_TEXT[tab]}
+                message={tab === "ongoing" ? "When a buyer purchases one of your listings it will show up here." : "Nothing here yet."}
+                actionLabel={tab === "ongoing" ? "Add a listing" : undefined}
+                onAction={() => router.push("/(tabs)/seller/AddWaste")}
+              />
             ) : (
               orders
                 .filter((o) => tabForOrder(o) === tab)
@@ -265,7 +271,7 @@ const styles = StyleSheet.create({
   summaryValue: { ...Type.h2, color: Palette.brand[900] },
   summaryRule: { width: 1, height: 34, backgroundColor: Palette.brand[200], marginHorizontal: Space.lg },
 
-  emptyTab: { ...Type.body, color: Palette.ink[500], textAlign: "center", paddingVertical: Space.xl },
+  ratingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Space.md },
   card: { marginBottom: Space.md },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   typeIcon: {
