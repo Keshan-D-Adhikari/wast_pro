@@ -45,6 +45,8 @@ export interface UserProfile {
   points?: number;
   /** The smart bin this seller sees (a key under bins/ in the IoT database). Set by an admin; defaults to bin001. */
   binId?: string;
+  /** Where the smart bin physically is (the firmware sends no GPS). Set by the seller from the dashboard. */
+  binLocation?: { latitude: number; longitude: number };
 }
 
 export interface MarketplaceItem {

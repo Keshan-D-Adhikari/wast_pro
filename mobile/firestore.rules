@@ -51,11 +51,22 @@ service cloud.firestore {
         order.totalPrice == listing.totalPrice;
     }
 
+    // If binLocation is being set it must be a real coordinate pair.
+    function isValidBinLocation() {
+      return !('binLocation' in request.resource.data) ||
+        (request.resource.data.binLocation is map &&
+          request.resource.data.binLocation.keys().hasOnly(['latitude', 'longitude']) &&
+          request.resource.data.binLocation.latitude is number &&
+          request.resource.data.binLocation.longitude is number &&
+          request.resource.data.binLocation.latitude >= -90 && request.resource.data.binLocation.latitude <= 90 &&
+          request.resource.data.binLocation.longitude >= -180 && request.resource.data.binLocation.longitude <= 180);
+    }
+
     // users/{uid} - profile doc, keyed by the account's own auth uid.
     // Private: only the owner and admins can read it (it holds email/phone/address). Buyer and
     // seller names shown to each other come from the names copied onto listings, offers and orders.
     // Sign-up may only create a seller or buyer profile (an admin is made by hand in the console),
-    // and the owner can only edit their own contact details, never role, points, `disabled` or `binId`
+    // and the owner can only edit their own contact details, never role, points, `disabled` or `binId` (they may set `binLocation`, where their bin is)
     // (an admin assigns which smart bin a seller sees).
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
@@ -66,7 +77,8 @@ service cloud.firestore {
       allow update: if
         (isOwner(uid) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['fullName', 'phone', 'location', 'photoURL', 'updatedAt'])) ||
+            .hasOnly(['fullName', 'phone', 'location', 'photoURL', 'updatedAt', 'binLocation']) &&
+          isValidBinLocation()) ||
         (isAdmin() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled', 'binId']) &&
           (!('binId' in request.resource.data) ||

@@ -75,6 +75,8 @@ export default function AddWaste() {
         if (userDoc.exists()) {
           setSellerName(userDoc.data().fullName);
           setBinId(userDoc.data().binId || DEFAULT_BIN_ID);
+          // A saved bin location (set on the dashboard) wins over the phone's current position.
+          if (userDoc.data().binLocation) setSellerBinLocation(userDoc.data().binLocation);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -117,7 +119,7 @@ export default function AddWaste() {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-          setSellerBinLocation(loc.coords);
+          setSellerBinLocation((prev) => prev ?? loc.coords);
         }
       } catch (error) {
         console.error("Error fetching seller location:", error);

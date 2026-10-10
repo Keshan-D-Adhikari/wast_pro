@@ -8,6 +8,7 @@ import {
   TextInput,
 } from "react-native";
 import { PieChart } from "react-native-chart-kit";
+import * as Location from "expo-location";
 import MapView, { Marker, APP_MAP_PROVIDER } from "../../../components/platform-map";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
@@ -75,10 +76,10 @@ export default function SellerDashboard() {
   const freshness = USE_MOCK_IOT
     ? { live: true, label: 'Demo data' }
     : describeFreshness(binData.lastUpdated, now);
-  // The ESP32 firmware doesn't upload GPS coordinates (see iotConfig.js),
-  // and users.location is a free-text address, so there's currently no
-  // source for a live bin location — the map below always shows "Not set".
-  const [binLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // The ESP32 firmware doesn't upload GPS coordinates (it only sends a place name), so the
+  // seller saves where the bin is on their profile with the button under the map.
+  const binLocation = sellerData?.binLocation ?? null;
+  const [savingLocation, setSavingLocation] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
@@ -176,6 +177,28 @@ export default function SellerDashboard() {
     checkAndNotify("food", binData.food?.status, binData.food?.overweight);
     checkAndNotify("metal", binData.metal?.status, binData.metal?.overweight);
   }, [binData, user, freshness.live]);
+
+  // Save the phone's current position as the bin's location (the seller is standing at the bin).
+  const handleSetBinLocation = async () => {
+    if (!user) return;
+    setSavingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location needed', 'Allow location access so we can place the bin on the map.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      await updateDoc(doc(db, "users", user.uid), {
+        binLocation: { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+      });
+    } catch (error) {
+      console.error("Could not save bin location:", error);
+      Alert.alert('Error', 'Could not save the bin location. Please try again.');
+    } finally {
+      setSavingLocation(false);
+    }
+  };
 
   const handleReportSubmit = () => {
     if (issueDescription.trim() === "") {
@@ -399,9 +422,10 @@ export default function SellerDashboard() {
         </Card>
 
         {/* Map Section */}
-        <SectionTitle meta={binLocation ? undefined : 'Not set'}>Smart bin location</SectionTitle>
+        <SectionTitle meta={binLocation ? (binData.location || 'Saved') : 'Not set'}>Smart bin location</SectionTitle>
         <Card style={styles.mapCard} elevation={1}>
           <MapView
+            key={binLocation ? `${binLocation.latitude},${binLocation.longitude}` : 'no-bin-location'}
             provider={APP_MAP_PROVIDER}
             style={styles.map}
             initialRegion={{
@@ -416,6 +440,14 @@ export default function SellerDashboard() {
             )}
           </MapView>
         </Card>
+        <Button
+          label={binLocation ? "Update bin location to where I am now" : "Set bin location to where I am now"}
+          icon="locate-outline"
+          variant="secondary"
+          onPress={handleSetBinLocation}
+          loading={savingLocation}
+          style={styles.locationBtn}
+        />
 
         {/* Report Button */}
         <Button
@@ -576,6 +608,7 @@ const styles = StyleSheet.create({
   binMoistureHigh: { color: Palette.status.warning.base, fontWeight: '700' },
 
   mapCard: { padding: 0, overflow: 'hidden', height: 170 },
+  locationBtn: { marginTop: Space.md },
   map: { width: "100%", height: "100%" },
 
   reportBtn: { marginTop: Space['2xl'] },
