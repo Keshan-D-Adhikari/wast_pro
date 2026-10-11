@@ -33,11 +33,11 @@ export const Palette = {
   background: '#F4F8F2',
   overlay: 'rgba(20, 38, 26, 0.55)',
 
-  /** Per-waste-type accents, kept distinct so bins stay recognisable */
+  /** Per-waste-type accents: plastic blue, food green, metal orange */
   waste: {
     plastic: { base: '#2E7CD6', tint: '#E7F1FC' },
-    food: { base: '#E8853B', tint: '#FDF0E4' },
-    metal: { base: '#7B8794', tint: '#EEF1F4' },
+    food: { base: '#2E9E4F', tint: '#E4F4E8' },
+    metal: { base: '#E07B1A', tint: '#FDF0E1' },
   },
 
   /** Semantic status colours */

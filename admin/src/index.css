@@ -27,10 +27,10 @@
   /* Waste Accents */
   --waste-plastic: #2E7CD6;
   --waste-plastic-tint: #E7F1FC;
-  --waste-food: #E8853B;
-  --waste-food-tint: #FDF0E4;
-  --waste-metal: #5B6B7C;
-  --waste-metal-tint: #EEF1F4;
+  --waste-food: #2E9E4F;
+  --waste-food-tint: #E4F4E8;
+  --waste-metal: #E07B1A;
+  --waste-metal-tint: #FDF0E1;
 
   /* Semantic Statuses */
   --status-success: #2E7D32;
