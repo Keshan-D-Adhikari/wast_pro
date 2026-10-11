@@ -209,7 +209,7 @@ own bottom navigation (`BottomNav`).
 | `(tabs)/Welcome.tsx` | Welcome | "Get Started" goes to Login |
 | `(tabs)/Login.tsx` | Login | Email + password, role-based redirect, disabled-account check, **Forgot password** (sends a reset email) |
 | `(tabs)/CreateAccount.tsx` | Sign up | Creates the Auth user and `users/{uid}` profile (role seller or buyer) |
-| `(tabs)/seller/SellerDashboard.tsx` | Seller home | Live bin cards, Bin ON/OFF, donut chart, bin map with a company/place name search to set where the bin is (no GPS), notifications, issue report |
+| `(tabs)/seller/SellerDashboard.tsx` | Seller home | Live bin cards, Bin ON/OFF, donut chart, bin map with type-ahead company/place suggestions to set where the bin is (no GPS), notifications, issue report |
 | `(tabs)/seller/AddWaste.tsx` | List waste | Pick compartments, enter weight, priced per kg, creates marketplace listings |
 | `(tabs)/seller/SellerOrders.tsx` | Seller orders | Tabs Ongoing / Completed / Cancelled; Confirm, Decline, Mark completed; shows buyer rating |
 | `(tabs)/seller/SellerOffers.tsx` | Seller offers | Accept (creates an order in a transaction) or reject offers |
@@ -256,7 +256,7 @@ The two `EditProfile.tsx` files are 5-line wrappers around `components/profile-e
 | `utils/orderNotifications.ts` | Message and type of the notification a seller's action sends to the buyer |
 | `utils/passwordReset.ts` | Messages for the reset-email result (same message for unknown email, so accounts cannot be probed) |
 | `utils/donut.ts` | Donut slice geometry and `formatKg` (up to 3 decimals) |
-| `utils/placeSearch.ts` | Company / place name search (OpenStreetMap Nominatim, Sri Lanka only, no API key) used by the seller to set where the smart bin is |
+| `utils/placeSearch.ts` | Type-ahead company / place suggestions (Photon on OpenStreetMap data, Sri Lanka only, no API key) used by the seller to set where the smart bin is |
 | `utils/shortId.ts` | Short support IDs derived from the document id: `USR-7K3F9A` (user), `ORD-A1B2C3` (order); the bin keeps its own id such as `bin001`. Same rule in `admin/src/lib/shortId.js` |
 | `utils/money.ts` | `roundMoney` and `formatRs` (`Rs 120`, `Rs 7.20`) |
 | `types.ts` | Shared types: `UserProfile`, `MarketplaceItem`, `Order`, `Offer`, `AppNotification`, `BinData`, `BinCompartment`, `UserLocation`, `WasteType` |
@@ -402,7 +402,7 @@ bins/bin001/
 - **Bin ON / OFF:** a bin is ON if `lastUpdated` is within the last 2 minutes. When OFF the app shows the last known readings and raises **no new alerts**.
 - **Auth:** the app signs in to the IoT project anonymously; this keeps working after the rules are tightened.
 - **Linking a seller to a bin:** an admin sets `users/{uid}.binId`; the seller app reads `binId || 'bin001'`.
-- **Bin location:** the firmware sends no GPS, so the seller types a company or place name on the dashboard, taps Search and picks a result; it is saved as `binLocation` with its name in `binPlaceName`.
+- **Bin location:** the firmware sends no GPS, so the seller types a company or place name on the dashboard and picks a suggestion; it is saved as `binLocation` with its name in `binPlaceName`.
 - **Mock mode:** `EXPO_PUBLIC_USE_MOCK_IOT=true` (dev builds only) shows simulated data with Normal and Alert presets.
 
 ---
@@ -462,7 +462,7 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 
 | Suite | Tool | Count | What it covers |
 |-------|------|-------|----------------|
-| Mobile unit | Jest + jest-expo | 70 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
+| Mobile unit | Jest + jest-expo | 71 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
 | Admin unit | Vitest | 41 | filters, telemetry parsing |
 | Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 127 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 

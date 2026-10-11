@@ -1,31 +1,49 @@
-import { parsePlaces, placeSearchUrl } from './placeSearch';
+import { parsePlaces, placeSuggestUrl } from './placeSearch';
+
+const feature = (props: Record<string, string>, coords: unknown = [79.9630065, 6.9190684]) => ({
+  type: 'Feature',
+  properties: props,
+  geometry: { type: 'Point', coordinates: coords },
+});
 
 describe('parsePlaces', () => {
-  it('turns Nominatim items into results with a name, address and coordinates', () => {
-    const results = parsePlaces([
-      { lat: '6.9271', lon: '79.8612', name: 'Acme Recyclers', display_name: 'Acme Recyclers, Galle Road, Colombo, Sri Lanka' },
-    ]);
+  it('turns Photon features into results with a name, address and coordinates', () => {
+    const results = parsePlaces({
+      features: [
+        feature({ name: 'Horizon Campus', street: 'Suhada Mawatha', city: 'Malabe', county: 'Colombo District', state: 'Western Province' }),
+      ],
+    });
     expect(results).toEqual([
-      { name: 'Acme Recyclers', address: 'Acme Recyclers, Galle Road, Colombo, Sri Lanka', latitude: 6.9271, longitude: 79.8612 },
+      {
+        name: 'Horizon Campus',
+        address: 'Suhada Mawatha, Malabe, Colombo District, Western Province',
+        latitude: 6.9190684,
+        longitude: 79.9630065,
+      },
     ]);
   });
 
-  it('falls back to the first part of the address when there is no name', () => {
-    const [r] = parsePlaces([{ lat: '7', lon: '80', name: '', display_name: 'Industrial Zone, Kandy, Sri Lanka' }]);
-    expect(r.name).toBe('Industrial Zone');
+  it('falls back to the first address part when there is no name', () => {
+    const [r] = parsePlaces({ features: [feature({ street: 'Galle Road', city: 'Colombo' })] });
+    expect(r.name).toBe('Galle Road');
   });
 
-  it('drops entries without usable coordinates and copes with bad input', () => {
-    expect(parsePlaces([{ lat: 'x', lon: '80' }, { lat: '95', lon: '10' }, { name: 'No coords' }])).toEqual([]);
+  it('drops entries without usable coordinates and removes duplicates', () => {
+    const same = feature({ name: 'Acme', city: 'Kandy' });
+    expect(parsePlaces({ features: [same, same, feature({ name: 'Bad' }, ['x', 'y']), feature({ name: 'Far' }, [10, 95])] })).toHaveLength(1);
+  });
+
+  it('copes with bad input', () => {
     expect(parsePlaces(null)).toEqual([]);
     expect(parsePlaces({})).toEqual([]);
+    expect(parsePlaces({ features: 'x' })).toEqual([]);
   });
 });
 
-describe('placeSearchUrl', () => {
+describe('placeSuggestUrl', () => {
   it('encodes the text and limits the search to Sri Lanka', () => {
-    const url = placeSearchUrl(' Acme & Sons ');
+    const url = placeSuggestUrl(' Acme & Sons ');
     expect(url).toContain('q=Acme%20%26%20Sons');
-    expect(url).toContain('countrycodes=lk');
+    expect(url).toContain('bbox=79.4,5.8,82.0,9.9');
   });
 });

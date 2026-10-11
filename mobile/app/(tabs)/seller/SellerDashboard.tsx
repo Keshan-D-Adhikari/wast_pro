@@ -85,9 +85,12 @@ export default function SellerDashboard() {
   const [savingLocation, setSavingLocation] = useState(false);
   // Choosing where the bin is: the seller types a company or place, then picks a result (no GPS).
   const [placeQuery, setPlaceQuery] = useState('');
-  const [placeResults, setPlaceResults] = useState<PlaceResult[] | null>(null); // null = not searched yet
-  const [placeSearching, setPlaceSearching] = useState(false);
-  const [placeError, setPlaceError] = useState('');
+  // The suggestions that came back, and the text they are for (so an old answer is never shown for new text).
+  const [placeState, setPlaceState] = useState<{ text: string; results: PlaceResult[]; error: string }>({
+    text: '',
+    results: [],
+    error: '',
+  });
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
@@ -144,24 +147,33 @@ export default function SellerDashboard() {
     });
   }, [binId]);
 
-  const handlePlaceSearch = async () => {
-    Keyboard.dismiss();
-    if (placeQuery.trim().length < 3) {
-      setPlaceError('Type at least 3 letters of the company or place name.');
-      return;
-    }
-    setPlaceSearching(true);
-    setPlaceError('');
-    setPlaceResults(null);
-    try {
-      setPlaceResults(await searchPlaces(placeQuery));
-    } catch (error) {
-      console.warn('Place search failed:', error);
-      setPlaceError('Could not search right now. Check your internet connection and try again.');
-    } finally {
-      setPlaceSearching(false);
-    }
-  };
+  // Suggest places as the seller types: wait for a short pause, then look the text up.
+  const placeText = placeQuery.trim();
+  useEffect(() => {
+    if (placeText.length < 3) return;
+    let cancelled = false; // the text changed (or the screen closed) while we waited
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchPlaces(placeText);
+        if (!cancelled) setPlaceState({ text: placeText, results, error: '' });
+      } catch (error) {
+        console.warn('Place search failed:', error);
+        if (!cancelled) {
+          setPlaceState({ text: placeText, results: [], error: 'Could not search right now. Check your internet connection.' });
+        }
+      }
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [placeText]);
+
+  const placeLongEnough = placeText.length >= 3;
+  const placeAnswered = placeLongEnough && placeState.text === placeText;
+  const placeResults = placeAnswered ? placeState.results : [];
+  const placeError = placeAnswered ? placeState.error : '';
+  const placeSearching = placeLongEnough && !placeAnswered;
 
   // The seller picked a result: save it as where the bin is.
   const handleSelectPlace = async (place: PlaceResult) => {
@@ -172,8 +184,8 @@ export default function SellerDashboard() {
         binLocation: { latitude: place.latitude, longitude: place.longitude },
         binPlaceName: place.name.slice(0, 120),
       });
-      setPlaceResults(null);
       setPlaceQuery('');
+      Keyboard.dismiss();
     } catch (error) {
       console.error("Could not save bin location:", error);
       Alert.alert('Error', 'Could not save the bin location. Please try again.');
@@ -426,34 +438,25 @@ export default function SellerDashboard() {
           icon="business-outline"
           placeholder="Company or place name"
           value={placeQuery}
-          onChangeText={(t) => { setPlaceQuery(t); setPlaceError(''); }}
-          onSubmitEditing={handlePlaceSearch}
-          returnKeyType="search"
+          onChangeText={setPlaceQuery}
+          returnKeyType="done"
           autoCapitalize="words"
           error={placeError}
           containerStyle={styles.placeInput}
         />
-        <Button
-          label="Search location"
-          icon="search-outline"
-          variant="secondary"
-          onPress={handlePlaceSearch}
-          loading={placeSearching}
-          style={styles.locationBtn}
-        />
+        {placeSearching && <Text style={[Type.caption, styles.placeStatus]}>Searching…</Text>}
 
-        {placeResults !== null && placeResults.length === 0 && (
-          <Text style={[Type.small, styles.placeEmpty]}>
-            No place found for “{placeQuery.trim()}”. Try the company name with the town, or a nearby landmark.
+        {placeAnswered && placeResults.length === 0 && !placeError && (
+          <Text style={[Type.small, styles.placeStatus]}>
+            No place found. Try the company name with the town, or a nearby landmark.
           </Text>
         )}
-        {placeResults !== null && placeResults.length > 0 && (
+        {placeResults.length > 0 && (
           <Card style={styles.placeList} elevation={1}>
-            <Text style={[Type.caption, styles.placeListTitle]}>Tap the right place to save it</Text>
             {placeResults.map((place, index) => (
               <TouchableOpacity
                 key={`${place.latitude},${place.longitude},${index}`}
-                style={styles.placeRow}
+                style={[styles.placeRow, index > 0 && styles.placeRowDivider]}
                 disabled={savingLocation}
                 onPress={() => handleSelectPlace(place)}
                 accessibilityRole="button"
@@ -641,12 +644,11 @@ const styles = StyleSheet.create({
   binMoistureHigh: { color: Palette.status.warning.base, fontWeight: '700' },
 
   mapCard: { padding: 0, overflow: 'hidden', height: 170 },
-  locationBtn: { marginBottom: Space.lg },
   placeInput: { marginTop: Space.md },
-  placeEmpty: { marginBottom: Space.lg, textAlign: 'center' },
-  placeList: { marginBottom: Space.lg },
-  placeListTitle: { marginBottom: Space.sm },
+  placeStatus: { marginBottom: Space.md, color: Palette.ink[500] },
+  placeList: { marginBottom: Space.lg, paddingVertical: Space.xs },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingVertical: Space.md },
+  placeRowDivider: { borderTopWidth: 1, borderTopColor: Palette.ink[100] },
   placeText: { flex: 1 },
   map: { width: "100%", height: "100%" },
 
