@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
 
   headerRow: { flexDirection: "row", alignItems: "center", gap: Space.md, marginBottom: Space.xl },
   headerText: { flex: 1 },
-  headerName: { ...Type.h1, fontSize: 26, marginTop: 2 },
+  headerName: { ...Type.h1, fontSize: 28, marginTop: 2 },
   notifBtn: {
     width: 42,
     height: 42,
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   binLabel: { ...Type.caption, marginTop: Space.md },
-  binLevel: { fontSize: 24, fontWeight: '800', lineHeight: 29, marginBottom: Space.sm },
+  binLevel: { fontSize: 26, fontWeight: '800', lineHeight: 31, marginBottom: Space.sm },
   progressTrack: {
     height: 5,
     borderRadius: Radius.pill,

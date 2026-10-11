@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   },
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: 32, fontWeight: '800', color: Palette.brand[600] },
-  name: { ...Type.h2, fontSize: 23 },
+  name: { ...Type.h2, fontSize: 25 },
   rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
