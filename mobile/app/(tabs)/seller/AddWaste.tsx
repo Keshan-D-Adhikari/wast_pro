@@ -249,7 +249,7 @@ export default function AddWaste() {
 
   return (
     <View style={styles.root}>
-      <Screen withBottomNav>
+      <Screen withBottomNav keyboardAware>
         <ScreenHeader
           title="Add to marketplace"
           subtitle="List waste measured in your smart bin"

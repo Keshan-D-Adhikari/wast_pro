@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, StyleProp, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -12,13 +12,15 @@ type ScreenProps = {
   /** Leave room for a fixed bottom nav bar. */
   withBottomNav?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Keep a focused text input above the on-screen keyboard — use on a scrolling screen that has inputs. */
+  keyboardAware?: boolean;
 };
 
 /**
  * Page shell — applies the app background, safe-area top inset and the
  * standard horizontal gutter so screens don't each re-invent padding.
  */
-export function Screen({ children, scroll = true, withBottomNav = false, contentStyle }: ScreenProps) {
+export function Screen({ children, scroll = true, withBottomNav = false, contentStyle, keyboardAware = false }: ScreenProps) {
   const insets = useSafeAreaInsets();
 
   const padding = {
@@ -31,17 +33,28 @@ export function Screen({ children, scroll = true, withBottomNav = false, content
     return <View style={[styles.root, padding, contentStyle]}>{children}</View>;
   }
 
-  return (
-    <View style={styles.root}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[padding, contentStyle]}
-        keyboardShouldPersistTaps="handled"
-      >
-        {children}
-      </ScrollView>
-    </View>
+  const scrollView = (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={[padding, contentStyle]}
+      keyboardShouldPersistTaps="handled"
+      // iOS: pads the scroll area by the keyboard height and scrolls the focused input into view.
+      automaticallyAdjustKeyboardInsets={keyboardAware}
+    >
+      {children}
+    </ScrollView>
   );
+
+  // Android (edge-to-edge) does not resize the window for the keyboard, so shrink the view instead.
+  if (keyboardAware && Platform.OS === 'android') {
+    return (
+      <KeyboardAvoidingView style={styles.root} behavior="padding">
+        {scrollView}
+      </KeyboardAvoidingView>
+    );
+  }
+
+  return <View style={styles.root}>{scrollView}</View>;
 }
 
 type ScreenHeaderProps = {

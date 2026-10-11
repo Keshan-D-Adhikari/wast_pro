@@ -274,7 +274,7 @@ export default function SellerDashboard() {
 
   return (
     <View style={styles.root}>
-      <Screen withBottomNav>
+      <Screen withBottomNav keyboardAware>
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
@@ -484,6 +484,7 @@ export default function SellerDashboard() {
         visible={reportModalVisible}
         title="Report an issue"
         onClose={() => setReportModalVisible(false)}
+        avoidKeyboard
       >
         <Text style={[Type.small, styles.sheetHint]}>
           Describe what’s wrong with the bin or its sensors.
