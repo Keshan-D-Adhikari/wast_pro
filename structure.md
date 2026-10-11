@@ -1,917 +1,540 @@
-# SmartWaste Pro — Complete Codebase Structure & Documentation
+# SmartWaste Pro — Codebase Structure & Technical Reference
 
-> **IoT-Based Intelligent Waste Management & Recycling Marketplace**  
-> Final Year Project · Horizon Campus, Faculty of Information Technology  
-> **Author:** Keshan D. Adhikari (ITBIN-2211-0137) · **Year:** 2026  
-> **Supervisor:** Ms. A.A.P.W. Athukorala · **Co-supervisor:** Mr. Daminda Herath
-
----
-
-## Table of Contents
-
-1. [Project Overview](#1-project-overview)
-2. [System Architecture](#2-system-architecture)
-3. [Full Directory Tree](#3-full-directory-tree)
-4. [Technology Stack](#4-technology-stack)
-5. [Mobile App — Deep Dive](#5-mobile-app--deep-dive)
-6. [Admin Dashboard — Deep Dive](#6-admin-dashboard--deep-dive)
-7. [Cloud Backend (Firebase)](#7-cloud-backend-firebase)
-8. [Cloud Functions (Stripe Payments)](#8-cloud-functions-stripe-payments)
-9. [IoT Hardware & Configuration](#9-iot-hardware--configuration)
-10. [Firestore Data Model](#10-firestore-data-model)
-11. [Firestore Security Rules](#11-firestore-security-rules)
-12. [Design System (Mobile)](#12-design-system-mobile)
-13. [TypeScript Types & Interfaces](#13-typescript-types--interfaces)
-14. [Utility Functions & Constants](#14-utility-functions--constants)
-15. [Testing Strategy](#15-testing-strategy)
-16. [CI/CD Pipeline](#16-cicd-pipeline)
-17. [Environment Variables](#17-environment-variables)
-18. [App Screens & Navigation Flow](#18-app-screens--navigation-flow)
-19. [Order & Payment Flow](#19-order--payment-flow)
-20. [Research Objectives & Status](#20-research-objectives--status)
+> IoT-based waste management and recycling marketplace.
+> Final-year project, Horizon Campus (Faculty of IT). Author: Keshan D. Adhikari (ITBIN-2211-0137).
+>
+> This file describes the code **as it is on the `main` branch**: what each folder and file does, the
+> tools and technologies used, the data model, the security rules, the tests and how everything fits
+> together. For setup steps see `README.md`, `mobile/README.md` and `admin/README.md`.
 
 ---
 
-## 1. Project Overview
+## Contents
 
-**SmartWaste Pro** bridges the gap between waste producers (Sellers) and recycling companies (Buyers) through:
-
-- **ESP32 Smart Bins** — physical 3-compartment bins (Plastic / Food / Metal) with ultrasonic, load cell, and moisture sensors that push live readings to Firebase Realtime Database via WiFi.
-- **React Native Mobile App** — cross-platform app for Sellers to monitor bins and list waste, and for Buyers to browse the marketplace, navigate to pickup locations, and pay.
-- **React Web Admin Panel** — role-gated dashboard for administrators to monitor all bins, users, marketplace listings, and orders in real time.
+1. [What the system is](#1-what-the-system-is)
+2. [Architecture](#2-architecture)
+3. [Repository layout](#3-repository-layout)
+4. [Technology stack](#4-technology-stack)
+5. [Mobile app](#5-mobile-app)
+6. [Admin dashboard](#6-admin-dashboard)
+7. [Firebase backend](#7-firebase-backend)
+8. [Firestore data model](#8-firestore-data-model)
+9. [Security rules](#9-security-rules)
+10. [IoT smart bin](#10-iot-smart-bin)
+11. [Cloud Functions and card payments](#11-cloud-functions-and-card-payments)
+12. [Main user flows](#12-main-user-flows)
+13. [Design system](#13-design-system)
+14. [Tests](#14-tests)
+15. [CI](#15-ci)
+16. [Environment variables](#16-environment-variables)
+17. [Commands](#17-commands)
+18. [Git workflow](#18-git-workflow)
+19. [Known limitations](#19-known-limitations)
 
 ---
 
-## 2. System Architecture
+## 1. What the system is
+
+SmartWaste Pro connects people who produce sorted waste (**sellers**) with recyclers (**buyers**), and
+gives sellers a smart bin that reports how full it is.
+
+Three parts:
+
+| Part | What it is | Users |
+|------|-----------|-------|
+| **Smart bin** | ESP32 with ultrasonic (fill level) and load-cell (weight) sensors, three compartments: plastic, food, metal. Uploads readings over Wi-Fi. | Hardware (partner-built firmware) |
+| **Mobile app** | Expo / React Native app for sellers and buyers. | Sellers, buyers |
+| **Admin dashboard** | React web app to oversee users, listings, orders and bins. | Admins |
+
+Everything shares one Firebase backend (plus a second Firebase project that only holds the live bin data).
+
+---
+
+## 2. Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                  IoT Layer (Hardware)                       │
-│  ESP32 + Ultrasonic + Load Cell + Moisture Sensor           │
-│  ──── WiFi ──► Firebase Realtime Database (IoT Project)     │
-└──────────────────────────┬──────────────────────────────────┘
-                           │  Anonymous Auth read
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│             Firebase Cloud (Main Project)                   │
-│  ┌─────────────────┐  ┌───────────────┐  ┌──────────────┐  │
-│  │  Firebase Auth  │  │  Firestore    │  │   Storage    │  │
-│  │ (Email/Pass)    │  │ (5 collections)│  │ (profile img)│  │
-│  └─────────────────┘  └───────────────┘  └──────────────┘  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │     Firebase Cloud Functions (Node.js v2)            │   │
-│  │  createCheckoutSession / verifyCheckoutSession       │   │
-│  └──────────────────────────────────────────────────────┘   │
-└───────────┬───────────────────────────────┬─────────────────┘
-            │                               │
-            ▼                               ▼
-┌──────────────────────┐       ┌────────────────────────┐
-│  Mobile App          │       │  Admin Panel           │
-│  React Native 0.86   │       │  React 19 + Vite 7     │
-│  Expo SDK 57         │       │  react-router-dom 7    │
-│  Expo Router (file)  │       │  Vanilla CSS           │
-│  TypeScript 6        │       │  Firebase JS SDK 12    │
-│  react-native-maps   │       └────────────────────────┘
-│  Stripe (via browser)│
-└──────────────────────┘
+                    ┌──────────────────────────┐
+                    │  ESP32 smart bin (bin001)│
+                    │  ultrasonic + load cells │
+                    └────────────┬─────────────┘
+                                 │ Wi-Fi, writes every few seconds
+                                 ▼
+                ┌──────────────────────────────────┐
+                │ Firebase project "smartwastepro" │
+                │ Realtime Database (IoT data)     │
+                │ bins/bin001/compartments/...     │
+                └───────┬─────────────────┬────────┘
+              read (onValue)        read (onValue)
+                        │                 │
+        ┌───────────────▼──────┐   ┌──────▼───────────────┐
+        │ Mobile app (Expo)    │   │ Admin dashboard      │
+        │ seller / buyer       │   │ (React + Vite)       │
+        └───────────┬──────────┘   └──────────┬───────────┘
+                    │  Auth, Firestore,       │  Auth, Firestore
+                    │  Storage, Functions     │
+                    ▼                         ▼
+          ┌──────────────────────────────────────────┐
+          │ Firebase project "wast-pro"              │
+          │  Authentication   (email + password)     │
+          │  Cloud Firestore  (users, marketplace,   │
+          │                    orders, offers,       │
+          │                    notifications)        │
+          │  Storage          (profile photos)       │
+          │  Cloud Functions  (Stripe Checkout)      │
+          └──────────────────────────────────────────┘
 ```
+
+Key decisions:
+
+- **No custom server.** Clients talk to Firebase directly; **Firestore security rules** are the access control.
+- **Two Firebase projects.** The main project (`wast-pro`) holds accounts and marketplace data. The IoT project (`smartwastepro-1085e`) holds only live sensor data in the Realtime Database, so the firmware never touches user data.
+- **Live data by listeners.** Screens subscribe with `onSnapshot` / `onValue`, so changes appear without refreshing.
 
 ---
 
-## 3. Full Directory Tree
+## 3. Repository layout
 
 ```
-wast-pro/                                   ← Monorepo root
-├── .git/                                   ← Git repository
-├── .github/
-│   └── workflows/
-│       └── ci.yml                          ← GitHub Actions CI (lint+test+build)
+wast-pro/
+├── README.md                    Project overview, setup, features, test counts
+├── structure.md                 This file
+├── reqament.txt                 Requirements notes
+├── thesis_code_segments.md      Code excerpts used in the thesis
 ├── .gitignore
-├── README.md                               ← Project overview & quickstart
-├── Screenshot 2026-09-25 032101.png        ← Reference screenshot
-├── SmartWastePro_Feature_Overview.pdf      ← Feature brief document
-├── reqament.txt                            ← Requirements notes
+├── .github/workflows/ci.yml     CI: admin, mobile, Firestore rules jobs
+├── screenshots/                 App screenshots used in the README
 │
-├── screenshots/                            ← App screenshots (8 PNGs)
-│   ├── Login_page.PNG
-│   ├── create_account.PNG
-│   ├── seller_dashboard.PNG
-│   ├── Add_wast.PNG
-│   ├── My_oder.PNG
-│   ├── Seller_profile.PNG
-│   ├── buyer_dashboard.PNG
-│   └── buyer_profile.PNG
+├── mobile/                      Expo (React Native) app + Firebase config
+│   ├── app/                     Screens (Expo Router, file-based routing)
+│   ├── components/              Shared UI components
+│   ├── constants/               Design tokens and bin-status helpers
+│   ├── hooks/                   Custom hooks
+│   ├── utils/                   Pure helper functions (each has a test)
+│   ├── functions/               Firebase Cloud Functions (Stripe)
+│   ├── tests/rules/             Firestore rules tests (emulator)
+│   ├── scripts/                 One-off scripts (seed data, project reset)
+│   ├── docs/analysis_report.md  Earlier analysis report
+│   ├── assets/images/           Logo, icons, splash, backgrounds
+│   ├── firebaseConfig.js        Main Firebase project (native)
+│   ├── firebaseConfig.web.js    Main Firebase project (web build)
+│   ├── iotConfig.js             IoT Firebase project + mock data
+│   ├── firestore.rules          Security rules
+│   ├── firestore.indexes.json   Composite indexes
+│   ├── firebase.json            Firebase CLI config (rules, indexes, functions)
+│   ├── types.ts                 Shared TypeScript types
+│   ├── app.json                 Expo config
+│   ├── package.json, tsconfig.json, eslint.config.js
+│   └── .env.example             Environment variable template
 │
-├── admin/                                  ← Web Admin Dashboard
-│   ├── .claude/                            ← Claude AI project notes
-│   ├── .env                                ← Firebase credentials (gitignored)
-│   ├── .env.example                        ← Env template
-│   ├── .gitignore
-│   ├── README.md
-│   ├── eslint.config.js                    ← ESLint 9 flat config
-│   ├── index.html                          ← Vite HTML entry
-│   ├── package.json                        ← Admin deps & scripts
-│   ├── vite.config.js                      ← Vite + React plugin config
-│   ├── vitest.config.js                    ← Vitest test runner config
-│   ├── dist/                               ← Production build output
-│   ├── public/                             ← Static assets
-│   └── src/
-│       ├── main.jsx                        ← React DOM entry point
-│       ├── App.jsx                         ← Root router + auth gate
-│       ├── App.css                         ← Global admin styles
-│       ├── index.css                       ← Base CSS reset & variables
-│       ├── AuthContext.jsx                 ← React context for Firebase auth
-│       ├── authContextInstance.js          ← Shared context reference
-│       ├── useAuth.js                      ← Auth hook (user, isAdmin, loading)
-│       ├── firebaseConfig.js               ← Firebase SDK init (admin project)
-│       ├── iotConfig.js                    ← Firebase Realtime DB (IoT project)
-│       ├── assets/                         ← Admin static images/icons
-│       ├── lib/
-│       │   ├── filters.js                  ← Collection filter helpers
-│       │   ├── filters.test.js             ← Unit tests for filters
-│       │   └── usePaginatedCollection.js   ← Paginated Firestore hook
-│       └── pages/
-│           ├── Layout.jsx                  ← Shell with sidebar navigation
-│           ├── Login.jsx                   ← Admin Firebase login page
-│           ├── NotAdmin.jsx                ← Access-denied page
-│           ├── Overview.jsx                ← Dashboard stats summary
-│           ├── BinStatus.jsx               ← IoT bin readings monitor
-│           ├── Users.jsx                   ← User management table
-│           ├── Marketplace.jsx             ← Marketplace listings viewer
-│           └── Orders.jsx                  ← Orders management table
-│
-└── mobile/                                 ← React Native Mobile App
-    ├── .claude/                            ← Claude AI project notes
-    ├── .env                                ← Env vars (gitignored)
-    ├── .env.example                        ← Env template
-    ├── .expo/                              ← Expo local state cache
-    ├── .gitignore
-    ├── .vscode/                            ← VS Code workspace settings
-    ├── README.md
-    ├── app.json                            ← Expo app config (name, scheme, icons)
-    ├── eslint.config.js                    ← ESLint flat config
-    ├── expo-env.d.ts                       ← Expo TypeScript globals
-    ├── firebase.json                       ← Firebase project deploy config
-    ├── firebaseConfig.js                   ← Main Firebase SDK init (native)
-    ├── firebaseConfig.web.js               ← Main Firebase SDK init (web)
-    ├── firestore.rules                     ← Firestore Security Rules
-    ├── iotConfig.js                        ← IoT Firebase Realtime DB init
-    ├── package.json                        ← Mobile deps & scripts
-    ├── tsconfig.json                       ← TypeScript strict config
-    ├── types.ts                            ← Shared TypeScript interfaces
-    │
-    ├── app/                                ← Expo Router file-based routes
-    │   ├── _layout.tsx                     ← Root stack layout (theme, animations)
-    │   └── (tabs)/                         ← Tab-group root
-    │       ├── _layout.tsx                 ← Tab navigator config
-    │       ├── index.tsx                   ← Redirect guard (role-based)
-    │       ├── Welcome.tsx                 ← Welcome / landing screen
-    │       ├── Login.tsx                   ← Firebase email/password login
-    │       ├── CreateAccount.tsx           ← New user registration
-    │       ├── buyer/
-    │       │   ├── BuyerDashboard.tsx      ← Marketplace browse + map + buy modal
-    │       │   ├── BuyerOrders.tsx         ← Purchase history + cancel orders
-    │       │   ├── BuyerProfile.tsx        ← Buyer stats & profile
-    │       │   └── EditProfile.tsx         ← Route stub → shared profile editor
-    │       └── seller/
-    │           ├── SellerDashboard.tsx     ← IoT bin monitor + pie chart + earnings
-    │           ├── AddWaste.tsx            ← List waste to marketplace
-    │           ├── SellerOrders.tsx        ← Incoming orders management
-    │           ├── SellerProfile.tsx       ← Seller stats & profile
-    │           └── EditProfile.tsx         ← Route stub → shared profile editor
-    │
-    ├── components/
-    │   ├── platform-map.tsx                ← Native: delegates to react-native-maps
-    │   ├── platform-map.web.tsx            ← Web: DOM-based map fallback
-    │   ├── profile-editor.tsx              ← Shared profile edit form (buyer+seller)
-    │   └── ui/                             ← Primitive UI component library
-    │       ├── badge.tsx                   ← Status & category badges
-    │       ├── badge.test.ts               ← Badge unit tests
-    │       ├── bottom-nav.tsx              ← Custom animated bottom navigation bar
-    │       ├── button.tsx                  ← Primary / ghost / danger buttons
-    │       ├── card.tsx                    ← Elevated surface card
-    │       ├── chip.tsx                    ← Pill filter chips
-    │       ├── empty-state.tsx             ← Empty list placeholder
-    │       ├── list-option.tsx             ← Tappable row list item
-    │       ├── screen.tsx                  ← Safe-area screen wrapper
-    │       ├── sheet.tsx                   ← Bottom sheet / modal panel
-    │       └── text-field.tsx              ← Styled text input
-    │
-    ├── constants/
-    │   ├── design.ts                       ← Design tokens (Palette, Space, Radius, Shadow, Type)
-    │   ├── design.test.ts                  ← Design token tests
-    │   ├── bin-status.ts                   ← Firmware bin-status enum helpers
-    │   └── bin-status.test.ts              ← Bin status unit tests
-    │
-    ├── utils/
-    │   ├── distance.ts                     ← Haversine great-circle formula
-    │   └── distance.test.ts                ← Distance calculation tests
-    │
-    ├── scripts/
-    │   ├── reset-project.js                ← Wipe & re-scaffold Expo project
-    │   └── seedMockData.js                 ← Seed Firestore with mock data
-    │
-    ├── functions/                          ← Firebase Cloud Functions
-    │   ├── package.json                    ← Functions deps (Stripe, firebase-admin)
-    │   └── index.js                        ← createCheckoutSession + verifyCheckoutSession
-    │
-    ├── assets/
-    │   └── images/                         ← App icon, splash, adaptive icons
-    │
-    └── docs/
-        └── analysis_report.md              ← Codebase analysis report
+└── admin/                       Admin dashboard (React + Vite)
+    ├── src/
+    │   ├── main.jsx, App.jsx    Entry point and routes
+    │   ├── AuthContext.jsx, useAuth.js, authContextInstance.js
+    │   ├── firebaseConfig.js, iotConfig.js
+    │   ├── pages/               One file per screen
+    │   ├── lib/                 Pure helpers + paginated listener hook
+    │   ├── components/Icons.jsx
+    │   └── App.css, index.css
+    ├── public/logo.png
+    ├── index.html, vite.config.js, vitest.config.js, eslint.config.js
+    ├── package.json
+    └── .env.example
+```
+
+About 150 files are tracked in git; roughly 8,400 lines of application source (TypeScript/JavaScript) plus tests.
+
+---
+
+## 4. Technology stack
+
+### Mobile app (`mobile/`)
+
+| Area | Technology |
+|------|-----------|
+| Framework | **Expo SDK 57**, **React Native 0.86**, **React 19** (React Compiler enabled), new architecture on |
+| Language | **TypeScript 6** (strict), some plain JS config files |
+| Routing | **Expo Router 57** (file-based, typed routes), React Navigation 7 under the hood |
+| Backend SDK | **Firebase JS SDK 12**: Auth, Firestore, Storage, Functions, Realtime Database |
+| Local storage | `@react-native-async-storage/async-storage` (keeps the sign-in session) |
+| Maps and location | `react-native-maps`, `expo-location` |
+| Graphics | `react-native-svg` (donut chart), `@expo/vector-icons` (Ionicons) |
+| Media | `expo-image`, `expo-image-picker` (profile photo) |
+| Payments | `expo-web-browser` (opens Stripe Checkout; no native Stripe SDK, so Expo Go works) |
+| Animation / gestures | `react-native-reanimated`, `react-native-gesture-handler`, `react-native-worklets` |
+| Other Expo modules | `expo-constants`, `expo-font`, `expo-haptics`, `expo-linking`, `expo-splash-screen`, `expo-status-bar`, `expo-symbols`, `expo-system-ui`, `expo-file-system` |
+| Web target | `react-native-web` (a web build exists; the map has a web fallback) |
+| Testing | **Jest 29** + `jest-expo`, `@testing-library/react-native` 14, `@firebase/rules-unit-testing` 5 |
+| Lint | ESLint 9 + `eslint-config-expo` |
+
+### Admin dashboard (`admin/`)
+
+| Area | Technology |
+|------|-----------|
+| Framework | **React 19**, **Vite 7** (plain JavaScript / JSX) |
+| Routing | `react-router-dom` 7 |
+| Backend SDK | Firebase JS SDK 12 (Auth, Firestore, Realtime Database) |
+| Testing | **Vitest 5**, Testing Library, jsdom |
+| Lint | ESLint 9 (react-hooks, react-refresh plugins) |
+
+### Backend and services
+
+| Service | Use |
+|---------|-----|
+| Firebase Authentication | Email + password sign-in (Google sign-in was tried and removed) |
+| Cloud Firestore | Users, marketplace listings, orders, offers, notifications |
+| Firebase Realtime Database | Live smart-bin readings (separate project) |
+| Firebase Storage | Profile photos |
+| Cloud Functions (Node, `firebase-functions` 6, `firebase-admin` 12) | Stripe Checkout session create + verify (written, not deployed) |
+| Stripe (test mode) | Card payments |
+| Firebase CLI / Emulator Suite | Deploying rules and indexes; running rules tests |
+
+### Tooling
+
+Node 22 (required by Vitest 5), npm, Git + GitHub, GitHub Actions, Java 21 (Firestore emulator),
+VS Code settings in `mobile/.vscode`.
+
+---
+
+## 5. Mobile app
+
+### 5.1 Navigation (`mobile/app/`)
+
+Expo Router maps files to screens. `app/_layout.tsx` wraps everything in `SafeAreaProvider` and a
+light-only navigation theme; `app/(tabs)/_layout.tsx` is a stack with swipe-back. Every screen draws its
+own bottom navigation (`BottomNav`).
+
+| Route file | Screen | Notes |
+|-----------|--------|-------|
+| `(tabs)/index.tsx` | Splash | Animated logo, then goes to Welcome |
+| `(tabs)/Welcome.tsx` | Welcome | "Get Started" goes to Login |
+| `(tabs)/Login.tsx` | Login | Email + password, role-based redirect, disabled-account check, **Forgot password** (sends a reset email) |
+| `(tabs)/CreateAccount.tsx` | Sign up | Creates the Auth user and `users/{uid}` profile (role seller or buyer) |
+| `(tabs)/seller/SellerDashboard.tsx` | Seller home | Live bin cards, Bin ON/OFF, donut chart, bin map, set-bin-location, notifications, issue report |
+| `(tabs)/seller/AddWaste.tsx` | List waste | Pick compartments, enter weight, priced per kg, creates marketplace listings |
+| `(tabs)/seller/SellerOrders.tsx` | Seller orders | Tabs Ongoing / Completed / Cancelled; Confirm, Decline, Mark completed; shows buyer rating |
+| `(tabs)/seller/SellerOffers.tsx` | Seller offers | Accept (creates an order in a transaction) or reject offers |
+| `(tabs)/seller/SellerProfile.tsx`, `EditProfile.tsx` | Profile | Stats (earned, weight) and profile editor |
+| `(tabs)/buyer/BuyerDashboard.tsx` | Marketplace | Search, type filter, distance, route map, Buy Now (cash or card), Make an Offer, notification bell |
+| `(tabs)/buyer/BuyerOrders.tsx` | Buyer orders | Tabs, cancel, pay accepted-offer order by card, route map, star rating |
+| `(tabs)/buyer/BuyerOffers.tsx` | Buyer offers | Offers made, withdraw |
+| `(tabs)/buyer/BuyerProfile.tsx`, `EditProfile.tsx` | Profile | Profile and editor |
+
+The two `EditProfile.tsx` files are 5-line wrappers around `components/profile-editor.tsx`.
+
+### 5.2 Components (`mobile/components/`)
+
+| File | Purpose |
+|------|---------|
+| `platform-map.tsx` / `platform-map.web.tsx` | Map wrapper: `react-native-maps` on devices, a simple fallback on web |
+| `profile-editor.tsx` | Shared profile form: name, phone, Sri Lanka location list, photo upload to Storage |
+| `ui/screen.tsx` | `Screen` (safe areas, padding, scroll) and `ScreenHeader` |
+| `ui/card.tsx` | `Card`, `SectionTitle`, `Divider`, `DetailRow` |
+| `ui/button.tsx` | Button variants (primary, secondary, danger), loading state |
+| `ui/text-field.tsx` | Labelled input with icon and **show/hide password** toggle |
+| `ui/badge.tsx` | Status badges and `Notice`; maps order status to tone and label |
+| `ui/chip.tsx` | `ChipGroup` filter pills |
+| `ui/sheet.tsx` | Bottom-sheet modal used for every dialog |
+| `ui/bottom-nav.tsx` | Floating bottom navigation for sellers and buyers (with a solid strip under it) |
+| `ui/empty-state.tsx` | `EmptyState` and `LoadingState` |
+| `ui/list-option.tsx` | Selectable list rows |
+| `ui/donut-chart.tsx` | SVG donut chart with total in the centre and a legend; "Bin is empty" state |
+| `ui/order-tabs.tsx` | Ongoing / Completed / Cancelled tabs with counts |
+| `ui/star-rating.tsx` | 1–5 stars, read-only or tappable |
+| `ui/notification-bell.tsx` | Bell with unread badge and notifications sheet (used for buyers) |
+
+### 5.3 Hooks, constants, utils
+
+| File | Purpose |
+|------|---------|
+| `hooks/useAuthUser.ts` | Returns the signed-in user only after Firebase has restored the session **and** `reload()` confirms the account still exists. A deleted or disabled account is signed out; nobody signed in is sent to Login. Prevents "Missing or insufficient permissions" on start-up. |
+| `constants/design.ts` | Design tokens (colours, spacing, radius, shadows, type) |
+| `constants/bin-status.ts` | Maps firmware status (EMPTY, LOW, HALF, 75%, FULL, ERROR) to colour and label |
+| `utils/binTelemetry.ts` | Turns raw firmware data into numbers: parses level text and weight (grams → kg), computes live/offline by 2-minute staleness (`STALE_AFTER_MS`) |
+| `utils/distance.ts` | Haversine distance in km |
+| `utils/orderActions.ts` | Which actions a seller may take per order status; whether completing collects cash |
+| `utils/orderTabs.ts` | Which tab an order belongs to (pending/confirmed = Ongoing) and counts per tab |
+| `utils/orderNotifications.ts` | Message and type of the notification a seller's action sends to the buyer |
+| `utils/passwordReset.ts` | Messages for the reset-email result (same message for unknown email, so accounts cannot be probed) |
+| `utils/donut.ts` | Donut slice geometry and `formatKg` (up to 3 decimals) |
+| `utils/money.ts` | `roundMoney` and `formatRs` (`Rs 120`, `Rs 7.20`) |
+| `types.ts` | Shared types: `UserProfile`, `MarketplaceItem`, `Order`, `Offer`, `AppNotification`, `BinData`, `BinCompartment`, `UserLocation`, `WasteType` |
+
+### 5.4 Firebase configuration
+
+- `firebaseConfig.js` — initialises the main project with AsyncStorage persistence; exports `auth`, `db`, `storage`, `functions`.
+- `firebaseConfig.web.js` — same for the web build.
+- `iotConfig.js` — a second, named Firebase app for the IoT project: Realtime Database `iotDb`, anonymous sign-in with persistence, `DEFAULT_BIN_ID = 'bin001'`, and development-only mock data (`USE_MOCK_IOT` is `__DEV__ && env flag`, so production never shows fake data).
+
+### 5.5 Scripts
+
+- `scripts/seedMockData.js` — seeds demo data with a service-account key (never committed).
+- `scripts/reset-project.js` — Expo template reset script.
+
+---
+
+## 6. Admin dashboard
+
+Routes (`src/App.jsx`): a gate shows Login when signed out, "Not an admin" when the user's role is not
+`admin`, and otherwise the layout with these pages.
+
+| Route | Page | Content |
+|-------|------|---------|
+| `/` | `Overview.jsx` | KPI cards: total users, sellers, buyers, available listings, total / pending-or-confirmed / completed orders, completed revenue (bounded read, capped at 500 orders) |
+| `/bins` | `BinStatus.jsx` | Live readings of the default bin (`bin001`), Bin ON/OFF and freshness |
+| `/users` | `Users.jsx` | Search and filter, enable/disable accounts, set which `binId` a seller sees (via a prompt) |
+| `/marketplace` | `Marketplace.jsx` | All listings with filters, delete a listing |
+| `/orders` | `Orders.jsx` | All orders with filters, change order status |
+
+Other files:
+
+- `AuthContext.jsx`, `useAuth.js`, `authContextInstance.js` — auth state and `isAdmin` (reads `users/{uid}.role`).
+- `lib/usePaginatedCollection.js` — live listener with a growing `limit` (25 per page) instead of streaming everything.
+- `lib/filters.js` — search/filter functions for users, listings and orders (unit tested).
+- `lib/binTelemetry.js` — same parsing as the mobile app (unit tested).
+- `iotConfig.js` — IoT Realtime Database connection; `BIN_ID = "bin001"`; mock data only in dev.
+- `pages/Layout.jsx` — sidebar and outlet; `pages/Login.jsx`, `pages/NotAdmin.jsx`.
+- `components/Icons.jsx` — inline SVG icons. `App.css` / `index.css` — styles.
+
+Admin accounts are created **by hand** in the Firebase console (set `role: "admin"`); the app's sign-up cannot create one.
+
+---
+
+## 7. Firebase backend
+
+Project `wast-pro`:
+
+| Service | Details |
+|---------|---------|
+| Authentication | Email + password |
+| Firestore | Rules in `mobile/firestore.rules`, indexes in `mobile/firestore.indexes.json`, both deployed with the Firebase CLI |
+| Storage | Profile photos |
+| Functions | `mobile/functions` (not deployed; needs the Blaze plan and a Stripe key) |
+
+Composite indexes (needed by the app's queries, all built):
+
+| Collection | Fields |
+|-----------|--------|
+| `orders` | `sellerUid` ascending, `createdAt` descending |
+| `orders` | `buyerUid` ascending, `createdAt` descending |
+| `offers` | `buyerUid` ascending, `createdAt` descending |
+
+Deploy: `firebase deploy --only firestore:rules` (and `firestore:indexes`) from `mobile/`.
+
+---
+
+## 8. Firestore data model
+
+### `users/{uid}`
+`fullName`, `email`, `role` (`seller` | `buyer` | `admin`), `phone`, `location` (text), `photoURL`,
+`points`, `createdAt`, `updatedAt`, `disabled` (admin only), `binId` (admin only, which bin the seller sees),
+`binLocation { latitude, longitude }` (set by the seller from the dashboard).
+
+### `marketplace/{listingId}` — waste listings
+`sellerUid`, `sellerName`, `wasteType` (`plastic` | `food` | `metal`), `weightKg`, `pricePerKg`,
+`totalPrice` (rounded to 2 decimals), `location {latitude, longitude}`, `status` (`available` | `sold`),
+`soldOrderId` (set while sold; ties a cancel back to the order), `createdAt`.
+
+### `orders/{orderId}`
+`listingId`, `buyerUid`, `buyerName`, `sellerUid`, `sellerName`, `wasteType`, `weightKg`, `totalPrice`,
+`paymentMethod` (`cash` | `card`), `paymentStatus` (`pending` | `paid`), `paymentLast4`,
+`status` (`pending` → `confirmed` → `completed`, or `cancelled`), `location`, `createdAt`, `cancelledAt`,
+`offerId` (set when created from an accepted offer), `rating` (1–5, set once by the buyer after completion).
+
+### `offers/{offerId}`
+`listingId`, `buyerUid`, `buyerName`, `sellerUid`, `sellerName`, `wasteType`, `weightKg`, `askingPrice`,
+`offeredPrice`, `status` (`pending` | `accepted` | `rejected` | `withdrawn`), `createdAt`, `updatedAt`.
+
+### `notifications/{id}`
+`toUid`, `type`, `message`, `read`, `createdAt`, plus `orderId` or `offerId` so rules can verify the sender.
+Types: `bin_full`, `order_placed`, `order_cancelled`, `order_confirmed`, `order_completed`,
+`offer_received`, `offer_accepted`, `offer_rejected`.
+
+### `bins/{uid}`
+Legacy per-seller bin document (owner read/write). Live readings come from the Realtime Database instead.
+
+### Realtime Database (IoT project) — see section 10.
+
+---
+
+## 9. Security rules
+
+`mobile/firestore.rules` is the main protection, because clients talk to Firestore directly.
+Helper functions: `isSignedIn`, `isOwner`, `isAdmin`, `isOrderParty`, `isOfferParty`,
+`isAcceptedOfferOrder`, `isBuyingListing`, `isRestoringListing`, `isValidNewListing`,
+`isValidListingEdit`, `isValidBinLocation`, `isDirectPurchaseOfListing`.
+
+| Collection | Who may do what |
+|-----------|-----------------|
+| `users` | Read: owner or admin only (profiles are private). Create: owner, role must be seller or buyer, no `disabled`/`points`. Update: owner may change only `fullName`, `phone`, `location`, `photoURL`, `updatedAt` and a **valid** `binLocation`; admin may change only `disabled` and `binId` (checked with a regex). Delete: never. |
+| `marketplace` | Read: any signed-in user. Create: the seller, with a valid listing (known type, positive weight and price within limits, starts `available`). Update: the seller (valid edit), or a buyer **only** as part of buying (available → sold, in the same batch that creates their order) or cancelling (sold → available, in the same batch that cancels the order). Delete: seller or admin. |
+| `orders` | Read: buyer, seller or admin. Create: a buyer direct purchase that matches the real listing (seller, price, still available), or a seller creating the order while accepting an offer. Update: buyer cancels an unpaid order; buyer pays an accepted-offer order by card (payment fields only); seller moves status forward or marks a cash order paid; buyer rates a completed order once (1–5, `rating` only); admin changes `status` only. Delete: never. |
+| `offers` | Read: buyer, seller, admin. Buyer creates own pending offers and may withdraw; seller accepts or rejects offers on their listings. |
+| `notifications` | Read, update, delete: the recipient (admin may read). Create: the recipient must exist, and the type decides who may send: `bin_full` only to yourself; order types only between the two parties of that order; `order_confirmed` / `order_completed` **only from the order's seller**; offer types only between the two parties of that offer. |
+| `bins` | Owner read/write; admin read. |
+
+### Realtime Database (IoT project)
+Currently `.read: true, .write: true` so the prototype works. The plan is to restrict it (read for
+signed-in users, write only by the device) once the hardware is verified, and to regenerate the legacy
+database secret that was shared during development.
+
+---
+
+## 10. IoT smart bin
+
+- **Hardware:** ESP32, ultrasonic sensor per compartment (fill level), load cell (weight), moisture sensor (food). Firmware is written by the hardware partner.
+- **Firebase project:** `smartwastepro-1085e` (separate from the main one), Realtime Database.
+- **Data shape** (firmware):
+
+```
+bins/bin001/
+  lastUpdated            epoch milliseconds
+  location               "Horizon Campus"   (text, not GPS)
+  owner
+  compartments/
+    plastic/ { level: "text", weight: grams }
+    food/    { level: "text", weight: grams }
+    metal/   { level: "text", weight: grams }
+```
+
+- **Parsing:** `utils/binTelemetry.ts` (mobile) and `lib/binTelemetry.js` (admin) convert level text to a percentage and a status, weight in grams to kg (`WEIGHT_UNIT_DIVISOR = 1000`), and compute freshness.
+- **Bin ON / OFF:** a bin is ON if `lastUpdated` is within the last 2 minutes. When OFF the app shows the last known readings and raises **no new alerts**.
+- **Auth:** the app signs in to the IoT project anonymously; this keeps working after the rules are tightened.
+- **Linking a seller to a bin:** an admin sets `users/{uid}.binId`; the seller app reads `binId || 'bin001'`.
+- **Bin location:** the firmware sends no GPS, so the seller taps "Set bin location" on the dashboard; the phone's position is saved as `binLocation`.
+- **Mock mode:** `EXPO_PUBLIC_USE_MOCK_IOT=true` (dev builds only) shows simulated data with Normal and Alert presets.
+
+---
+
+## 11. Cloud Functions and card payments
+
+`mobile/functions/index.js` (Node, v2 callable functions, secret `STRIPE_SECRET_KEY`):
+
+- `createCheckoutSession({ amount, wasteType, listingId })` — creates a Stripe Checkout session in LKR and returns its URL. Success/cancel redirect to the app's `mobile://payment-complete` scheme.
+- `verifyCheckoutSession({ sessionId })` — checks on the server that the session belongs to the caller and is paid, returns the card's last 4 digits.
+
+The app opens the Checkout URL with `expo-web-browser`, then calls verify. **Status: written but not
+deployed** (needs the Firebase Blaze plan and a Stripe test key). Until then the demo uses cash on delivery.
+
+---
+
+## 12. Main user flows
+
+### Seller
+1. Sign up as seller, sign in.
+2. Dashboard shows the three compartments live (level %, status, weight) and a donut chart of weights. Bin ON/OFF shows whether the bin is reporting.
+3. **Add Waste:** choose compartments, enter weights; the price per kg gives the total; listings are created on the marketplace.
+4. **Orders:** a buyer's purchase appears under Ongoing. Seller **Confirms** or **Declines** (decline cancels the order and relists the waste in one atomic batch), then **Marks completed** (cash orders are marked paid at hand-over).
+5. **Offers:** accept (creates a confirmed order in a transaction and rejects other offers) or reject.
+
+### Buyer
+1. Browse the marketplace (search, type filter, distance, route map).
+2. **Buy Now** (cash or card) — creates the order and marks the listing sold in one batch — or **Make an Offer**.
+3. **Orders** tabs: Ongoing / Completed / Cancelled; cancel an unpaid order (listing is relisted); pay an accepted-offer order by card.
+4. After completion, give 1–5 stars.
+5. A bell shows notifications when the seller confirms, completes or declines an order.
+
+### Admin
+Sign in on the web dashboard, watch the bin, enable/disable users, assign bins, review listings and orders.
+
+### Order state machine
+
+```
+pending ──seller confirm──► confirmed ──seller complete──► completed ──buyer rates──► (rating)
+   │                            │
+   └── buyer cancel / seller decline (relists the waste) ──► cancelled
 ```
 
 ---
 
-## 4. Technology Stack
+## 13. Design system
 
-### 4.1 Mobile Application
+`mobile/constants/design.ts` holds the tokens; screens use them instead of hard-coded values.
 
-| Category | Technology | Version | Purpose |
-|---|---|---|---|
-| **Runtime** | React Native | 0.86.3 | Cross-platform mobile framework |
-| **Platform** | Expo SDK | ^57.0.0 | Build, OTA updates, native modules |
-| **Navigation** | Expo Router | ~57.0.21 | File-based routing (like Next.js) |
-| **Language** | TypeScript | ~6.0.3 | Static typing across entire mobile app |
-| **UI** | React | 19.2.3 | Component model |
-| **State/Auth** | Firebase JS SDK | ^12.11.0 | Auth, Firestore, Storage, Realtime DB |
-| **Maps** | react-native-maps | 1.27.2 | Google Maps with marker + route polyline |
-| **Location** | expo-location | ~57.0.18 | GPS coordinates (buyer proximity) |
-| **Charts** | react-native-chart-kit | ^6.12.0 | Pie charts for bin fill levels |
-| **Animation** | react-native-reanimated | 4.5.1 | Smooth UI animations |
-| **Gestures** | react-native-gesture-handler | ~2.32.0 | Swipe / gesture interactions |
-| **Storage** | AsyncStorage | 2.2.0 | Persist auth session across restarts |
-| **Images** | expo-image-picker | ~57.0.18 | Profile photo selection |
-| **Images** | expo-image | ~57.0.5 | Optimised image rendering |
-| **Payments** | expo-web-browser | ~57.0.3 | Opens Stripe Checkout in browser |
-| **Icons** | @expo/vector-icons | ^15.0.3 | Ionicons, MaterialIcons, etc. |
-| **SVG** | react-native-svg | 15.15.4 | SVG rendering for charts |
-
-### 4.2 Admin Dashboard
-
-| Category | Technology | Version | Purpose |
-|---|---|---|---|
-| **Framework** | React | ^19.2.0 | Web UI framework |
-| **Build Tool** | Vite | ^7.2.4 | Dev server & production bundler |
-| **Routing** | react-router-dom | ^7.18.4 | SPA client-side routing |
-| **Language** | JavaScript (JSX) | ES2022 | No TypeScript in admin |
-| **Styling** | Vanilla CSS | — | Custom CSS, no utility framework |
-| **Backend** | Firebase JS SDK | ^12.19.0 | Auth, Firestore, Realtime DB |
-| **Testing** | Vitest | ^5.0.1 | Unit testing |
-| **Test Utils** | @testing-library/react | ^16.3.3 | Component testing |
-| **Linting** | ESLint 9 | ^9.39.1 | Flat config linting |
-
-### 4.3 Cloud Backend
-
-| Service | Provider | Purpose |
-|---|---|---|
-| **Authentication** | Firebase Auth | Email/password login, role-based routing |
-| **Primary Database** | Cloud Firestore | 5 collections: users, bins, marketplace, orders, notifications |
-| **IoT Database** | Firebase Realtime Database | Live ESP32 sensor feeds (separate Firebase project) |
-| **File Storage** | Firebase Storage | Profile photo uploads |
-| **Serverless Functions** | Firebase Cloud Functions v2 | Node.js — Stripe payment server-side logic |
-| **Security Rules** | Firestore Security Rules | Role-scoped, per-collection access control |
-
-### 4.4 Payment Processing
-
-| Technology | Purpose |
-|---|---|
-| **Stripe** | Card payment processing (LKR currency) |
-| **Stripe Checkout** | Hosted payment page — no native SDK needed |
-| **Firebase Functions** | Server-side session creation & verification |
-| **expo-web-browser** | Opens Stripe URL, redirects back via `mobile://` scheme |
-
-### 4.5 IoT Hardware
-
-| Component | Role |
-|---|---|
-| **ESP32 Microcontroller** | Main IoT controller with WiFi |
-| **Ultrasonic Sensor (HC-SR04)** | Measures bin fill level (%) |
-| **Load Cell + HX711** | Measures waste weight (kg) |
-| **Moisture Sensor** | Measures food compartment humidity (%) |
-| **Firebase Realtime Database** | Receives firmware sensor pushes via WiFi |
-
-### 4.6 Developer Tooling & CI/CD
-
-| Tool | Purpose |
-|---|---|
-| **GitHub Actions** | Automated CI: lint + test + build on push/PR |
-| **Jest + jest-expo** | Mobile unit testing |
-| **Vitest** | Admin unit testing |
-| **ESLint 9** | Lint (flat config in both projects) |
-| **npm** | Package management |
-| **Node.js 20** | CI runtime |
+- **Colours:** brand green (`brand` 50–900), neutral `ink` greys, per-waste accents (plastic blue, food orange, metal grey), status tones (success, warning, danger, info, neutral).
+- **Accessibility:** text colours meet WCAG AA contrast (4.5:1); `design.test.ts` checks this. Interactive elements carry accessibility roles and labels.
+- **Layout:** `Space`, `Radius`, `Shadow` scales; light theme only; floating bottom navigation; bottom-sheet modals.
 
 ---
 
-## 5. Mobile App — Deep Dive
+## 14. Tests
 
-### 5.1 Entry & Navigation
+| Suite | Tool | Count | What it covers |
+|-------|------|-------|----------------|
+| Mobile unit | Jest + jest-expo | 54 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
+| Admin unit | Vitest | 19 | filters, telemetry parsing |
+| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 103 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
-The app uses **Expo Router** (file-based routing, similar to Next.js App Router):
-
-```
-app/
-├── _layout.tsx          Root Stack — pins theme, slide animations, SafeAreaProvider
-└── (tabs)/
-    ├── _layout.tsx      Tab navigator (Bottom tabs via Expo Router)
-    ├── index.tsx        Role guard: routes seller→SellerDashboard, buyer→BuyerDashboard
-    ├── Welcome.tsx      Landing screen with sign-in / create account buttons
-    ├── Login.tsx        Firebase signInWithEmailAndPassword
-    ├── CreateAccount.tsx Firebase createUserWithEmailAndPassword + Firestore user doc
-    ├── buyer/           All buyer screens
-    └── seller/          All seller screens
-```
-
-### 5.2 Seller Screens
-
-| File | Size | What it does |
-|---|---|---|
-| `SellerDashboard.tsx` | 20 KB | Real-time IoT bin monitoring via Firebase Realtime DB. Shows fill % per compartment (Plastic/Food/Metal) as pie chart, weight, moisture, status badges. Earnings tracker, notification center, alert if bin >80%. |
-| `AddWaste.tsx` | 13 KB | Waste listing form. Reads current bin sensor data, auto-calculates price (`weight × price/kg`). Creates `marketplace` doc + `notifications` doc (order_placed). |
-| `SellerOrders.tsx` | 5 KB | Incoming buyer orders. Status management: pending → confirmed → completed. |
-| `SellerProfile.tsx` | 7.6 KB | Dynamic stats (total earnings, kg sold, trees saved, CO₂ reduced). Shows profile + navigation to Edit Profile. |
-| `EditProfile.tsx` | stub | Route stub that renders the shared `profile-editor.tsx` component. |
-
-### 5.3 Buyer Screens
-
-| File | Size | What it does |
-|---|---|---|
-| `BuyerDashboard.tsx` | 23 KB | Live marketplace feed from Firestore. Filter chips (All/Plastic/Food/Metal). GPS distance per listing (Haversine). Map modal showing seller pin + route polyline. Buy Now modal with payment selection (Cash / Stripe Card). VISA/Mastercard auto-detection by card prefix. |
-| `BuyerOrders.tsx` | 15 KB | Order history with status badges. Cancel pending order → marks `orders` doc cancelled → restores `marketplace` listing to `available`. |
-| `BuyerProfile.tsx` | 7.6 KB | Purchase stats (total spent, kg bought, environmental points). Profile + Edit. |
-| `EditProfile.tsx` | stub | Route stub → shared `profile-editor.tsx`. |
-
-### 5.4 Shared Components
-
-#### UI Primitives (`components/ui/`)
-
-| Component | Description |
-|---|---|
-| `badge.tsx` | Color-coded status badges (uses design tokens). Variants: success, warning, danger, info, neutral |
-| `bottom-nav.tsx` | Custom animated bottom navigation bar with active indicator |
-| `button.tsx` | Primary (filled green), ghost (outlined), danger (red) variants |
-| `card.tsx` | Elevated surface card with optional press handling |
-| `chip.tsx` | Pill-shaped filter chip for marketplace type filters |
-| `empty-state.tsx` | Friendly empty list placeholder with icon |
-| `list-option.tsx` | Tappable row list item with icon, label, chevron |
-| `screen.tsx` | Safe-area aware screen wrapper with scroll support |
-| `sheet.tsx` | Modal bottom sheet / overlay panel |
-| `text-field.tsx` | Styled text input with label and error state |
-
-#### Other Components
-
-| Component | Description |
-|---|---|
-| `platform-map.tsx` | Native stub — delegates to `react-native-maps` |
-| `platform-map.web.tsx` | Web fallback map using a DOM-based approach |
-| `profile-editor.tsx` | Shared profile form (name, phone, location, photo) used by both buyer and seller EditProfile routes. Saves to Firestore + Firebase Storage. |
+Rules tests live in `mobile/tests/rules/` (`offers`, `users-and-orders`, `listings`, `validation`,
+`seller-orders`) and run through `run.mjs`. They need Java 21.
 
 ---
 
-## 6. Admin Dashboard — Deep Dive
+## 15. CI
 
-The admin panel is a **Vite + React SPA** with Firebase authentication and a role gate.
+`.github/workflows/ci.yml` runs on pushes to `main`, `development`, `keshan-dev` and on pull requests
+to `main` / `development`. Node 22. Three jobs:
 
-### 6.1 Auth Gate (`App.jsx`)
-
-```
-BrowserRouter
-└── AuthProvider (AuthContext.jsx)
-    └── Gate component
-        ├── loading → spinner
-        ├── !user  → <Login />
-        ├── !isAdmin → <NotAdmin />
-        └── admin  → <Layout /> (sidebar shell)
-            ├── /             → <Overview />
-            ├── /bins         → <BinStatus />
-            ├── /users        → <Users />
-            ├── /marketplace  → <Marketplace />
-            └── /orders       → <Orders />
-```
-
-### 6.2 Admin Pages
-
-| Page | Description |
-|---|---|
-| `Overview.jsx` | Aggregate stats: total users, active listings, orders, bin alerts |
-| `BinStatus.jsx` | Reads IoT Firebase Realtime DB — shows live fill/weight/moisture per compartment |
-| `Users.jsx` | Paginated user table. Admin can toggle `disabled` flag on accounts |
-| `Marketplace.jsx` | Browse and filter all marketplace listings across all sellers |
-| `Orders.jsx` | Full orders table with status filtering and admin status override |
-
-### 6.3 Admin Utilities (`src/lib/`)
-
-| File | Description |
-|---|---|
-| `filters.js` | Pure functions for filtering Firestore collection snapshots by field/value |
-| `filters.test.js` | Unit tests for filter logic |
-| `usePaginatedCollection.js` | React hook for cursor-based Firestore pagination |
+1. **admin** — `npm ci`, lint, test, build.
+2. **mobile** — `npm ci`, lint, Jest.
+3. **firestore-rules** — Java 21, `npm run test:rules` on the emulator.
 
 ---
 
-## 7. Cloud Backend (Firebase)
+## 16. Environment variables
 
-### Firebase Projects Used
+Real values live in untracked `.env` files; `.env.example` shows the names.
 
-| Project | Purpose |
-|---|---|
-| **Main project** (`wast-pro`) | Auth + Firestore + Storage + Cloud Functions |
-| **IoT project** (separate) | Realtime Database for live ESP32 sensor data only |
+**Mobile (`mobile/.env`)** — `EXPO_PUBLIC_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`,
+`_MESSAGING_SENDER_ID`, `_APP_ID`, `_MEASUREMENT_ID`; IoT: `EXPO_PUBLIC_IOT_FIREBASE_API_KEY`,
+`_PROJECT_ID`, `_DATABASE_URL`; `EXPO_PUBLIC_USE_MOCK_IOT`.
 
-The two projects are intentionally kept separate — the IoT device only needs to write to Realtime DB, and the mobile app reads IoT data using anonymous auth with minimal permissions.
+**Admin (`admin/.env`)** — the same set with the `VITE_` prefix.
 
----
+**Functions** — secret `STRIPE_SECRET_KEY` set with `firebase functions:secrets:set`.
 
-## 8. Cloud Functions (Stripe Payments)
-
-**Location:** `mobile/functions/index.js`  
-**Runtime:** Node.js (Firebase Functions v2)
-
-### `createCheckoutSession`
-
-- **Trigger:** Firebase callable function (requires auth)
-- **Input:** `{ amount, wasteType, listingId }`
-- **Logic:** Creates a Stripe Checkout Session in `payment` mode (LKR currency)
-- **Output:** `{ url, sessionId }` — mobile app opens `url` in expo-web-browser
-- **Return URL scheme:** `mobile://payment-complete?status=success|cancel`
-
-### `verifyCheckoutSession`
-
-- **Trigger:** Firebase callable function (requires auth)
-- **Input:** `{ sessionId }`
-- **Logic:** Retrieves session from Stripe, verifies `buyerUid` matches caller, checks `payment_status === 'paid'`
-- **Output:** `{ paid, last4, amountTotal }` — `last4` is displayed as card receipt
-
-> **Security:** Stripe secret key is stored as a Firebase Function secret (`STRIPE_SECRET_KEY`), never embedded in client code.
+Never committed: `.env`, `serviceAccountKey.json`, `google-services.json`. No database secret is kept in the app.
 
 ---
 
-## 9. IoT Hardware & Configuration
+## 17. Commands
 
-### ESP32 Firmware Data Path
+```bash
+# Mobile (from mobile/)
+npm install
+npx expo start            # run in Expo Go
+npm run lint
+npm test                  # Jest
+npm run test:rules        # Firestore rules on the emulator (needs Java 21)
+npx tsc --noEmit          # type-check
 
-```
-ESP32 → WiFi → Firebase Realtime Database
-         bins/
-         └── Bin001/
-             ├── plastic/
-             │   ├── level      (number: 0–100 %)
-             │   ├── weight     (number: kg)
-             │   ├── moisture   (number: %)
-             │   ├── status     (string: EMPTY|LOW|HALF|75%|FULL|ERROR)
-             │   ├── overweight (boolean)
-             │   └── timestamp  (ISO string)
-             ├── food/   (same schema)
-             └── metal/  (same schema)
-```
+# Admin (from admin/)
+npm install
+npm run dev               # http://localhost:5173
+npm run lint
+npm test                  # Vitest
+npm run build
 
-### IoT Firebase Config (`iotConfig.js`)
-
-- Uses a **separate** Firebase project with Realtime Database
-- Mobile app connects using **anonymous auth** (no admin secret in client)
-- Exports `iotDb` (database instance) and `BIN_ID = 'Bin001'`
-
-### Bin Status Enum (from firmware)
-
-| Status | Meaning | UI Tone |
-|---|---|---|
-| `EMPTY` | 0–10% full | Neutral grey |
-| `LOW` | ~25% full | Info blue |
-| `HALF` | ~50% full | Warning amber |
-| `75%` | 75% full | Warning amber |
-| `FULL` | 100% full | Danger red |
-| `ERROR` | Sensor fault | Danger red |
-
----
-
-## 10. Firestore Data Model
-
-### Collection: `users`
-
-```typescript
-{
-  fullName: string,
-  email: string,
-  role: 'seller' | 'buyer' | 'admin',
-  createdAt?: string,
-  phone?: string,
-  photoURL?: string,
-  location?: string,
-  points?: number,
-  disabled?: boolean   // admin-only toggle
-}
-// Document ID = Firebase Auth UID
-```
-
-### Collection: `bins`
-
-```typescript
-{
-  plastic: BinCompartment,
-  food: BinCompartment,
-  metal: BinCompartment
-}
-// BinCompartment shape:
-{
-  level?: number,       // fill % (0–100)
-  weight?: number,      // kg
-  moisture?: number,    // % (food only)
-  status?: string,      // EMPTY|LOW|HALF|75%|FULL|ERROR
-  overweight?: boolean,
-  timestamp?: string
-}
-// Document ID = seller's Auth UID
-```
-
-### Collection: `marketplace`
-
-```typescript
-{
-  wasteType: 'plastic' | 'food' | 'metal',
-  weightKg: number,
-  totalPrice: number,
-  sellerUid: string,
-  sellerName: string,
-  location: { latitude: number, longitude: number },
-  status: 'available' | 'sold',
-  createdAt: Timestamp
-}
-```
-
-### Collection: `orders`
-
-```typescript
-{
-  listingId: string,
-  buyerUid: string,
-  buyerName: string,
-  sellerUid: string,
-  sellerName: string,
-  wasteType: string,
-  weightKg: number,
-  totalPrice: number,
-  paymentMethod: 'cash' | 'card',
-  paymentStatus: 'paid' | 'pending',
-  paymentLast4: string | null,
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled',
-  location: { latitude: number, longitude: number },
-  createdAt: Timestamp,
-  cancelledAt: Timestamp | null
-}
-```
-
-### Collection: `notifications`
-
-```typescript
-{
-  toUid: string,
-  type: 'bin_full' | 'order_placed' | 'order_cancelled',
-  message: string,
-  read: boolean,
-  createdAt: Timestamp,
-  orderId?: string    // present for order_* types
-}
+# Firebase (from mobile/)
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
 ```
 
 ---
 
-## 11. Firestore Security Rules
+## 18. Git workflow
 
-**Location:** `mobile/firestore.rules`
-
-| Collection | Rule Summary |
-|---|---|
-| `users/{uid}` | Any signed-in user can read. Only owner can create/update own doc. Role field is immutable after creation. Admin can toggle `disabled` only. Delete blocked. |
-| `bins/{uid}` | Only the owner (seller) or admin can read/write. |
-| `marketplace/{id}` | Any signed-in user can read. Only seller can create/delete. Buyer can only flip `status` field (available ↔ sold). |
-| `orders/{id}` | Only the buyer or seller on that order can read/update. Buyer creates orders. Delete blocked — cancelled orders stay for history. |
-| `notifications/{id}` | Only recipient can read/update/delete. Creation validates type, toUid exists, and for order events: caller must be buyer or seller on that order (anti-spoofing). |
-
-**Helper functions in rules:**
-
-| Function | Logic |
-|---|---|
-| `isSignedIn()` | `request.auth != null` |
-| `isOwner(uid)` | signed in AND auth.uid == uid |
-| `isAdmin()` | looks up `users/{uid}.role == 'admin'` |
-| `isOrderParty(orderId, toUid)` | validates caller is buyer or seller on given order |
+`keshan-dev` (daily work) → `development` → `main`. Changes are pushed to `keshan-dev` first, then
+fast-forwarded to `development` and `main` once checked. CI runs on all three.
 
 ---
 
-## 12. Design System (Mobile)
-
-**Location:** `mobile/constants/design.ts`
-
-All screens import from this single source of truth. No hardcoded values allowed.
-
-### Palette
-
-| Token | Value | Use |
-|---|---|---|
-| `brand.600` | `#4F772D` | Primary action buttons |
-| `brand.900` | `#1B4332` | Deep brand, nav active |
-| `ink.900` | `#14261A` | Headings |
-| `ink.700` | `#33443A` | Body text |
-| `ink.500` | `#5E6B60` | Muted labels |
-| `surface` | `#FFFFFF` | Card backgrounds |
-| `background` | `#F4F8F2` | Screen background |
-| `waste.plastic` | `#2E7CD6` / `#E7F1FC` | Plastic type accent |
-| `waste.food` | `#E8853B` / `#FDF0E4` | Food type accent |
-| `waste.metal` | `#7B8794` / `#EEF1F4` | Metal type accent |
-| `status.success` | `#2E7D32` | Confirmed/completed |
-| `status.warning` | `#B45309` | Half/75% bin |
-| `status.danger` | `#C2352F` | Full bin / cancel |
-
-### Spacing (4pt rhythm)
-
-```
-xs=4  sm=8  md=12  lg=16  xl=20  2xl=24  3xl=32  4xl=40
-```
-
-### Border Radius
-
-```
-sm=12  md=16  lg=20  xl=28  pill=999
-```
-
-### Shadow Levels
-
-- `1` — resting cards
-- `2` — raised sheets
-- `3` — floating modals
-
-### Typography Scale
-
-| Token | Size | Weight | Use |
-|---|---|---|---|
-| `h1` | 26px | 800 | Screen titles |
-| `h2` | 19px | 700 | Card titles |
-| `h3` | 16px | 700 | Section headings |
-| `body` | 15px | 400 | Default copy |
-| `bodyStrong` | 15px | 600 | Emphasized body |
-| `small` | 13px | 400 | Metadata |
-| `caption` | 11px | 600 | Labels, badges |
-| `metric` | 22px | 800 | Prices, stats (brand green) |
-
----
-
-## 13. TypeScript Types & Interfaces
-
-**Location:** `mobile/types.ts`
-
-| Type / Interface | Description |
-|---|---|
-| `WasteType` | `'plastic' \| 'food' \| 'metal'` |
-| `BinCompartment` | IoT sensor readings per compartment (level, weight, moisture, status, overweight, timestamp) |
-| `BinData` | `{ plastic, food, metal }` — all three BinCompartments |
-| `AppNotification` | Firestore notification doc (id, toUid, type, message, read, createdAt) |
-| `UserProfile` | User document shape (fullName, email, role, phone, photoURL, location, points) |
-| `MarketplaceItem` | Marketplace listing (id, wasteType, weightKg, totalPrice, sellerUid, sellerName, location, status, createdAt) |
-| `Order` | Full order document (all buyer/seller fields, payment, status, timestamps) |
-| `UserLocation` | `{ latitude: number, longitude: number }` |
-
----
-
-## 14. Utility Functions & Constants
-
-### `utils/distance.ts` — Haversine Formula
-
-```typescript
-calculateDistance(lat1, lon1, lat2, lon2): number
-// Returns great-circle distance in kilometres
-// Used in BuyerDashboard to show distance to each seller's bin
-```
-
-### `constants/bin-status.ts` — Firmware Status Helpers
-
-| Function | Description |
-|---|---|
-| `binStatusTone(status?)` | Maps firmware string → design `StatusTone` (neutral/info/warning/danger) |
-| `binStatusLabel(status?)` | Human-readable label (e.g. `"75%"` → `"75% full"`) |
-| `isBinFull(status?)` | Returns `true` if status is `'FULL'` |
-| `binStatusColor(status?)` | Returns full Palette status colour object |
-
-### `admin/src/lib/filters.js`
-
-Pure helper functions filtering Firestore collection arrays by field/value — used in admin pages for client-side filtering without extra queries.
-
-### `admin/src/lib/usePaginatedCollection.js`
-
-React hook providing cursor-based Firestore pagination. Exposes `items`, `loadMore`, `hasMore`, and `loading` state.
-
----
-
-## 15. Testing Strategy
-
-### Mobile Tests (Jest + jest-expo)
-
-| Test File | What is tested |
-|---|---|
-| `components/ui/badge.test.ts` | Badge variant rendering and token usage |
-| `constants/design.test.ts` | Design token shape validation |
-| `constants/bin-status.test.ts` | All firmware status → tone / label / color mappings |
-| `utils/distance.test.ts` | Haversine formula correctness (known lat/lon pairs) |
-
-**Run:** `npm test` inside `mobile/`
-
-### Admin Tests (Vitest + Testing Library)
-
-| Test File | What is tested |
-|---|---|
-| `src/lib/filters.test.js` | Filter helper edge cases |
-
-**Run:** `npm run test` inside `admin/`
-
----
-
-## 16. CI/CD Pipeline
-
-**Location:** `.github/workflows/ci.yml`  
-**Triggers:** Push to `main`, `development`, `keshan-dev`; PRs to `main` or `development`
-
-```yaml
-jobs:
-  admin:
-    runs-on: ubuntu-latest
-    steps:
-      - npm ci
-      - npm run lint    # ESLint 9
-      - npm run test    # Vitest
-      - npm run build   # Vite production build
-
-  mobile:
-    runs-on: ubuntu-latest
-    steps:
-      - npm ci
-      - npm run lint    # expo lint
-      - npm run test -- --ci   # Jest
-```
-
-Both jobs use **Node.js 20** with npm cache keyed to the respective `package-lock.json`.
-
----
-
-## 17. Environment Variables
-
-### Mobile (`mobile/.env`)
-
-| Variable | Purpose |
-|---|---|
-| `EXPO_PUBLIC_FIREBASE_API_KEY` | Main Firebase project API key |
-| `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase Auth domain |
-| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | Firestore project ID |
-| `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase Storage bucket |
-| `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | FCM sender ID |
-| `EXPO_PUBLIC_FIREBASE_APP_ID` | Firebase app ID |
-| `EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID` | Analytics measurement ID |
-| `EXPO_PUBLIC_IOT_FIREBASE_API_KEY` | IoT Firebase project API key |
-| `EXPO_PUBLIC_IOT_FIREBASE_PROJECT_ID` | IoT Firebase project ID |
-| `EXPO_PUBLIC_IOT_FIREBASE_DATABASE_URL` | Realtime Database URL |
-
-### Admin (`admin/.env`)
-
-Same Firebase credentials with `VITE_` prefix, pointing to the main project.
-
-### Cloud Functions (Firebase Secrets)
-
-| Secret | How to set |
-|---|---|
-| `STRIPE_SECRET_KEY` | `firebase functions:secrets:set STRIPE_SECRET_KEY` |
-
----
-
-## 18. App Screens & Navigation Flow
-
-```
-App Launch
-    │
-    ▼
-Welcome Screen (Welcome.tsx)
-    │
-    ├──► Login (Login.tsx)
-    │         │  Firebase signInWithEmailAndPassword
-    │         ▼
-    │      index.tsx (role guard)
-    │         ├── role=seller → SellerDashboard
-    │         └── role=buyer  → BuyerDashboard
-    │
-    └──► CreateAccount (CreateAccount.tsx)
-              │  Firebase createUser + Firestore users doc
-              ▼
-           index.tsx (role guard) → dashboard
-
-
-SELLER TAB FLOW:
-SellerDashboard ──► [+ Add to Marketplace] ──► AddWaste
-      │
-      └─── (Bottom Nav) ─── SellerOrders
-                        ─── SellerProfile ──► EditProfile
-
-
-BUYER TAB FLOW:
-BuyerDashboard ──► [Map Modal] (react-native-maps + route line)
-      │        ──► [Buy Now Modal] ──► Cash or Stripe Card
-      │                                     │
-      │                         expo-web-browser opens Stripe URL
-      │                                     │
-      │                         Return via mobile:// scheme
-      │                                     │
-      │                         verifyCheckoutSession (server)
-      │
-      └─── (Bottom Nav) ─── BuyerOrders (cancel → restore listing)
-                        ─── BuyerProfile ──► EditProfile
-```
-
----
-
-## 19. Order & Payment Flow
-
-```
-Buyer taps "Buy Now"
-        │
-        ▼
-Payment Modal opens
-        │
-   ┌────┴──────────────────────┐
-   │                           │
-Cash on Delivery          Card Payment
-        │                      │
-Create order doc           Call createCheckoutSession
-immediately                (Firebase Cloud Function)
-        │                      │
-        │                 Stripe Checkout Session created
-        │                      │
-        │                 expo-web-browser opens Stripe URL
-        │                      │
-        │                 User enters card → Stripe processes
-        │                      │
-        │                 Redirect → mobile://payment-complete
-        │                      │
-        │                 Call verifyCheckoutSession (server-side)
-        │                 confirms payment + returns last4 digits
-        │
-        └──────────┬────────────┘
-                   ▼
-        Create order doc in Firestore
-        Mark marketplace listing as 'sold'
-        Write notification to seller (order_placed)
-                   │
-                   ▼
-        Buyer tracks in "My Purchases" (BuyerOrders)
-                   │
-           [Cancel Order]?
-                   │
-        Mark order.status = 'cancelled'
-        Restore marketplace listing to 'available'
-        Write cancellation notification to seller
-```
-
----
-
-## 20. Research Objectives & Status
-
-| Objective | Status |
-|---|---|
-| 3-compartment IoT bin with fill, weight, moisture sensors | ⚠️ Partial — data model complete; ESP32 firmware is an external prototype |
-| Mobile marketplace for sellers + buyers + real-time alerts + order tracking | ✅ Complete |
-| Role-based admin dashboard (web) | ✅ Complete |
-| Stripe card payment integration | ✅ Complete |
-| Haversine GPS distance from buyer to seller | ✅ Complete |
-| Map view with seller bin location + route line | ✅ Complete |
-| Notification center with unread badge | ✅ Complete |
-| Environmental impact stats (CO₂ reduced, trees saved) | ✅ Complete |
-| Firestore Security Rules (role-scoped per collection) | ✅ Drafted — deploy with `firebase deploy --only firestore:rules` |
-| Energy-efficient IoT transmission (EGANT protocol) | ❌ Planned — not yet implemented |
-| Auto-listing at 70% bin capacity (no seller action needed) | ❌ Planned — currently manual one-tap by seller |
-| Firebase App Check | ❌ Required before production |
-| Email verification on signup | ❌ Required before production |
-
----
-
-## Quick Reference — Key Files
-
-| File | Path |
-|---|---|
-| Root README | `wast-pro/README.md` |
-| Mobile entry | `mobile/app/_layout.tsx` |
-| Role guard | `mobile/app/(tabs)/index.tsx` |
-| Seller Dashboard | `mobile/app/(tabs)/seller/SellerDashboard.tsx` |
-| Buyer Dashboard | `mobile/app/(tabs)/buyer/BuyerDashboard.tsx` |
-| Add Waste | `mobile/app/(tabs)/seller/AddWaste.tsx` |
-| Buyer Orders | `mobile/app/(tabs)/buyer/BuyerOrders.tsx` |
-| Profile Editor | `mobile/components/profile-editor.tsx` |
-| Design Tokens | `mobile/constants/design.ts` |
-| TypeScript Types | `mobile/types.ts` |
-| Firestore Rules | `mobile/firestore.rules` |
-| IoT Config | `mobile/iotConfig.js` |
-| Cloud Functions | `mobile/functions/index.js` |
-| Admin App Root | `admin/src/App.jsx` |
-| Admin Pages | `admin/src/pages/` |
-| CI Workflow | `.github/workflows/ci.yml` |
-| Seed Script | `mobile/scripts/seedMockData.js` |
-
----
-
-*Generated: 2026-09-29 — SmartWaste Pro full codebase analysis*
+## 19. Known limitations
+
+- Card payment is built but not deployed; the demo uses cash on delivery. Payment status is still written by the client (a real system would confirm it from a Stripe webhook).
+- The IoT Realtime Database rules are open until the hardware is verified, then they should be locked.
+- Weight unit (grams vs kg) and load-cell zeroing (tare) still need a check with a known weight.
+- Routing on the map is a straight line, not road routing.
+- One bin per seller; listings are whole compartments (no partial quantity).
+- No email verification, App Check or rate limiting.
+- Tests cover logic, rules and components; there are no end-to-end screen tests or Cloud Function tests.
+- Admin has no CSV/PDF export, and the Bin Status page shows only the default bin.
