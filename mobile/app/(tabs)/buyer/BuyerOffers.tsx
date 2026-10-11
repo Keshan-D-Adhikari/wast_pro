@@ -28,7 +28,6 @@ export default function BuyerOffers() {
   const authUser = useAuthUser();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
   // The orders created by accepted offers, by offer id (the buyer decides on these)
   const [offerOrders, setOfferOrders] = useState<Record<string, Order>>({});
   const [decidingId, setDecidingId] = useState<string | null>(null);
@@ -130,20 +129,6 @@ export default function BuyerOffers() {
     ]);
   };
 
-  const handleWithdraw = async (offer: Offer) => {
-    setWithdrawingId(offer.id);
-    try {
-      await updateDoc(doc(db, 'offers', offer.id), {
-        status: 'withdrawn',
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err) {
-      console.error('Withdraw error:', err);
-    } finally {
-      setWithdrawingId(null);
-    }
-  };
-
   const OfferCard = ({ offer }: { offer: Offer }) => {
     const accent = wasteAccent(offer.wasteType as any);
     const date = offer.createdAt?.toDate ? offer.createdAt.toDate().toLocaleDateString() : 'Just now';
@@ -207,13 +192,12 @@ export default function BuyerOffers() {
         })()}
 
         {offer.status === 'pending' && (
-          <Button
-            label="Withdraw offer"
-            variant="secondary"
-            style={styles.withdrawBtn}
-            loading={withdrawingId === offer.id}
-            onPress={() => handleWithdraw(offer)}
-          />
+          <View style={styles.waitingRow}>
+            <Ionicons name="time-outline" size={16} color={Palette.status.warning.base} />
+            <Text style={[Type.caption, { color: Palette.status.warning.base, fontWeight: '700', flex: 1 }]}>
+              Waiting for the seller to accept or reject.
+            </Text>
+          </View>
         )}
       </Card>
     );
@@ -266,7 +250,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     backgroundColor: Palette.status.success.tint,
   },
-  withdrawBtn: { marginTop: Space.lg },
+  waitingRow: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginTop: Space.md },
   decideRow: { flexDirection: 'row', gap: Space.md, marginTop: Space.lg },
   decideBtn: { flex: 1 },
 });

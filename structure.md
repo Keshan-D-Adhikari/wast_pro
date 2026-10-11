@@ -216,7 +216,7 @@ own bottom navigation (`BottomNav`).
 | `(tabs)/seller/SellerProfile.tsx`, `EditProfile.tsx` | Profile | Stats (earned, weight) and profile editor |
 | `(tabs)/buyer/BuyerDashboard.tsx` | Marketplace | Search, type filter, distance, route map, Buy Now (cash or card), Make an Offer, notification bell |
 | `(tabs)/buyer/BuyerOrders.tsx` | Buyer orders | Tabs, cancel, pay accepted-offer order by card, route map, star rating |
-| `(tabs)/buyer/BuyerOffers.tsx` | Buyer offers | Offers made, withdraw |
+| `(tabs)/buyer/BuyerOffers.tsx` | Buyer offers | Offers made; after the seller accepts, Buy or Decline |
 | `(tabs)/buyer/BuyerProfile.tsx`, `EditProfile.tsx` | Profile | Profile and editor |
 
 The two `EditProfile.tsx` files are 5-line wrappers around `components/profile-editor.tsx`.
@@ -368,7 +368,7 @@ Helper functions: `isSignedIn`, `isOwner`, `isAdmin`, `isOrderParty`, `isOfferPa
 | `users` | Read: owner or admin only (profiles are private). Create: owner, role must be seller or buyer, no `disabled`/`points`. Update: owner may change only `fullName`, `phone`, `location`, `photoURL`, `updatedAt` and a **valid** `binLocation`; admin may change only `disabled` and `binId` (checked with a regex). Delete: never. |
 | `marketplace` | Read: any signed-in user. Create: the seller, with a valid listing (known type, positive weight and price within limits, starts `available`). Update: the seller (valid edit), or a buyer **only** as part of buying (available → sold, in the same batch that creates their order) or cancelling (sold → available, in the same batch that cancels the order). Delete: seller or admin. |
 | `orders` | Read: buyer, seller or admin. Create: a buyer direct purchase that matches the real listing (seller, price, still available), or a seller creating the order while accepting an offer. Update: buyer cancels an unpaid order; buyer pays an accepted-offer order by card (payment fields only); seller moves status forward or marks a cash order paid; buyer rates a completed order once (1–5, `rating` only); admin changes `status` only. Delete: never. |
-| `offers` | Read: buyer, seller, admin. Buyer creates own pending offers and may withdraw; seller accepts or rejects offers on their listings. |
+| `offers` | Read: buyer, seller, admin. Buyer creates own offers (a pending offer cannot be withdrawn); seller accepts or rejects offers on their listings. |
 | `notifications` | Read, update, delete: the recipient (admin may read). Create: the recipient must exist, and the type decides who may send: `bin_full` only to yourself; order types only between the two parties of that order; `order_confirmed` / `order_completed` **only from the order's seller**; offer types only between the two parties of that offer. |
 | `bins` | Owner read/write; admin read. |
 
@@ -462,7 +462,7 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 |-------|------|-------|----------------|
 | Mobile unit | Jest + jest-expo | 57 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
 | Admin unit | Vitest | 21 | filters, telemetry parsing |
-| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 117 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
+| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 119 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
 Rules tests live in `mobile/tests/rules/` (`offers`, `users-and-orders`, `listings`, `validation`,
 `seller-orders`) and run through `run.mjs`. They need Java 21.

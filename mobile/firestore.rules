@@ -303,7 +303,8 @@ service cloud.firestore {
     }
 
     // offers/{offerId} - buyer-submitted price offers for marketplace listings.
-    // Buyers create their own offers and can withdraw (status→withdrawn) pending ones.
+    // Buyers create their own offers. A pending offer cannot be taken back: the seller answers it, and
+    // an accepted offer is then declined or bought through the order (see orders).
     // Sellers can read offers for their listings and accept/reject them.
     // Acceptance/rejection happens client-side; the transaction is trusted because
     // the seller must own the listing referenced by listingId.
@@ -323,15 +324,8 @@ service cloud.firestore {
         get(/databases/$(database)/documents/marketplace/$(request.resource.data.listingId)).data.sellerUid ==
           request.resource.data.sellerUid &&
         get(/databases/$(database)/documents/marketplace/$(request.resource.data.listingId)).data.status == 'available';
-      // Buyer may only withdraw their own pending offer.
       // Seller may accept/reject their own listing's offer.
       allow update: if isSignedIn() && (
-        (
-          resource.data.buyerUid == request.auth.uid &&
-          resource.data.status == 'pending' &&
-          request.resource.data.status == 'withdrawn' &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        ) ||
         (
           resource.data.sellerUid == request.auth.uid &&
           resource.data.status == 'pending' &&

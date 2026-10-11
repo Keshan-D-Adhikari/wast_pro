@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { setLogLevel, doc, setDoc, runTransaction, collection, addDoc } from 'firebase/firestore';
+import { setLogLevel, doc, setDoc, updateDoc, runTransaction, collection, addDoc } from 'firebase/firestore';
 
 // Expected permission-denied rejections are logged by the SDK; keep test output readable.
 setLogLevel('silent');
@@ -82,6 +82,12 @@ await check('buyer offer naming wrong seller rejected', () =>
 await seed();
 await check('buyer offer with non-number price rejected', () =>
   assertFails(addDoc(collection(buyer(), 'offers'), { listingId: 'L1', buyerUid: 'buyer1', sellerUid: 'seller1', offeredPrice: '90', status: 'pending' })));
+
+await seed();
+await check('buyer cannot withdraw a pending offer (only the seller answers it)', () =>
+  assertFails(updateDoc(doc(buyer(), 'offers/O1'), { status: 'withdrawn' })));
+await check('buyer cannot accept their own offer', () =>
+  assertFails(updateDoc(doc(buyer(), 'offers/O1'), { status: 'accepted' })));
 
 console.log(results.join('\n'));
 await env.cleanup();
