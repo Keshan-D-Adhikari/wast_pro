@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterUsers, filterListings, filterOrders, filterBins } from "./filters";
+import { filterUsers, filterListings, filterOrders, filterBins, groupListingsBySeller, filterSellers } from "./filters";
 
 describe("filterUsers", () => {
   const users = [
@@ -90,5 +90,31 @@ describe("filterBins", () => {
     expect(filterBins(items, summaries, { status: "on" }).map((b) => b.id)).toEqual(["bin001", "bin003"]);
     expect(filterBins(items, summaries, { status: "off" }).map((b) => b.id)).toEqual(["bin002"]);
     expect(filterBins(items, summaries, { status: "attention" }).map((b) => b.id)).toEqual(["bin002", "bin003"]);
+  });
+});
+
+describe("groupListingsBySeller", () => {
+  const listings = [
+    { id: "1", sellerUid: "s2", sellerName: "Nimal", status: "available", totalPrice: 100 },
+    { id: "2", sellerUid: "s1", sellerName: "Kamal", status: "sold", totalPrice: 7.2 },
+    { id: "3", sellerUid: "s2", sellerName: "Nimal", status: "sold", totalPrice: 50 },
+    { id: "4", sellerUid: "s2", sellerName: "Nimal", status: "available", totalPrice: 25.5 },
+  ];
+
+  it("groups by seller with counts and total value, sorted by name", () => {
+    const groups = groupListingsBySeller(listings);
+    expect(groups.map((g) => g.sellerName)).toEqual(["Kamal", "Nimal"]);
+    expect(groups[1]).toEqual({ sellerUid: "s2", sellerName: "Nimal", total: 3, available: 2, sold: 1, value: 175.5 });
+    expect(groups[0]).toMatchObject({ total: 1, available: 0, sold: 1, value: 7.2 });
+  });
+
+  it("copes with listings that have no seller", () => {
+    expect(groupListingsBySeller([{ id: "x", status: "available", totalPrice: 5 }])[0].sellerName).toBe("Unknown seller");
+  });
+
+  it("filters sellers by name", () => {
+    const groups = groupListingsBySeller(listings);
+    expect(filterSellers(groups, "nim").map((g) => g.sellerUid)).toEqual(["s2"]);
+    expect(filterSellers(groups, "").length).toBe(2);
   });
 });

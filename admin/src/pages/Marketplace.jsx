@@ -1,19 +1,36 @@
-import { useMemo, useState } from "react";
-import { deleteDoc, doc } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import { collection, deleteDoc, doc, limit, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
-import { filterListings } from "../lib/filters";
-import { usePaginatedCollection } from "../lib/usePaginatedCollection";
+import { filterListings, filterSellers, groupListingsBySeller } from "../lib/filters";
 import { IconSearch, IconMarketplace, IconTrash } from "../components/Icons";
 
-export default function Marketplace() {
-  const { docs: listings, loading, hasMore, loadMore } = usePaginatedCollection("marketplace");
-  const [search, setSearch] = useState("");
+// The sellers list is built from this many of the newest-written listings at most.
+const SELLER_SCAN_LIMIT = 500;
+
+const rs = (value) =>
+  `Rs. ${value != null ? Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}`;
+
+/** One seller's listings, with the type / status filters and Remove. */
+function SellerListings({ seller, onBack }) {
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
 
+  useEffect(() => {
+    return onSnapshot(
+      query(collection(db, "marketplace"), where("sellerUid", "==", seller.sellerUid)),
+      (snapshot) => {
+        setListings(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+  }, [seller.sellerUid]);
+
   const filtered = useMemo(
-    () => filterListings(listings, { search, status: statusFilter, wasteType: typeFilter }),
-    [listings, search, statusFilter, typeFilter]
+    () => filterListings(listings, { status: statusFilter, wasteType: typeFilter }),
+    [listings, statusFilter, typeFilter]
   );
 
   const handleRemove = async (id) => {
@@ -25,30 +42,19 @@ export default function Marketplace() {
     <section>
       <div className="page-header">
         <div>
-          <h1>Marketplace Listings</h1>
+          <button type="button" className="load-more-btn" style={{ margin: "0 0 0.75rem" }} onClick={onBack}>
+            ← All sellers
+          </button>
+          <h1>{seller.sellerName}</h1>
           <p className="subtitle">
-            Showing {filtered.length} of {listings.length} waste posts across sellers
+            Showing {filtered.length} of {listings.length} listings by this seller
           </p>
         </div>
       </div>
 
       <div className="toolbar">
-        <div className="search-input-wrapper">
-          <span className="search-icon"><IconSearch size={16} /></span>
-          <input
-            type="search"
-            placeholder="Search by seller name or location…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
         <div className="select-filter-wrapper">
-          <select
-            className="select-filter"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
+          <select className="select-filter" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="all">All Waste Types</option>
             <option value="plastic">Plastic</option>
             <option value="food">Food</option>
@@ -57,11 +63,7 @@ export default function Marketplace() {
         </div>
 
         <div className="select-filter-wrapper">
-          <select
-            className="select-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
+          <select className="select-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">All Statuses</option>
             <option value="available">Available only</option>
             <option value="sold">Sold only</option>
@@ -72,7 +74,7 @@ export default function Marketplace() {
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
-          <p>Loading marketplace listings…</p>
+          <p>Loading listings…</p>
         </div>
       )}
 
@@ -80,7 +82,7 @@ export default function Marketplace() {
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconMarketplace size={24} /></div>
           <h3>No listings found</h3>
-          <p>No marketplace post matches your current search criteria.</p>
+          <p>This seller has no listing that matches the filters.</p>
         </div>
       )}
 
@@ -93,7 +95,6 @@ export default function Marketplace() {
                   <th>Waste Type</th>
                   <th>Weight</th>
                   <th>Total Price</th>
-                  <th>Seller</th>
                   <th>Status</th>
                   <th style={{ textAlign: "right" }}>Actions</th>
                 </tr>
@@ -104,19 +105,12 @@ export default function Marketplace() {
                   return (
                     <tr key={item.id}>
                       <td>
-                        <span className={`badge waste-${typeCls}`}>
-                          {item.wasteType || "Waste"}
-                        </span>
+                        <span className={`badge waste-${typeCls}`}>{item.wasteType || "Waste"}</span>
                       </td>
                       <td style={{ fontWeight: 600 }}>{item.weightKg} kg</td>
-                      <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>
-                        Rs. {item.totalPrice != null ? item.totalPrice.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}
-                      </td>
-                      <td>{item.sellerName || "—"}</td>
+                      <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>{rs(item.totalPrice)}</td>
                       <td>
-                        <span className={`badge status-${item.status}`}>
-                          {item.status}
-                        </span>
+                        <span className={`badge status-${item.status}`}>{item.status}</span>
                       </td>
                       <td style={{ textAlign: "right" }}>
                         <button
@@ -137,11 +131,119 @@ export default function Marketplace() {
           </div>
         </div>
       )}
+    </section>
+  );
+}
 
-      {!loading && hasMore && (
-        <button type="button" className="load-more-btn" onClick={loadMore}>
-          Load more listings
-        </button>
+/** Marketplace listings grouped by seller; pick a seller to see and manage their listings. */
+export default function Marketplace() {
+  const [selected, setSelected] = useState(null);
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    return onSnapshot(
+      query(collection(db, "marketplace"), limit(SELLER_SCAN_LIMIT)),
+      (snapshot) => {
+        setListings(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+  }, []);
+
+  const sellers = useMemo(() => groupListingsBySeller(listings), [listings]);
+  const filtered = useMemo(() => filterSellers(sellers, search), [sellers, search]);
+
+  if (selected) {
+    // Keep showing the seller's latest name/counts while their listings change
+    const current = sellers.find((s) => s.sellerUid === selected.sellerUid) ?? selected;
+    return <SellerListings seller={current} onBack={() => setSelected(null)} />;
+  }
+
+  return (
+    <section>
+      <div className="page-header">
+        <div>
+          <h1>Marketplace Listings</h1>
+          <p className="subtitle">
+            {sellers.length} seller{sellers.length === 1 ? "" : "s"} with {listings.length} listing
+            {listings.length === 1 ? "" : "s"}. Select a seller to see their listings.
+          </p>
+        </div>
+      </div>
+
+      <div className="toolbar">
+        <div className="search-input-wrapper">
+          <span className="search-icon"><IconSearch size={16} /></span>
+          <input
+            type="search"
+            placeholder="Search by seller name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {loading && (
+        <div className="empty-state-box">
+          <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
+          <p>Loading marketplace listings…</p>
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="empty-state-box">
+          <div className="empty-state-icon"><IconMarketplace size={24} /></div>
+          <h3>{sellers.length === 0 ? "No listings yet" : "No sellers found"}</h3>
+          <p>{sellers.length === 0 ? "No seller has posted waste yet." : "No seller matches your search."}</p>
+        </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <div className="table-card">
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Seller</th>
+                  <th>Listings</th>
+                  <th>Available</th>
+                  <th>Sold</th>
+                  <th>Total value</th>
+                  <th style={{ textAlign: "right" }}>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s) => (
+                  <tr key={s.sellerUid} style={{ cursor: "pointer" }} onClick={() => setSelected(s)}>
+                    <td style={{ fontWeight: 600 }}>{s.sellerName}</td>
+                    <td>{s.total}</td>
+                    <td><span className="badge status-completed">{s.available}</span></td>
+                    <td><span className="badge status-pending">{s.sold}</span></td>
+                    <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>{rs(s.value)}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <button
+                        type="button"
+                        className="btn-sm-success"
+                        onClick={(e) => { e.stopPropagation(); setSelected(s); }}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!loading && listings.length >= SELLER_SCAN_LIMIT && (
+        <p className="subtitle" style={{ marginTop: "1rem" }}>
+          Showing sellers from the first {SELLER_SCAN_LIMIT} listings. Search for a seller to narrow down.
+        </p>
       )}
     </section>
   );

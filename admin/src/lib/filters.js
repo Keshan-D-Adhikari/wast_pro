@@ -52,3 +52,30 @@ export function filterBins(items, summaries, { search = "", status = "all" } = {
     return matchesStatus && matchesTerm;
   });
 }
+
+/** Listings grouped by seller: { sellerUid, sellerName, total, available, sold, value }, sorted by name. */
+export function groupListingsBySeller(listings) {
+  const groups = new Map();
+  for (const item of listings) {
+    const key = item.sellerUid || item.sellerName || "unknown";
+    const g = groups.get(key) ?? {
+      sellerUid: item.sellerUid || key,
+      sellerName: item.sellerName || "Unknown seller",
+      total: 0,
+      available: 0,
+      sold: 0,
+      value: 0,
+    };
+    g.total += 1;
+    if (item.status === "available") g.available += 1;
+    if (item.status === "sold") g.sold += 1;
+    g.value += Number(item.totalPrice) || 0;
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort((a, b) => a.sellerName.localeCompare(b.sellerName));
+}
+
+export function filterSellers(sellers, search = "") {
+  const term = search.trim().toLowerCase();
+  return sellers.filter((s) => !term || s.sellerName.toLowerCase().includes(term));
+}
