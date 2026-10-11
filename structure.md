@@ -136,6 +136,7 @@ wast-pro/
     │   ├── components/Icons.jsx
     │   └── App.css, index.css
     ├── public/logo.png
+    ├── firebase.json            Firebase Hosting config (deploys dist/ to https://wast-pro.web.app)
     ├── index.html, vite.config.js, vitest.config.js, eslint.config.js
     ├── package.json
     └── .env.example
@@ -321,7 +322,7 @@ Composite indexes (needed by the app's queries, all built):
 | `orders` | `buyerUid` ascending, `createdAt` descending |
 | `offers` | `buyerUid` ascending, `createdAt` descending |
 
-Deploy: `firebase deploy --only firestore:rules` (and `firestore:indexes`) from `mobile/`.
+Deploy: `firebase deploy --only firestore:rules` (and `firestore:indexes`) from `mobile/`. The admin site is hosted on Firebase Hosting (free plan) at https://wast-pro.web.app: `npm run build` then `firebase deploy --only hosting` from `admin/`.
 
 ---
 

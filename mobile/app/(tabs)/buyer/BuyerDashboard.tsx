@@ -531,6 +531,8 @@ export default function BuyerDashboard() {
             // Zoom so the buyer, the pickup point and the whole route are in view
             onMapReady={() => {
               if (!userLocation || !selectedItem) return;
+              // At (nearly) the same spot there is nothing to fit; fitting would zoom in until the map goes blank.
+              if (calculateDistance(userLocation.latitude, userLocation.longitude, selectedItem.location.latitude, selectedItem.location.longitude) < 0.1) return;
               mapRef.current?.fitToCoordinates(
                 [userLocation, selectedItem.location, ...(roadRoute?.points ?? [])],
                 { edgePadding: { top: 80, right: 60, bottom: 80, left: 60 }, animated: false }
@@ -539,8 +541,9 @@ export default function BuyerDashboard() {
             initialRegion={userLocation && selectedItem ? {
               latitude: (userLocation.latitude + selectedItem.location.latitude) / 2,
               longitude: (userLocation.longitude + selectedItem.location.longitude) / 2,
-              latitudeDelta: Math.abs(userLocation.latitude - selectedItem.location.latitude) * 2.5,
-              longitudeDelta: Math.abs(userLocation.longitude - selectedItem.location.longitude) * 2.5,
+              // never zoom closer than ~1 km across, even when the buyer is at the pickup point
+              latitudeDelta: Math.max(0.01, Math.abs(userLocation.latitude - selectedItem.location.latitude) * 2.5),
+              longitudeDelta: Math.max(0.01, Math.abs(userLocation.longitude - selectedItem.location.longitude) * 2.5),
             } : {
               latitude: selectedItem?.location?.latitude || 6.9271,
               longitude: selectedItem?.location?.longitude || 79.8612,
