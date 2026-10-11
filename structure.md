@@ -209,12 +209,12 @@ own bottom navigation (`BottomNav`).
 | `(tabs)/Welcome.tsx` | Welcome | "Get Started" goes to Login |
 | `(tabs)/Login.tsx` | Login | Email + password, role-based redirect, disabled-account check, **Forgot password** (sends a reset email) |
 | `(tabs)/CreateAccount.tsx` | Sign up | Creates the Auth user and `users/{uid}` profile (role seller or buyer) |
-| `(tabs)/seller/SellerDashboard.tsx` | Seller home | Live bin cards, Bin ON/OFF, donut chart, bin map, set-bin-location, notifications, issue report |
+| `(tabs)/seller/SellerDashboard.tsx` | Seller home | Live bin cards, Bin ON/OFF, donut chart, bin map with a company/place name search to set where the bin is (no GPS), notifications, issue report |
 | `(tabs)/seller/AddWaste.tsx` | List waste | Pick compartments, enter weight, priced per kg, creates marketplace listings |
 | `(tabs)/seller/SellerOrders.tsx` | Seller orders | Tabs Ongoing / Completed / Cancelled; Confirm, Decline, Mark completed; shows buyer rating |
 | `(tabs)/seller/SellerOffers.tsx` | Seller offers | Accept (creates an order in a transaction) or reject offers |
 | `(tabs)/seller/SellerProfile.tsx`, `EditProfile.tsx` | Profile | Stats (earned, weight) and profile editor |
-| `(tabs)/buyer/BuyerDashboard.tsx` | Marketplace | Smart bin location map (the buyer searches a company or place by name and picks the result; no GPS), search, type filter, distance, route map, Buy Now (cash or card), Make an Offer, notification bell |
+| `(tabs)/buyer/BuyerDashboard.tsx` | Marketplace | Search, type filter, distance, route map, Buy Now (cash or card), Make an Offer, notification bell |
 | `(tabs)/buyer/BuyerOrders.tsx` | Buyer orders | Tabs, cancel, pay accepted-offer order by card, route map, star rating |
 | `(tabs)/buyer/BuyerOffers.tsx` | Buyer offers | Offers made; after the seller accepts, Buy or Decline |
 | `(tabs)/buyer/BuyerProfile.tsx`, `EditProfile.tsx` | Profile | Profile and editor |
@@ -256,7 +256,7 @@ The two `EditProfile.tsx` files are 5-line wrappers around `components/profile-e
 | `utils/orderNotifications.ts` | Message and type of the notification a seller's action sends to the buyer |
 | `utils/passwordReset.ts` | Messages for the reset-email result (same message for unknown email, so accounts cannot be probed) |
 | `utils/donut.ts` | Donut slice geometry and `formatKg` (up to 3 decimals) |
-| `utils/placeSearch.ts` | Company / place name search (OpenStreetMap Nominatim, Sri Lanka only, no API key) used by the buyer to set where the smart bin is kept |
+| `utils/placeSearch.ts` | Company / place name search (OpenStreetMap Nominatim, Sri Lanka only, no API key) used by the seller to set where the smart bin is |
 | `utils/shortId.ts` | Short support IDs derived from the document id: `USR-7K3F9A` (user), `ORD-A1B2C3` (order); the bin keeps its own id such as `bin001`. Same rule in `admin/src/lib/shortId.js` |
 | `utils/money.ts` | `roundMoney` and `formatRs` (`Rs 120`, `Rs 7.20`) |
 | `types.ts` | Shared types: `UserProfile`, `MarketplaceItem`, `Order`, `Offer`, `AppNotification`, `BinData`, `BinCompartment`, `UserLocation`, `WasteType` |
@@ -329,7 +329,7 @@ Deploy: `firebase deploy --only firestore:rules` (and `firestore:indexes`) from 
 ### `users/{uid}`
 `fullName`, `email`, `role` (`seller` | `buyer` | `admin`), `phone`, `location` (text), `photoURL`,
 `points`, `createdAt`, `updatedAt`, `disabled` (admin only), `binId` (admin only, which bin the seller sees),
-`binLocation { latitude, longitude }` (a seller saves it from the dashboard; a buyer picks it by searching a place name), `binPlaceName` (the company or place the buyer picked).
+`binLocation { latitude, longitude }` (the seller picks it by searching a company or place name on the dashboard), `binPlaceName` (the name of the place they picked).
 
 ### `marketplace/{listingId}` — waste listings
 `sellerUid`, `sellerName`, `wasteType` (`plastic` | `food` | `metal`), `weightKg`, `pricePerKg`,
@@ -402,7 +402,7 @@ bins/bin001/
 - **Bin ON / OFF:** a bin is ON if `lastUpdated` is within the last 2 minutes. When OFF the app shows the last known readings and raises **no new alerts**.
 - **Auth:** the app signs in to the IoT project anonymously; this keeps working after the rules are tightened.
 - **Linking a seller to a bin:** an admin sets `users/{uid}.binId`; the seller app reads `binId || 'bin001'`.
-- **Bin location:** the firmware sends no GPS, so the seller taps "Set bin location" on the dashboard; the phone's position is saved as `binLocation`.
+- **Bin location:** the firmware sends no GPS, so the seller types a company or place name on the dashboard, taps Search and picks a result; it is saved as `binLocation` with its name in `binPlaceName`.
 - **Mock mode:** `EXPO_PUBLIC_USE_MOCK_IOT=true` (dev builds only) shows simulated data with Normal and Alert presets.
 
 ---

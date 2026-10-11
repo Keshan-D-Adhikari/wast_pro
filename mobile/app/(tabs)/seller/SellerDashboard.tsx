@@ -5,8 +5,8 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
+  Keyboard,
 } from "react-native";
-import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import MapView, { Marker, APP_MAP_PROVIDER } from "../../../components/platform-map";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +20,7 @@ import { iotDb, DEFAULT_BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DAT
 import { normalizeBin, describeFreshness } from "../../../utils/binTelemetry";
 import { formatKg } from "../../../utils/donut";
 import { notificationRoute } from "../../../utils/notificationRoute";
+import { searchPlaces, PlaceResult } from "../../../utils/placeSearch";
 import { ref as dbRef, onValue } from "firebase/database";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
@@ -27,6 +28,7 @@ import { binStatusColor, binStatusLabel, isBinFull } from "@/constants/bin-statu
 import { Screen } from "@/components/ui/screen";
 import { Card, SectionTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TextField } from "@/components/ui/text-field";
 import { Notice } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
@@ -81,6 +83,11 @@ export default function SellerDashboard() {
   // seller saves where the bin is on their profile with the button under the map.
   const binLocation = sellerData?.binLocation ?? null;
   const [savingLocation, setSavingLocation] = useState(false);
+  // Choosing where the bin is: the seller types a company or place, then picks a result (no GPS).
+  const [placeQuery, setPlaceQuery] = useState('');
+  const [placeResults, setPlaceResults] = useState<PlaceResult[] | null>(null); // null = not searched yet
+  const [placeSearching, setPlaceSearching] = useState(false);
+  const [placeError, setPlaceError] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
@@ -137,20 +144,36 @@ export default function SellerDashboard() {
     });
   }, [binId]);
 
-  // Save the phone's current position as the bin's location (the seller is standing at the bin).
-  const handleSetBinLocation = async () => {
+  const handlePlaceSearch = async () => {
+    Keyboard.dismiss();
+    if (placeQuery.trim().length < 3) {
+      setPlaceError('Type at least 3 letters of the company or place name.');
+      return;
+    }
+    setPlaceSearching(true);
+    setPlaceError('');
+    setPlaceResults(null);
+    try {
+      setPlaceResults(await searchPlaces(placeQuery));
+    } catch (error) {
+      console.warn('Place search failed:', error);
+      setPlaceError('Could not search right now. Check your internet connection and try again.');
+    } finally {
+      setPlaceSearching(false);
+    }
+  };
+
+  // The seller picked a result: save it as where the bin is.
+  const handleSelectPlace = async (place: PlaceResult) => {
     if (!user) return;
     setSavingLocation(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Location needed', 'Allow location access so we can place the bin on the map.');
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       await updateDoc(doc(db, "users", user.uid), {
-        binLocation: { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+        binLocation: { latitude: place.latitude, longitude: place.longitude },
+        binPlaceName: place.name.slice(0, 120),
       });
+      setPlaceResults(null);
+      setPlaceQuery('');
     } catch (error) {
       console.error("Could not save bin location:", error);
       Alert.alert('Error', 'Could not save the bin location. Please try again.');
@@ -381,7 +404,7 @@ export default function SellerDashboard() {
         </Card>
 
         {/* Map Section */}
-        <SectionTitle meta={binLocation ? (binData.location || 'Saved') : 'Not set'}>Smart bin location</SectionTitle>
+        <SectionTitle meta={binLocation ? (sellerData?.binPlaceName || binData.location || 'Saved') : 'Not set'}>Smart bin location</SectionTitle>
         <Card style={styles.mapCard} elevation={1}>
           <MapView
             key={binLocation ? `${binLocation.latitude},${binLocation.longitude}` : 'no-bin-location'}
@@ -399,14 +422,52 @@ export default function SellerDashboard() {
             )}
           </MapView>
         </Card>
+        <TextField
+          icon="business-outline"
+          placeholder="Company or place name (e.g. Horizon Campus, Malabe)"
+          value={placeQuery}
+          onChangeText={(t) => { setPlaceQuery(t); setPlaceError(''); }}
+          onSubmitEditing={handlePlaceSearch}
+          returnKeyType="search"
+          autoCapitalize="words"
+          error={placeError}
+          containerStyle={styles.placeInput}
+        />
         <Button
-          label={binLocation ? "Update bin location to where I am now" : "Set bin location to where I am now"}
-          icon="locate-outline"
+          label="Search location"
+          icon="search-outline"
           variant="secondary"
-          onPress={handleSetBinLocation}
-          loading={savingLocation}
+          onPress={handlePlaceSearch}
+          loading={placeSearching}
           style={styles.locationBtn}
         />
+
+        {placeResults !== null && placeResults.length === 0 && (
+          <Text style={[Type.small, styles.placeEmpty]}>
+            No place found for “{placeQuery.trim()}”. Try the company name with the town, or a nearby landmark.
+          </Text>
+        )}
+        {placeResults !== null && placeResults.length > 0 && (
+          <Card style={styles.placeList} elevation={1}>
+            <Text style={[Type.caption, styles.placeListTitle]}>Tap the right place to save it</Text>
+            {placeResults.map((place, index) => (
+              <TouchableOpacity
+                key={`${place.latitude},${place.longitude},${index}`}
+                style={styles.placeRow}
+                disabled={savingLocation}
+                onPress={() => handleSelectPlace(place)}
+                accessibilityRole="button"
+                accessibilityLabel={`Use ${place.name} as the bin location`}
+              >
+                <Ionicons name="location-outline" size={18} color={Palette.brand[600]} />
+                <View style={styles.placeText}>
+                  <Text style={Type.bodyStrong} numberOfLines={1}>{place.name}</Text>
+                  <Text style={Type.small} numberOfLines={2}>{place.address}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </Card>
+        )}
 
         {/* Report Button */}
         <Button
@@ -579,7 +640,13 @@ const styles = StyleSheet.create({
   binMoistureHigh: { color: Palette.status.warning.base, fontWeight: '700' },
 
   mapCard: { padding: 0, overflow: 'hidden', height: 170 },
-  locationBtn: { marginTop: Space.md },
+  locationBtn: { marginBottom: Space.lg },
+  placeInput: { marginTop: Space.md },
+  placeEmpty: { marginBottom: Space.lg, textAlign: 'center' },
+  placeList: { marginBottom: Space.lg },
+  placeListTitle: { marginBottom: Space.sm },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingVertical: Space.md },
+  placeText: { flex: 1 },
   map: { width: "100%", height: "100%" },
 
   reportBtn: { marginTop: Space['2xl'] },
