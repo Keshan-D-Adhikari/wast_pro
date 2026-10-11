@@ -281,7 +281,7 @@ Routes (`src/App.jsx`): a gate shows Login when signed out, "Not an admin" when 
 |-------|------|---------|
 | `/` | `Overview.jsx` | KPI cards: total users, sellers, buyers, available listings, total / pending-or-confirmed / completed orders, completed revenue (bounded read, capped at 500 orders) |
 | `/bins` | `BinStatus.jsx` | List of every bin in the IoT database (search, ON/OFF/needs-attention filter); selecting one opens its live readings, Bin ON/OFF and freshness |
-| `/users` | `Users.jsx` | Search and filter, enable/disable accounts, set which `binId` a seller sees (via a prompt) |
+| `/users` | `Users.jsx` | Search and filter, edit a user (name, phone, location, points), enable/disable accounts, set which `binId` a seller sees |
 | `/marketplace` | `Marketplace.jsx` | All listings with filters, delete a listing |
 | `/orders` | `Orders.jsx` | All orders with filters, change order status |
 
@@ -365,7 +365,7 @@ Helper functions: `isSignedIn`, `isOwner`, `isAdmin`, `isOrderParty`, `isOfferPa
 
 | Collection | Who may do what |
 |-----------|-----------------|
-| `users` | Read: owner or admin only (profiles are private). Create: owner, role must be seller or buyer, no `disabled`/`points`. Update: owner may change only `fullName`, `phone`, `location`, `photoURL`, `updatedAt` and a **valid** `binLocation`; admin may change only `disabled` and `binId` (checked with a regex). Delete: never. |
+| `users` | Read: owner or admin only (profiles are private). Create: owner, role must be seller or buyer, no `disabled`/`points`. Update: owner may change only `fullName`, `phone`, `location`, `photoURL`, `updatedAt` and a **valid** `binLocation`; admin may change only `disabled`, `binId` (regex), and `fullName`, `phone`, `location`, `points` (each range-checked); never `role` or `email`. Delete: never. |
 | `marketplace` | Read: any signed-in user. Create: the seller, with a valid listing (known type, positive weight and price within limits, starts `available`). Update: the seller (valid edit), or a buyer **only** as part of buying (available → sold, in the same batch that creates their order) or cancelling (sold → available, in the same batch that cancels the order). Delete: seller or admin. |
 | `orders` | Read: buyer, seller or admin. Create: a buyer direct purchase that matches the real listing (seller, price, still available), or a seller creating the order while accepting an offer. Update: buyer cancels an unpaid order; buyer pays an accepted-offer order by card (payment fields only); seller moves status forward or marks a cash order paid; buyer rates a completed order once (1–5, `rating` only); admin changes `status` only. Delete: never. |
 | `offers` | Read: buyer, seller, admin. Buyer creates own offers (a pending offer cannot be withdrawn); seller accepts or rejects offers on their listings. |
@@ -461,8 +461,8 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 | Suite | Tool | Count | What it covers |
 |-------|------|-------|----------------|
 | Mobile unit | Jest + jest-expo | 60 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
-| Admin unit | Vitest | 27 | filters, telemetry parsing |
-| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 119 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
+| Admin unit | Vitest | 30 | filters, telemetry parsing |
+| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 123 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
 Rules tests live in `mobile/tests/rules/` (`offers`, `users-and-orders`, `listings`, `validation`,
 `seller-orders`) and run through `run.mjs`. They need Java 21.

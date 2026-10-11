@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { deleteField, doc, updateDoc } from "firebase/firestore";
+import { deleteField, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { filterUsers } from "../lib/filters";
+import { validateUserEdit } from "../lib/userEdit";
 import { usePaginatedCollection } from "../lib/usePaginatedCollection";
 import { IconSearch, IconUsers } from "../components/Icons";
 
@@ -12,6 +13,11 @@ export default function Users() {
   const { docs: users, loading, hasMore, loadMore } = usePaginatedCollection("users");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [editing, setEditing] = useState(null); // the user being edited, or null
+  const [form, setForm] = useState({ fullName: "", phone: "", location: "", points: "" });
+  const [formErrors, setFormErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const filtered = useMemo(
     () => filterUsers(users, { search, role: roleFilter }),
@@ -24,6 +30,38 @@ export default function Users() {
       return;
     await updateDoc(doc(db, "users", u.id), { disabled: !u.disabled });
   };
+
+  const openEdit = (u) => {
+    setEditing(u);
+    setForm({
+      fullName: u.fullName ?? "",
+      phone: u.phone ?? "",
+      location: u.location ?? "",
+      points: u.points != null ? String(u.points) : "0",
+    });
+    setFormErrors({});
+    setSaveError("");
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    const result = validateUserEdit(form);
+    setFormErrors(result.errors);
+    if (!result.ok) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      await updateDoc(doc(db, "users", editing.id), { ...result.data, updatedAt: serverTimestamp() });
+      setEditing(null);
+    } catch (err) {
+      console.error("Could not update user:", err);
+      setSaveError("Could not save the changes. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   // Link a seller to a smart bin (a key under bins/ in the IoT database). Empty = use the default bin.
   const assignBin = async (u) => {
@@ -142,6 +180,9 @@ export default function Users() {
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
+                      <button type="button" className="btn-sm-success" style={{ marginRight: "0.4rem" }} onClick={() => openEdit(u)}>
+                        Edit
+                      </button>
                       {u.role !== "admin" && (
                         <button
                           type="button"
@@ -164,6 +205,51 @@ export default function Users() {
         <button type="button" className="load-more-btn" onClick={loadMore}>
           Load more accounts
         </button>
+      )}
+
+      {editing && (
+        <div className="modal-overlay" onClick={() => !saving && setEditing(null)}>
+          <form className="modal-card" onClick={(e) => e.stopPropagation()} onSubmit={saveEdit} noValidate>
+            <h2 style={{ margin: "0 0 0.25rem" }}>Edit user</h2>
+            <p className="subtitle" style={{ margin: "0 0 1.25rem" }}>
+              {editing.email} · <span className={`badge role-${editing.role}`}>{editing.role}</span>
+            </p>
+
+            {[
+              ["fullName", "Full name", "text"],
+              ["phone", "Phone number", "tel"],
+              ["location", "Location", "text"],
+              ["points", "Reward points", "text"],
+            ].map(([key, label, type]) => (
+              <div className="form-group" key={key}>
+                <label className="form-label" htmlFor={`edit-${key}`}>{label}</label>
+                <input
+                  id={`edit-${key}`}
+                  className="input-field plain"
+                  type={type}
+                  inputMode={key === "points" ? "numeric" : undefined}
+                  value={form[key]}
+                  onChange={setField(key)}
+                />
+                {formErrors[key] && <p className="field-error">{formErrors[key]}</p>}
+              </div>
+            ))}
+
+            <p className="subtitle" style={{ margin: "0 0 1rem", fontSize: "0.8rem" }}>
+              The email and role cannot be changed here.
+            </p>
+            {saveError && <p className="field-error">{saveError}</p>}
+
+            <div className="modal-actions">
+              <button type="button" className="load-more-btn" style={{ margin: 0 }} disabled={saving} onClick={() => setEditing(null)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-sm-success" style={{ padding: "0.6rem 1.25rem" }} disabled={saving}>
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </section>
   );

@@ -48,6 +48,22 @@ await t('admin can disable a user', () => assertSucceeds(updateDoc(doc(as('admin
 await t('admin can assign a seller a smart bin', () => assertSucceeds(updateDoc(doc(as('admin1'), 'users/seller1'), { binId: 'bin001' })));
 await t('admin cannot assign a malformed bin id', () => assertFails(updateDoc(doc(as('admin1'), 'users/seller1'), { binId: '../secrets' })));
 await t('admin cannot assign a non-text bin id', () => assertFails(updateDoc(doc(as('admin1'), 'users/seller1'), { binId: 123 })));
+const adminEdit = (data) => updateDoc(doc(as('admin1'), 'users/seller1'), data);
+await t("admin can correct a user's name, phone, location and points", () =>
+  assertSucceeds(adminEdit({ fullName: 'New Name', phone: '0771234567', location: 'Colombo', points: 50, updatedAt: new Date() })));
+await t('admin cannot change a role or email', async () => {
+  await assertFails(adminEdit({ role: 'admin' }));
+  await assertFails(adminEdit({ email: 'other@x.com' }));
+});
+await t('admin edits must be sane: empty name, long phone, negative or fractional points are rejected', async () => {
+  await assertFails(adminEdit({ fullName: '' }));
+  await assertFails(adminEdit({ phone: '1'.repeat(30) }));
+  await assertFails(adminEdit({ points: -5 }));
+  await assertFails(adminEdit({ points: 1.5 }));
+  await assertFails(adminEdit({ points: '10' }));
+});
+await t('a normal user cannot use the admin edit on someone else', () =>
+  assertFails(updateDoc(doc(as('buyer1'), 'users/seller1'), { points: 999 })));
 await t('a seller cannot assign themselves a bin', () => assertFails(updateDoc(doc(as('seller1'), 'users/seller1'), { binId: 'bin002' })));
 await t('a buyer cannot assign someone a bin', () => assertFails(updateDoc(doc(as('buyer1'), 'users/seller1'), { binId: 'bin002' })));
 await t('seller saves where their bin is (valid coordinates)', () => assertSucceeds(updateDoc(doc(as('seller1'), 'users/seller1'), { binLocation: { latitude: 6.9271, longitude: 79.8612 } })));

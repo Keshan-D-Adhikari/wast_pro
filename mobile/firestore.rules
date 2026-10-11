@@ -65,12 +65,23 @@ service cloud.firestore {
           request.resource.data.binLocation.longitude >= -180 && request.resource.data.binLocation.longitude <= 180);
     }
 
+    // What an admin may correct on someone's profile: name, phone, location and points, each a sane
+    // value. Role and email are never editable here.
+    function isValidAdminProfileEdit() {
+      let d = request.resource.data;
+      let changed = d.diff(resource.data).affectedKeys();
+      return (!changed.hasAny(['fullName']) || (d.fullName is string && d.fullName.size() >= 1 && d.fullName.size() <= 80)) &&
+        (!changed.hasAny(['phone']) || (d.phone is string && d.phone.size() <= 20)) &&
+        (!changed.hasAny(['location']) || (d.location is string && d.location.size() <= 80)) &&
+        (!changed.hasAny(['points']) || (d.points is int && d.points >= 0 && d.points <= 1000000));
+    }
+
     // users/{uid} - profile doc, keyed by the account's own auth uid.
     // Private: only the owner and admins can read it (it holds email/phone/address). Buyer and
     // seller names shown to each other come from the names copied onto listings, offers and orders.
     // Sign-up may only create a seller or buyer profile (an admin is made by hand in the console),
     // and the owner can only edit their own contact details, never role, points, `disabled` or `binId` (they may set `binLocation`, where their bin is)
-    // (an admin assigns which smart bin a seller sees).
+    // (an admin assigns which smart bin a seller sees and may correct their name, phone, location and points).
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid) &&
@@ -83,7 +94,9 @@ service cloud.firestore {
             .hasOnly(['fullName', 'phone', 'location', 'photoURL', 'updatedAt', 'binLocation']) &&
           isValidBinLocation()) ||
         (isAdmin() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled', 'binId']) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['disabled', 'binId', 'fullName', 'phone', 'location', 'points', 'updatedAt']) &&
+          isValidAdminProfileEdit() &&
           (!('binId' in request.resource.data) ||
             (request.resource.data.binId is string && request.resource.data.binId.matches('^[A-Za-z0-9_-]{1,32}$'))));
       allow delete: if false;

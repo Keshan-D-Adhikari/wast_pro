@@ -263,13 +263,13 @@ Put a `serviceAccountKey.json` in `mobile/scripts/` (never commit it), then `nod
 | Project | Command | What runs |
 |---------|---------|-----------|
 | `mobile/` | `npm test` | 60 Jest unit tests (donut chart maths, distance, status colours, bin status and telemetry parsing, order actions, colour contrast, password field) |
-| `admin/` | `npm test` | 27 Vitest unit tests (table filters, bin telemetry parsing) |
-| `mobile/` | `npm run test:rules` | 119 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
+| `admin/` | `npm test` | 30 Vitest unit tests (table filters, bin telemetry parsing) |
+| `mobile/` | `npm run test:rules` | 123 Firestore security-rule tests on the Firebase Emulator (needs Java 21+) |
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
 - **admin:** lint, test, build
 - **mobile:** lint, test
-- **firestore-rules:** the 119 security-rule tests on the Firebase Emulator
+- **firestore-rules:** the 123 security-rule tests on the Firebase Emulator
 
 The rule tests (`mobile/tests/rules/`) cover user privacy and sign-up, offer acceptance, order updates, listing validation, and buying/cancelling listings, including attempts to tamper with prices, double-buy a listing, post a malformed listing or promote yourself to admin. Automated coverage of the screens, the payment flow and the Cloud Functions is still limited.
 
