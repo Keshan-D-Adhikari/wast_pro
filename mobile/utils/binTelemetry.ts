@@ -20,7 +20,7 @@ export const STALE_AFTER_MS = 2 * 60 * 1000;
 
 const TYPES: WasteType[] = ['plastic', 'food', 'metal'];
 
-type RawCompartment = { level?: unknown; weight?: unknown } | undefined | null;
+type RawCompartment = { level?: unknown; weight?: unknown; overweight?: unknown } | undefined | null;
 
 export function parseLevel(raw: unknown): { level: number; status: string } {
   if (typeof raw === 'number' && Number.isFinite(raw)) return fromPercent(raw);
@@ -51,10 +51,15 @@ export function parseWeightKg(raw: unknown): number {
   return Math.round((n / WEIGHT_UNIT_DIVISOR) * 1000) / 1000;
 }
 
+/** The firmware's `overweight` flag: true means the compartment is over its weight limit, false is normal. */
+export function parseOverweight(raw: unknown): boolean {
+  return raw === true || (typeof raw === 'string' && raw.trim().toLowerCase() === 'true');
+}
+
 function normalizeCompartment(raw: RawCompartment): BinCompartment {
-  if (!raw) return { level: 0, weight: 0 };
+  if (!raw) return { level: 0, weight: 0, overweight: false };
   const { level, status } = parseLevel(raw.level);
-  return { level, status, weight: parseWeightKg(raw.weight) };
+  return { level, status, weight: parseWeightKg(raw.weight), overweight: parseOverweight(raw.overweight) };
 }
 
 /** Raw `bins/<id>` value from the firmware -> BinData. Returns null when there is no data. */

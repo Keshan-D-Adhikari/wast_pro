@@ -1,5 +1,5 @@
 import {
-  normalizeBin, parseLevel, parseWeightKg, toEpochMs, describeFreshness, formatAge, STALE_AFTER_MS,
+  normalizeBin, parseOverweight, parseLevel, parseWeightKg, toEpochMs, describeFreshness, formatAge, STALE_AFTER_MS,
 } from './binTelemetry';
 
 describe('parseLevel', () => {
@@ -45,16 +45,16 @@ describe('normalizeBin', () => {
       location: 'Horizon Campus',
       owner: 'user001',
     });
-    expect(bin?.plastic).toEqual({ level: 100, status: 'FULL', weight: 3.4 });
-    expect(bin?.food).toEqual({ level: 50, status: 'HALF', weight: 1.8 });
-    expect(bin?.metal).toEqual({ level: 0, status: 'EMPTY', weight: 0.012 });
+    expect(bin?.plastic).toEqual({ level: 100, status: 'FULL', weight: 3.4, overweight: false });
+    expect(bin?.food).toEqual({ level: 50, status: 'HALF', weight: 1.8, overweight: false });
+    expect(bin?.metal).toEqual({ level: 0, status: 'EMPTY', weight: 0.012, overweight: false });
     expect(bin?.lastUpdated).toBe(1790695315669);
     expect(bin?.location).toBe('Horizon Campus');
   });
   it('flags a failed sensor as ERROR and keeps the rest', () => {
     const bin = normalizeBin({ compartments: { plastic: { level: 'ERROR', weight: -0.03 }, food: { level: 'EMPTY', weight: 0 } } });
     expect(bin?.plastic.status).toBe('ERROR');
-    expect(bin?.metal).toEqual({ level: 0, weight: 0 }); // missing compartment
+    expect(bin?.metal).toEqual({ level: 0, weight: 0, overweight: false }); // missing compartment
   });
   it('returns null for no data', () => {
     expect(normalizeBin(null)).toBeNull();
@@ -81,5 +81,22 @@ describe('toEpochMs / freshness', () => {
     expect(formatAge(5 * 60_000)).toBe('5 min ago');
     expect(formatAge(3 * 3_600_000)).toBe('3 h ago');
     expect(formatAge(11 * 86_400_000)).toBe('11 days ago');
+  });
+});
+
+describe('overweight flag', () => {
+  it('is true only when the firmware says true', () => {
+    expect(parseOverweight(true)).toBe(true);
+    expect(parseOverweight('true')).toBe(true);
+    expect(parseOverweight(false)).toBe(false);
+    expect(parseOverweight(undefined)).toBe(false);
+    expect(parseOverweight(1)).toBe(false);
+  });
+
+  it('is carried through normalizeBin per compartment', () => {
+    const bin = normalizeBin({ compartments: { plastic: { level: '50%', weight: 9000, overweight: true }, food: { level: 'EMPTY', weight: 0, overweight: false } } });
+    expect(bin?.plastic.overweight).toBe(true);
+    expect(bin?.food.overweight).toBe(false);
+    expect(bin?.metal.overweight).toBe(false);
   });
 });

@@ -58,10 +58,15 @@ export function toEpochMs(raw) {
   return null;
 }
 
+/** The firmware's `overweight` flag: true means the compartment is over its weight limit, false is normal. */
+export function parseOverweight(raw) {
+  return raw === true || (typeof raw === "string" && raw.trim().toLowerCase() === "true");
+}
+
 function normalizeCompartment(raw) {
-  if (!raw) return { level: 0, weight: 0 };
+  if (!raw) return { level: 0, weight: 0, overweight: false };
   const { level, status } = parseLevel(raw.level);
-  return { level, status, weight: parseWeightKg(raw.weight) };
+  return { level, status, weight: parseWeightKg(raw.weight), overweight: parseOverweight(raw.overweight) };
 }
 
 /** Raw `bins/<id>` value from the firmware -> { plastic, food, metal, lastUpdated, location }, or null. */

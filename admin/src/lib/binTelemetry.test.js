@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeBin, parseLevel, parseWeightKg, toEpochMs, describeFreshness, formatAge, STALE_AFTER_MS } from "./binTelemetry";
+import { normalizeBin, parseOverweight, parseLevel, parseWeightKg, toEpochMs, describeFreshness, formatAge, STALE_AFTER_MS } from "./binTelemetry";
 
 describe("parseLevel", () => {
   it("maps the firmware level words and percentages", () => {
@@ -34,7 +34,7 @@ describe("normalizeBin", () => {
       location: "Horizon Campus",
       owner: "user001",
     });
-    expect(bin.plastic).toEqual({ level: 100, status: "FULL", weight: 3.4 });
+    expect(bin.plastic).toEqual({ level: 100, status: "FULL", weight: 3.4, overweight: false });
     expect(bin.food.status).toBe("ERROR");
     expect(bin.lastUpdated).toBe(1790695315669);
     expect(bin.location).toBe("Horizon Campus");
@@ -59,5 +59,20 @@ describe("freshness", () => {
   it("formats ages", () => {
     expect(formatAge(30_000)).toBe("30s ago");
     expect(formatAge(11 * 86_400_000)).toBe("11 days ago");
+  });
+});
+
+describe("overweight flag", () => {
+  it("is true only when the firmware says true", () => {
+    expect(parseOverweight(true)).toBe(true);
+    expect(parseOverweight("true")).toBe(true);
+    expect(parseOverweight(false)).toBe(false);
+    expect(parseOverweight(undefined)).toBe(false);
+  });
+
+  it("is carried through normalizeBin per compartment", () => {
+    const bin = normalizeBin({ compartments: { plastic: { level: "50%", weight: 9000, overweight: true }, food: { level: "EMPTY", weight: 0, overweight: false } } });
+    expect(bin.plastic.overweight).toBe(true);
+    expect(bin.food.overweight).toBe(false);
   });
 });

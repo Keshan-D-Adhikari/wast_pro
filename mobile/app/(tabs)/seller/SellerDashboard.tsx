@@ -198,6 +198,8 @@ export default function SellerDashboard() {
     }
   };
 
+  const overweightLabels = COMPARTMENTS.filter((c) => binData[c.type]?.overweight).map((c) => c.label);
+
   const handleReportSubmit = () => {
     if (issueDescription.trim() === "") {
       Alert.alert("Error", "Please enter the issue details.");
@@ -385,6 +387,15 @@ export default function SellerDashboard() {
           <Notice
             icon="cloud-offline-outline"
             text="The smart bin hasn't sent data recently, so these are the last known readings and no new alerts are raised."
+          />
+        )}
+
+        {/* The firmware sets `overweight` to true when a compartment is over its weight limit */}
+        {freshness.live && overweightLabels.length > 0 && (
+          <Notice
+            icon="warning"
+            tone="danger"
+            text={`Overweight: ${overweightLabels.join(', ')} ${overweightLabels.length > 1 ? 'are' : 'is'} over the weight limit. Please empty ${overweightLabels.length > 1 ? 'them' : 'it'}.`}
           />
         )}
 
