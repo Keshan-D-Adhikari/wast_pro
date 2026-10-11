@@ -24,13 +24,6 @@ export default function Users() {
     [users, search, roleFilter]
   );
 
-  const toggleDisabled = async (u) => {
-    const action = u.disabled ? "re-enable" : "disable";
-    if (!confirm(`${action === "disable" ? "Disable" : "Re-enable"} ${u.fullName || u.email}?`))
-      return;
-    await updateDoc(doc(db, "users", u.id), { disabled: !u.disabled });
-  };
-
   const openEdit = (u) => {
     setEditing(u);
     setForm({
@@ -183,15 +176,6 @@ export default function Users() {
                       <button type="button" className="btn-sm-success" style={{ marginRight: "0.4rem" }} onClick={() => openEdit(u)}>
                         Edit
                       </button>
-                      {u.role !== "admin" && (
-                        <button
-                          type="button"
-                          className={u.disabled ? "btn-sm-success" : "btn-sm-danger"}
-                          onClick={() => toggleDisabled(u)}
-                        >
-                          {u.disabled ? "Re-enable" : "Disable"}
-                        </button>
-                      )}
                     </td>
                   </tr>
                 ))}

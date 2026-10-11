@@ -281,7 +281,7 @@ Routes (`src/App.jsx`): a gate shows Login when signed out, "Not an admin" when 
 |-------|------|---------|
 | `/` | `Overview.jsx` | KPI cards: total users, sellers, buyers, available listings, total / pending-or-confirmed / completed orders, completed revenue (bounded read, capped at 500 orders) |
 | `/bins` | `BinStatus.jsx` | List of every bin in the IoT database (search, ON/OFF/needs-attention filter); selecting one opens its live readings, Bin ON/OFF and freshness |
-| `/users` | `Users.jsx` | Search and filter, edit a user (name, phone, location, points), enable/disable accounts, set which `binId` a seller sees |
+| `/users` | `Users.jsx` | Search and filter, edit a user (name, phone, location, points), set which `binId` a seller sees |
 | `/marketplace` | `Marketplace.jsx` | All listings with filters, delete a listing |
 | `/orders` | `Orders.jsx` | All orders with filters, change order status |
 
