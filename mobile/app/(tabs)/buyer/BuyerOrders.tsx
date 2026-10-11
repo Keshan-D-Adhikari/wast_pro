@@ -124,7 +124,6 @@ export default function BuyerOrders() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersList = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Order))
-        .filter(order => order.status !== 'cancelled')
         .sort((a, b) => {
           const timeA = a.createdAt?.seconds || 0;
           const timeB = b.createdAt?.seconds || 0;
@@ -256,7 +255,7 @@ export default function BuyerOrders() {
     }
   };
 
-  const totalSpent = orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+  const totalSpent = orders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
   const handleRate = async (order: Order, rating: number) => {
     try {

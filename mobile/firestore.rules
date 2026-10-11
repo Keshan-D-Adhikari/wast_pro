@@ -40,7 +40,10 @@ service cloud.firestore {
         after.buyerUid == order.buyerUid &&
         after.listingId == order.listingId &&
         order.totalPrice == after.offeredPrice &&
-        order.paymentStatus == 'pending';
+        order.paymentStatus == 'pending' &&
+        // the order waits for the buyer to choose whether to buy at the accepted price
+        order.status == 'pending' &&
+        order.awaitingBuyer == true;
     }
 
     // True if `order` is a plain purchase of an available listing at the listing's own seller and price.
@@ -191,6 +194,7 @@ service cloud.firestore {
       );
       // Updates are limited to specific transitions, and never touch price, parties or listing:
       //  - buyer cancels their own unpaid, not-yet-completed order
+      //  - buyer chooses to buy at the accepted offer price (awaitingBuyer -> confirmed), or cancels
       //  - buyer pays an accepted-offer order by card (payment fields only)
       //  - seller moves the order status forward, or marks a cash order paid when collected
       //  - buyer rates a completed order once (rating only)
@@ -213,8 +217,20 @@ service cloud.firestore {
             .hasOnly(['paymentMethod', 'paymentStatus', 'paymentLast4'])
         ) ||
         (
+          // buyer chooses to buy at the price the seller accepted: the order is confirmed
+          resource.data.buyerUid == request.auth.uid &&
+          'offerId' in resource.data &&
+          resource.data.get('awaitingBuyer', false) == true &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'confirmed' &&
+          request.resource.data.awaitingBuyer == false &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'awaitingBuyer'])
+        ) ||
+        (
           resource.data.sellerUid == request.auth.uid &&
           resource.data.status != 'cancelled' &&
+          // while the buyer is still deciding the seller can only cancel, not move the order forward
+          (resource.data.get('awaitingBuyer', false) == false || request.resource.data.status == 'cancelled') &&
           request.resource.data.status in ['confirmed', 'completed', 'cancelled'] &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
         ) ||

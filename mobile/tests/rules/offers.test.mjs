@@ -27,7 +27,7 @@ async function seed() {
 
 const baseOrder = {
   listingId: 'L1', buyerUid: 'buyer1', sellerUid: 'seller1', totalPrice: 80,
-  paymentMethod: 'cash', paymentStatus: 'pending', status: 'confirmed', offerId: 'O1',
+  paymentMethod: 'cash', paymentStatus: 'pending', status: 'pending', awaitingBuyer: true, offerId: 'O1',
 };
 
 function accept(db, order) {

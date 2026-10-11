@@ -88,6 +88,8 @@ export interface Order {
   cancelledAt: Timestamp | null;
   /** Set when the order was created by a seller accepting this buyer offer. */
   offerId?: string;
+  /** True from the moment a seller accepts an offer until the buyer chooses to buy or decline. */
+  awaitingBuyer?: boolean;
   /** 1-5 stars the buyer gave after the order was completed. */
   rating?: number;
 }

@@ -1,10 +1,13 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection, query, where, onSnapshot, orderBy, updateDoc, doc, getDoc, addDoc, writeBatch, deleteField, serverTimestamp,
+} from 'firebase/firestore';
 import { db } from '../../../firebaseConfig';
 import { useAuthUser } from '../../../hooks/useAuthUser';
-import { Offer } from '../../../types';
+import { Offer, Order } from '../../../types';
+import { formatRs } from '../../../utils/money';
 
 import { Palette, Space, Radius, Type, wasteAccent } from '@/constants/design';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
@@ -26,6 +29,9 @@ export default function BuyerOffers() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  // The orders created by accepted offers, by offer id (the buyer decides on these)
+  const [offerOrders, setOfferOrders] = useState<Record<string, Order>>({});
+  const [decidingId, setDecidingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authUser) return;
@@ -46,6 +52,78 @@ export default function BuyerOffers() {
 
     return () => unsubscribe();
   }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    const q = query(collection(db, 'orders'), where('buyerUid', '==', authUser.uid));
+    return onSnapshot(q, (snapshot) => {
+      const byOffer: Record<string, Order> = {};
+      snapshot.docs.forEach((d) => {
+        const o = { id: d.id, ...d.data() } as Order;
+        if (o.offerId) byOffer[o.offerId] = o;
+      });
+      setOfferOrders(byOffer);
+    }, (err) => console.error('Offer orders error:', err));
+  }, [authUser]);
+
+  // The seller accepted: the buyer chooses to buy at the accepted price.
+  const handleBuy = async (offer: Offer, order: Order) => {
+    setDecidingId(offer.id);
+    try {
+      await updateDoc(doc(db, 'orders', order.id), { status: 'confirmed', awaitingBuyer: false });
+      await addDoc(collection(db, 'notifications'), {
+        toUid: order.sellerUid,
+        type: 'order_placed',
+        message: `${order.buyerName || 'The buyer'} will buy your ${order.wasteType} waste at ${formatRs(order.totalPrice)}.`,
+        read: false,
+        createdAt: serverTimestamp(),
+        orderId: order.id,
+      });
+      Alert.alert('Order confirmed', `You will buy this at ${formatRs(order.totalPrice)}. Pay in My Purchases, by card or cash on delivery.`);
+    } catch (err) {
+      console.error('Buy error:', err);
+      Alert.alert('Error', 'Could not confirm the purchase. Please try again.');
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
+  // ...or declines: the order is cancelled and the listing goes back on the marketplace.
+  const handleDecline = (offer: Offer, order: Order) => {
+    Alert.alert('Decline this offer?', 'The listing goes back on the marketplace and you will not buy it at this price.', [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setDecidingId(offer.id);
+          try {
+            const listingRef = doc(db, 'marketplace', order.listingId);
+            const listingSnap = await getDoc(listingRef);
+            const batch = writeBatch(db);
+            batch.update(doc(db, 'orders', order.id), { status: 'cancelled', cancelledAt: serverTimestamp() });
+            if (listingSnap.exists() && listingSnap.data().soldOrderId === order.id) {
+              batch.update(listingRef, { status: 'available', soldOrderId: deleteField() });
+            }
+            await batch.commit();
+            await addDoc(collection(db, 'notifications'), {
+              toUid: order.sellerUid,
+              type: 'order_cancelled',
+              message: `${order.buyerName || 'The buyer'} declined to buy your ${order.wasteType} waste at ${formatRs(order.totalPrice)}.`,
+              read: false,
+              createdAt: serverTimestamp(),
+              orderId: order.id,
+            });
+          } catch (err) {
+            console.error('Decline error:', err);
+            Alert.alert('Error', 'Could not decline. Please try again.');
+          } finally {
+            setDecidingId(null);
+          }
+        },
+      },
+    ]);
+  };
 
   const handleWithdraw = async (offer: Offer) => {
     setWithdrawingId(offer.id);
@@ -85,14 +163,43 @@ export default function BuyerOffers() {
         <DetailRow label="Your offer" value={`Rs ${offer.offeredPrice}`} emphasis />
         <DetailRow label="Date" value={date} />
 
-        {offer.status === 'accepted' && (
-          <View style={styles.acceptedBanner}>
-            <Ionicons name="checkmark-circle" size={16} color={Palette.status.success.base} />
-            <Text style={[Type.caption, { color: Palette.status.success.base, fontWeight: '700' }]}>
-              Offer accepted! Check My Purchases for the order.
-            </Text>
-          </View>
-        )}
+        {offer.status === 'accepted' && (() => {
+          const order = offerOrders[offer.id];
+          const waiting = !!order && order.status === 'pending' && order.awaitingBuyer === true;
+          const declined = !!order && order.status === 'cancelled';
+          const tone = declined ? Palette.status.danger.base : Palette.status.success.base;
+          return (
+            <>
+              <View style={styles.acceptedBanner}>
+                <Ionicons name={declined ? 'close-circle' : 'checkmark-circle'} size={16} color={tone} />
+                <Text style={[Type.caption, { color: tone, fontWeight: '700', flex: 1 }]}>
+                  {declined
+                    ? 'You did not buy this offer.'
+                    : waiting
+                      ? `Accepted! Buy it at ${formatRs(offer.offeredPrice)}, or decline.`
+                      : 'Offer accepted. Check My Purchases for the order.'}
+                </Text>
+              </View>
+              {waiting && (
+                <View style={styles.decideRow}>
+                  <Button
+                    label="Decline"
+                    variant="danger"
+                    style={styles.decideBtn}
+                    disabled={decidingId === offer.id}
+                    onPress={() => handleDecline(offer, order)}
+                  />
+                  <Button
+                    label={`Buy at ${formatRs(offer.offeredPrice)}`}
+                    style={styles.decideBtn}
+                    loading={decidingId === offer.id}
+                    onPress={() => handleBuy(offer, order)}
+                  />
+                </View>
+              )}
+            </>
+          );
+        })()}
 
         {offer.status === 'pending' && (
           <Button
@@ -155,4 +262,6 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.status.success.tint,
   },
   withdrawBtn: { marginTop: Space.lg },
+  decideRow: { flexDirection: 'row', gap: Space.md, marginTop: Space.lg },
+  decideBtn: { flex: 1 },
 });

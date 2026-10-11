@@ -4,6 +4,9 @@ describe('sellerActionsFor', () => {
   it('lets a seller confirm or decline a pending order', () => {
     expect(sellerActionsFor({ status: 'pending' })).toEqual(['confirm', 'decline']);
   });
+  it('lets a seller only decline an accepted offer while the buyer is still deciding', () => {
+    expect(sellerActionsFor({ status: 'pending', awaitingBuyer: true })).toEqual(['decline']);
+  });
   it('lets a seller complete a confirmed order', () => {
     expect(sellerActionsFor({ status: 'confirmed' })).toEqual(['complete']);
   });

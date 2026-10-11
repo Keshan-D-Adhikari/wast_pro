@@ -83,7 +83,7 @@ await t('seller accepts offer (listing sold with soldOrderId)', () => {
     await tx.get(doc(db, 'marketplace/L1')); await tx.get(doc(db, 'offers/OF1'));
     tx.update(doc(db, 'offers/OF1'), { status: 'accepted' });
     tx.update(doc(db, 'marketplace/L1'), { status: 'sold', soldOrderId: 'ORD9' });
-    tx.set(doc(db, 'orders/ORD9'), { ...order('buyer1', { totalPrice: 80, status: 'confirmed', offerId: 'OF1' }) });
+    tx.set(doc(db, 'orders/ORD9'), { ...order('buyer1', { totalPrice: 80, status: 'pending', awaitingBuyer: true, offerId: 'OF1' }) });
   }));
 });
 await t('buyer then cancels that offer order and restores the listing', () => {

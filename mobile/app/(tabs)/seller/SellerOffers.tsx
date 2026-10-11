@@ -68,7 +68,7 @@ export default function SellerOffers() {
   const handleAccept = (offer: Offer) => {
     Alert.alert(
       'Accept offer?',
-      `Accept Rs ${offer.offeredPrice} from ${offer.buyerName} for ${offer.wasteType} waste?\n\nThis will create a confirmed order at the offered price and reject all other pending offers for this listing.`,
+      `Accept Rs ${offer.offeredPrice} from ${offer.buyerName} for ${offer.wasteType} waste?\n\nThe listing is held for this buyer, who then chooses whether to buy at this price. All other pending offers for this listing are rejected.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -104,10 +104,11 @@ export default function SellerOffers() {
                   wasteType: offer.wasteType,
                   weightKg: offer.weightKg,
                   totalPrice: offer.offeredPrice,
-                  paymentMethod: 'cash',          // buyer will choose payment after acceptance
+                  paymentMethod: 'cash',          // buyer chooses payment after buying
                   paymentStatus: 'pending',
                   paymentLast4: null,
-                  status: 'confirmed',
+                  status: 'pending',
+                  awaitingBuyer: true,         // the buyer now chooses to buy at this price or decline
                   location: listing.location,
                   createdAt: serverTimestamp() as any,
                   cancelledAt: null,
@@ -154,13 +155,13 @@ export default function SellerOffers() {
               await addDoc(collection(db, 'notifications'), {
                 toUid: offer.buyerUid,
                 type: 'offer_accepted',
-                message: `Your offer of Rs ${offer.offeredPrice} for ${offer.wasteType} waste has been accepted! An order has been created.`,
+                message: `Your offer of Rs ${offer.offeredPrice} for ${offer.wasteType} waste has been accepted! Open My Offers to buy it at that price or decline.`,
                 read: false,
                 createdAt: serverTimestamp(),
                 offerId: offer.id,
               });
 
-              Alert.alert('Offer accepted', `Order created for Rs ${offer.offeredPrice}. Buyer has been notified.`);
+              Alert.alert('Offer accepted', `The buyer has been told and can now buy at Rs ${offer.offeredPrice} or decline.`);
             } catch (err: unknown) {
               Alert.alert('Error', err instanceof Error ? err.message : 'Could not accept offer. Please try again.');
             } finally {

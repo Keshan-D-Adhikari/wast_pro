@@ -67,6 +67,29 @@ await t('a cancelled order cannot be revived by the seller', async () => {
   await assertFails(updateDoc(doc(as('seller1'), 'orders/O1'), { status: 'confirmed' }));
 });
 
+// Accepted offer: the buyer decides ---------------------------------------------
+const waiting = (o = {}) => order({ offerId: 'OF1', status: 'pending', awaitingBuyer: true, ...o });
+await seed(waiting());
+await t('buyer chooses to buy at the accepted price (awaitingBuyer -> confirmed)', () =>
+  assertSucceeds(updateDoc(doc(as('buyer1'), 'orders/O1'), { status: 'confirmed', awaitingBuyer: false })));
+await seed(waiting());
+await t('buyer cannot change the price while confirming', () =>
+  assertFails(updateDoc(doc(as('buyer1'), 'orders/O1'), { status: 'confirmed', awaitingBuyer: false, totalPrice: 1 })));
+await t('buyer cannot jump straight to completed', () =>
+  assertFails(updateDoc(doc(as('buyer1'), 'orders/O1'), { status: 'completed', awaitingBuyer: false })));
+await t('buyer can decline instead (cancel the waiting order)', () =>
+  assertSucceeds(updateDoc(doc(as('buyer1'), 'orders/O1'), { status: 'cancelled', cancelledAt: new Date() })));
+await seed(waiting());
+await t('seller cannot confirm or complete while the buyer is deciding', async () => {
+  await assertFails(updateDoc(doc(as('seller1'), 'orders/O1'), { status: 'confirmed' }));
+  await assertFails(updateDoc(doc(as('seller1'), 'orders/O1'), { status: 'completed' }));
+});
+await t('seller can still cancel a waiting order', () =>
+  assertSucceeds(updateDoc(doc(as('seller1'), 'orders/O1'), { status: 'cancelled', cancelledAt: new Date() })));
+await seed(order({ offerId: 'OF1', status: 'confirmed' }));
+await t('buyer cannot use the confirm step on an order that is not waiting', () =>
+  assertFails(updateDoc(doc(as('buyer1'), 'orders/O1'), { status: 'confirmed', awaitingBuyer: false })));
+
 console.log(res.join('\n'));
 // Ratings --------------------------------------------------------------------
 await seed(order({ status: 'completed' }));
