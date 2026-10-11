@@ -15,12 +15,13 @@ import { useState, useEffect } from "react";
 // Firebase Imports
 import { db } from "../../../firebaseConfig";
 import { useAuthUser } from "../../../hooks/useAuthUser";
-import { doc, onSnapshot, collection, query, where, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, where, updateDoc, getDocs, writeBatch } from "firebase/firestore";
 import { iotDb, DEFAULT_BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../../../iotConfig";
 import { normalizeBin, describeFreshness } from "../../../utils/binTelemetry";
 import { formatKg } from "../../../utils/donut";
 import { notificationRoute } from "../../../utils/notificationRoute";
 import { searchPlaces, PlaceResult } from "../../../utils/placeSearch";
+import { calculateDistance } from "../../../utils/distance";
 import { ref as dbRef, onValue } from "firebase/database";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
@@ -193,6 +194,31 @@ export default function SellerDashboard() {
       setSavingLocation(false);
     }
   };
+
+  // A listing stores the place it is collected from, so listings made before the bin location was set or
+  // changed would send buyers to the old spot. Keep the seller's available listings at the bin's location.
+  const binLat = binLocation?.latitude;
+  const binLng = binLocation?.longitude;
+  useEffect(() => {
+    if (!user || binLat === undefined || binLng === undefined) return;
+    (async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "marketplace"), where("sellerUid", "==", user.uid), where("status", "==", "available"))
+        );
+        const stale = snap.docs.filter((d) => {
+          const loc = d.data().location;
+          return !loc || calculateDistance(loc.latitude, loc.longitude, binLat, binLng) > 0.02; // more than ~20 m off
+        });
+        if (stale.length === 0) return;
+        const batch = writeBatch(db);
+        stale.forEach((d) => batch.update(d.ref, { location: { latitude: binLat, longitude: binLng } }));
+        await batch.commit();
+      } catch (error) {
+        console.warn("Could not update listing locations:", error);
+      }
+    })();
+  }, [user, binLat, binLng]);
 
   const overweightLabels = COMPARTMENTS.filter((c) => binData[c.type]?.overweight).map((c) => c.label);
 

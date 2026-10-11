@@ -257,6 +257,7 @@ The two `EditProfile.tsx` files are 5-line wrappers around `components/profile-e
 | `utils/passwordReset.ts` | Messages for the reset-email result (same message for unknown email, so accounts cannot be probed) |
 | `utils/donut.ts` | Donut slice geometry and `formatKg` (up to 3 decimals) |
 | `utils/placeSearch.ts` | Type-ahead company / place suggestions (Photon on OpenStreetMap data, Sri Lanka only, no API key) used by the seller to set where the smart bin is |
+| `utils/route.ts` | Road route between the buyer and the pickup point (OSRM public service, no API key); the buyer's route map falls back to a straight line if it is unreachable |
 | `utils/shortId.ts` | Short support IDs derived from the document id: `USR-7K3F9A` (user), `ORD-A1B2C3` (order); the bin keeps its own id such as `bin001`. Same rule in `admin/src/lib/shortId.js` |
 | `utils/money.ts` | `roundMoney` and `formatRs` (`Rs 120`, `Rs 7.20`) |
 | `types.ts` | Shared types: `UserProfile`, `MarketplaceItem`, `Order`, `Offer`, `AppNotification`, `BinData`, `BinCompartment`, `UserLocation`, `WasteType` |
@@ -462,7 +463,7 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 
 | Suite | Tool | Count | What it covers |
 |-------|------|-------|----------------|
-| Mobile unit | Jest + jest-expo | 71 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
+| Mobile unit | Jest + jest-expo | 74 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
 | Admin unit | Vitest | 41 | filters, telemetry parsing |
 | Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 127 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
@@ -535,7 +536,7 @@ fast-forwarded to `development` and `main` once checked. CI runs on all three.
 - Card payment is built but not deployed; the demo uses cash on delivery. Payment status is still written by the client (a real system would confirm it from a Stripe webhook).
 - The IoT Realtime Database rules are open until the hardware is verified, then they should be locked.
 - Weight unit (grams vs kg) and load-cell zeroing (tare) still need a check with a known weight.
-- Routing on the map is a straight line, not road routing.
+- The pickup route uses the free OSRM public service (road route with a straight-line fallback), which is for light use only; no live traffic.
 - One bin per seller; listings are whole compartments (no partial quantity).
 - No email verification, App Check or rate limiting.
 - Tests cover logic, rules and components; there are no end-to-end screen tests or Cloud Function tests.

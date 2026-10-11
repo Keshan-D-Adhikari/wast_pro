@@ -31,6 +31,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, APP_MAP_PROVIDER, Callout } from "../../../components/platform-map";
 import { MarketplaceItem, UserLocation, Offer } from "../../../types";
 import { calculateDistance } from "../../../utils/distance";
+import { fetchRoadRoute, RoadRoute } from "../../../utils/route";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
@@ -69,6 +70,7 @@ export default function BuyerDashboard() {
   const [paymentMethod, setPaymentMethod] = useState<string>('');
 
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
+  const [roadRoute, setRoadRoute] = useState<RoadRoute | null>(null); // null = straight line only
   // `any` here is deliberate: MapView's ref type differs between the native
   // (react-native-maps) and web (placeholder) halves of platform-map, and this
   // ref is only ever passed straight through to <MapView ref={mapRef} />.
@@ -369,8 +371,14 @@ export default function BuyerDashboard() {
         item.location.latitude, item.location.longitude
       );
       setRouteDistance(dist.toFixed(1));
+      setRoadRoute(null);
 
       setMapModalVisible(true);
+
+      // Ask for the road route in the background; the straight line shows until it arrives.
+      fetchRoadRoute(buyer, item.location)
+        .then((route) => setRoadRoute(route))
+        .catch((err) => console.warn('Road route unavailable:', err));
     } catch (error) {
       console.warn('Map error:', error);
       Alert.alert('Error', 'Could not open map');
@@ -496,13 +504,18 @@ export default function BuyerDashboard() {
             <View style={styles.flex}>
               <Text style={Type.h2}>Pickup route</Text>
               <Text style={[Type.small, styles.mapModalMeta]}>
-                {routeDistance ? `${routeDistance} km · straight line` : 'Calculating…'}
+                {roadRoute
+                  ? `${roadRoute.distanceKm.toFixed(1)} km · about ${Math.max(1, Math.round(roadRoute.durationMin))} min by road`
+                  : routeDistance
+                    ? `${routeDistance} km · straight line`
+                    : 'Calculating…'}
               </Text>
             </View>
             <TouchableOpacity
               onPress={() => {
                 setMapModalVisible(false);
                 setRouteDistance(null);
+                setRoadRoute(null);
               }}
               style={styles.closeMapBtn}
               hitSlop={8}
@@ -515,6 +528,14 @@ export default function BuyerDashboard() {
             ref={mapRef}
             provider={APP_MAP_PROVIDER}
             style={styles.flex}
+            // Zoom so the buyer, the pickup point and the whole route are in view
+            onMapReady={() => {
+              if (!userLocation || !selectedItem) return;
+              mapRef.current?.fitToCoordinates(
+                [userLocation, selectedItem.location, ...(roadRoute?.points ?? [])],
+                { edgePadding: { top: 80, right: 60, bottom: 80, left: 60 }, animated: false }
+              );
+            }}
             initialRegion={userLocation && selectedItem ? {
               latitude: (userLocation.latitude + selectedItem.location.latitude) / 2,
               longitude: (userLocation.longitude + selectedItem.location.longitude) / 2,
@@ -560,16 +581,20 @@ export default function BuyerDashboard() {
                   </Callout>
                 </Marker>
 
-                {/* Straight Line Route */}
-                <Polyline
-                  coordinates={[
-                    { latitude: userLocation.latitude, longitude: userLocation.longitude },
-                    { latitude: selectedItem.location.latitude, longitude: selectedItem.location.longitude }
-                  ]}
-                  strokeColor="#4285F4"
-                  strokeWidth={4}
-                  lineDashPattern={[10, 5]}
-                />
+                {/* Road route when we have it, otherwise a straight dashed line */}
+                {roadRoute ? (
+                  <Polyline coordinates={roadRoute.points} strokeColor="#4285F4" strokeWidth={5} />
+                ) : (
+                  <Polyline
+                    coordinates={[
+                      { latitude: userLocation.latitude, longitude: userLocation.longitude },
+                      { latitude: selectedItem.location.latitude, longitude: selectedItem.location.longitude }
+                    ]}
+                    strokeColor="#4285F4"
+                    strokeWidth={4}
+                    lineDashPattern={[10, 5]}
+                  />
+                )}
               </>
             )}
           </MapView>
