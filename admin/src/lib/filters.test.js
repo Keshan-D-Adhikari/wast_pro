@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterUsers, filterListings, filterOrders, filterBins, groupListingsBySeller, filterSellers, groupOrdersByUser, filterPeople } from "./filters";
+import { filterUsers, filterListings, filterOrders, filterBins, groupListingsBySeller, filterSellers, groupOrdersByUser, filterPeople, orderUsersAdminsFirst } from "./filters";
 
 describe("filterUsers", () => {
   const users = [
@@ -141,5 +141,22 @@ describe("groupOrdersByUser", () => {
     const people = groupOrdersByUser(orders);
     expect(filterPeople(people, "nim").map((p) => p.uid)).toEqual(["s1"]);
     expect(filterPeople(people, "").length).toBe(3);
+  });
+});
+
+describe("orderUsersAdminsFirst", () => {
+  const users = [
+    { id: "3", fullName: "Zed", role: "buyer" },
+    { id: "1", fullName: "Amal", role: "seller" },
+    { id: "2", fullName: "Boss", role: "admin" },
+  ];
+
+  it("puts admins first, then the rest by name", () => {
+    expect(orderUsersAdminsFirst(users).map((u) => u.id)).toEqual(["2", "1", "3"]);
+  });
+
+  it("adds admin accounts that are not in the loaded page, without duplicating", () => {
+    const result = orderUsersAdminsFirst(users, [{ id: "2", fullName: "Boss", role: "admin" }, { id: "9", fullName: "Late", role: "admin" }]);
+    expect(result.map((u) => u.id)).toEqual(["2", "9", "1", "3"]);
   });
 });

@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
-import { deleteField, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import { collection, deleteField, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
-import { filterUsers } from "../lib/filters";
+import { filterUsers, orderUsersAdminsFirst } from "../lib/filters";
 import { validateUserEdit } from "../lib/userEdit";
 import { usePaginatedCollection } from "../lib/usePaginatedCollection";
 import { IconSearch, IconUsers } from "../components/Icons";
@@ -10,7 +10,17 @@ import { IconSearch, IconUsers } from "../components/Icons";
 const DEFAULT_BIN = "bin001";
 
 export default function Users() {
-  const { docs: users, loading, hasMore, loadMore } = usePaginatedCollection("users");
+  const { docs: pagedUsers, loading, hasMore, loadMore } = usePaginatedCollection("users");
+  // Admin accounts are fetched on their own so they always show at the top, even before "Load more".
+  const [admins, setAdmins] = useState([]);
+  useEffect(() => {
+    return onSnapshot(
+      query(collection(db, "users"), where("role", "==", "admin")),
+      (snapshot) => setAdmins(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      () => {}
+    );
+  }, []);
+  const users = useMemo(() => orderUsersAdminsFirst(pagedUsers, admins), [pagedUsers, admins]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [editing, setEditing] = useState(null); // the user being edited, or null

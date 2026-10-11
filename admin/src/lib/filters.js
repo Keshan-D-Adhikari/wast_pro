@@ -112,3 +112,14 @@ export function filterPeople(people, search = "") {
   const term = search.trim().toLowerCase();
   return people.filter((p) => !term || p.name.toLowerCase().includes(term));
 }
+
+/** Merges the paginated users with the admin accounts and puts admins first, then everyone else by name. */
+export function orderUsersAdminsFirst(users, admins = []) {
+  const byId = new Map(users.map((u) => [u.id, u]));
+  for (const a of admins) byId.set(a.id, a);
+  return [...byId.values()].sort((a, b) => {
+    const rank = (u) => (u.role === "admin" ? 0 : 1);
+    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    return (a.fullName || a.email || "").localeCompare(b.fullName || b.email || "");
+  });
+}
