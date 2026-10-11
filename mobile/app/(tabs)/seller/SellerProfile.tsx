@@ -1,3 +1,4 @@
+import { formatRs } from '../../../utils/money';
 import { View, Text, StyleSheet, Image, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -89,7 +90,7 @@ export default function SellerProfile() {
 
   const earnedLabel = stats.totalEarned >= 1000
     ? 'Rs ' + (stats.totalEarned / 1000).toFixed(1) + 'K'
-    : 'Rs ' + stats.totalEarned;
+    : formatRs(stats.totalEarned);
 
   return (
     <View style={styles.root}>

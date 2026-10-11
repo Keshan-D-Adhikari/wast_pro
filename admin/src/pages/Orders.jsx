@@ -110,7 +110,7 @@ export default function Orders() {
                       </td>
                       <td style={{ fontWeight: 600 }}>{o.weightKg} kg</td>
                       <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>
-                        Rs. {o.totalPrice != null ? o.totalPrice.toLocaleString() : "0"}
+                        Rs. {o.totalPrice != null ? o.totalPrice.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}
                       </td>
                       <td style={{ fontWeight: 500 }}>{o.buyerName || "—"}</td>
                       <td style={{ color: "var(--ink-700)" }}>{o.sellerName || "—"}</td>

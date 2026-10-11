@@ -110,7 +110,7 @@ export default function Marketplace() {
                       </td>
                       <td style={{ fontWeight: 600 }}>{item.weightKg} kg</td>
                       <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>
-                        Rs. {item.totalPrice != null ? item.totalPrice.toLocaleString() : "0"}
+                        Rs. {item.totalPrice != null ? item.totalPrice.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}
                       </td>
                       <td>{item.sellerName || "—"}</td>
                       <td>

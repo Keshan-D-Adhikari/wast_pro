@@ -79,7 +79,7 @@ export default function Overview() {
     { label: "Total orders placed", value: d.totalOrders, icon: <IconOrders size={22} />, category: "orders" },
     { label: "Pending / confirmed orders", value: d.pendingOrders, icon: <IconOrders size={22} />, category: "orders" },
     { label: "Completed orders", value: d.completedOrders, icon: <IconOrders size={22} />, category: "orders" },
-    { label: "Completed revenue", value: `Rs. ${d.revenue.toLocaleString()}`, icon: <IconLeaf size={22} />, category: "revenue" },
+    { label: "Completed revenue", value: `Rs. ${d.revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: <IconLeaf size={22} />, category: "revenue" },
   ];
 
   return (

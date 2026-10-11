@@ -42,6 +42,7 @@ import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { StarRating } from "@/components/ui/star-rating";
+import { formatRs } from "../../../utils/money";
 import { OrderTabs } from "@/components/ui/order-tabs";
 import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
 
@@ -100,7 +101,7 @@ export default function BuyerOrders() {
         paymentStatus: 'paid',
         paymentLast4: verification.last4 ?? null,
       });
-      Alert.alert('Payment successful', `Rs ${order.totalPrice} paid.`);
+      Alert.alert('Payment successful', `${formatRs(order.totalPrice)} paid.`);
     } catch (error: unknown) {
       Alert.alert('Payment failed', error instanceof Error ? error.message : 'Please try again.');
     } finally {
@@ -285,7 +286,7 @@ export default function BuyerOrders() {
 
         <DetailRow label="Seller" value={order.sellerName || '—'} />
         <DetailRow label="Weight" value={`${order.weightKg} kg`} />
-        <DetailRow label="Amount" value={`Rs ${order.totalPrice}`} emphasis />
+        <DetailRow label="Amount" value={formatRs(order.totalPrice)} emphasis />
 
         <View style={styles.badgeRow}>
           {order.paymentMethod === 'cash' ? (
@@ -366,7 +367,7 @@ export default function BuyerOrders() {
             <View style={styles.summaryRule} />
             <View style={styles.summaryItem}>
               <Text style={Type.caption}>TOTAL VALUE</Text>
-              <Text style={styles.summaryValue}>Rs {totalSpent.toFixed(0)}</Text>
+              <Text style={styles.summaryValue}>{formatRs(totalSpent)}</Text>
             </View>
           </Card>
         )}
@@ -402,7 +403,7 @@ export default function BuyerOrders() {
             <View style={styles.flex}>
               <Text style={Type.h2}>Pickup location</Text>
               <Text style={Type.small}>
-                {selectedOrder?.wasteType} waste · Rs {selectedOrder?.totalPrice}
+                {selectedOrder?.wasteType} waste · {formatRs(selectedOrder?.totalPrice)}
               </Text>
               {!!routeDistance && (
                 <Text style={styles.routeInfo}>{routeDistance} km · straight line</Text>

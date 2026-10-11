@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/badge';
 import { TextField } from '@/components/ui/text-field';
 import { BottomNav } from '@/components/ui/bottom-nav';
+import { formatRs, roundMoney } from '../../../utils/money';
 import { BinCompartment, BinData, UserLocation, WasteType } from '../../../types';
 
 interface WasteTypeConfig {
@@ -144,7 +145,7 @@ export default function AddWaste() {
       ...prev,
       [type]: {
         weight: cleaned,
-        total: isNaN(total) ? 0 : total,
+        total: isNaN(total) ? 0 : roundMoney(total),
         selected: cleaned.length > 0
       }
     }));
@@ -287,7 +288,7 @@ export default function AddWaste() {
                 </View>
                 {item.selected && (
                   <View style={[styles.wastePrice, { backgroundColor: accent.base }]}>
-                    <Text style={styles.wastePriceText}>Rs {item.total.toFixed(0)}</Text>
+                    <Text style={styles.wastePriceText}>{formatRs(item.total)}</Text>
                   </View>
                 )}
               </View>
@@ -333,12 +334,12 @@ export default function AddWaste() {
                   <DetailRow
                     key={type}
                     label={`${priceConfig[type].label} · ${item.weight} kg × Rs ${priceConfig[type].pricePerKg}`}
-                    value={`Rs ${item.total.toFixed(0)}`}
+                    value={formatRs(item.total)}
                   />
                 ) : null
               )}
               <Divider />
-              <DetailRow label="Grand total" value={`Rs ${grandTotal.toFixed(0)}`} emphasis />
+              <DetailRow label="Grand total" value={formatRs(grandTotal)} emphasis />
             </Card>
           </>
         )}

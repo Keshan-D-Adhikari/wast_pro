@@ -16,6 +16,7 @@ import { Badge, statusTone, statusLabel } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { StarRating } from "@/components/ui/star-rating";
+import { formatRs } from "../../../utils/money";
 import { OrderTabs } from "@/components/ui/order-tabs";
 import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
 import { Order } from "../../../types";
@@ -98,7 +99,7 @@ export default function SellerOrders() {
     Alert.alert(
       'Mark as completed?',
       collectsCash
-        ? `Confirm you have received Rs ${order.totalPrice} in cash and handed over the ${order.wasteType} waste.`
+        ? `Confirm you have received ${formatRs(order.totalPrice)} in cash and handed over the ${order.wasteType} waste.`
         : `Confirm the ${order.wasteType} waste has been handed over.`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -171,7 +172,7 @@ export default function SellerOrders() {
         <DetailRow label="Buyer" value={order.buyerName || '—'} />
         <DetailRow label="Weight" value={`${order.weightKg} kg`} />
         <DetailRow label="Date" value={date} />
-        <DetailRow label="Total" value={`Rs ${order.totalPrice}`} emphasis />
+        <DetailRow label="Total" value={formatRs(order.totalPrice)} emphasis />
 
         <View style={styles.paymentRow}>
           <Badge
@@ -252,7 +253,7 @@ export default function SellerOrders() {
             <View style={styles.summaryRule} />
             <View style={styles.summaryItem}>
               <Text style={Type.caption}>EARNED (COMPLETED)</Text>
-              <Text style={styles.summaryValue}>Rs {totalEarned.toFixed(0)}</Text>
+              <Text style={styles.summaryValue}>{formatRs(totalEarned)}</Text>
             </View>
           </Card>
         )}

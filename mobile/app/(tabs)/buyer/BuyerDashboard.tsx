@@ -40,6 +40,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { TextField } from "@/components/ui/text-field";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { formatRs } from "../../../utils/money";
 import { Sheet } from "@/components/ui/sheet";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { ChipGroup } from "@/components/ui/chip";
@@ -182,7 +183,7 @@ export default function BuyerDashboard() {
       await addDoc(collection(db, 'notifications'), {
         toUid: offerItem.sellerUid,
         type: 'offer_received',
-        message: `${buyerName} made an offer of Rs ${parsed} for your ${offerItem.wasteType} waste (asking Rs ${offerItem.totalPrice}).`,
+        message: `${buyerName} made an offer of Rs ${parsed} for your ${offerItem.wasteType} waste (asking ${formatRs(offerItem.totalPrice)}).`,
         read: false,
         createdAt: serverTimestamp(),
         offerId: offerRef.id,
@@ -253,8 +254,8 @@ export default function BuyerDashboard() {
       }
 
       const notificationMsg = buyerName + ' placed an order for your '
-        + buyingItem.wasteType + ' waste - Rs '
-        + buyingItem.totalPrice
+        + buyingItem.wasteType + ' waste - '
+        + formatRs(buyingItem.totalPrice)
         + (method === 'card' ? ' (PAID)' : ' (Cash on Delivery)');
 
       // orderId lets Firestore rules verify the sender/recipient are
@@ -275,11 +276,11 @@ export default function BuyerDashboard() {
       if (method === 'card') {
         Alert.alert(
           "Payment Successful!",
-          'Rs ' + orderData.totalPrice + ' charged to card' +
+          formatRs(orderData.totalPrice) + ' charged to card' +
             (orderData.paymentLast4 ? ' ending in ' + orderData.paymentLast4 : '') + '.'
         );
       } else {
-        Alert.alert("Order Placed!", 'Pay Rs ' + orderData.totalPrice + ' in cash when seller delivers.');
+        Alert.alert("Order Placed!", 'Pay ' + formatRs(orderData.totalPrice) + ' in cash when seller delivers.');
       }
 
       router.push("/(tabs)/buyer/BuyerOrders");
@@ -395,7 +396,7 @@ export default function BuyerDashboard() {
             <Text style={Type.caption} numberOfLines={1}>{item.sellerName}</Text>
           </View>
           <View style={[styles.priceRibbon, { backgroundColor: accent.base }]}>
-            <Text style={styles.priceRibbonText}>Rs {item.totalPrice || 0}</Text>
+            <Text style={styles.priceRibbonText}>{formatRs(item.totalPrice)}</Text>
           </View>
         </View>
 
@@ -553,7 +554,7 @@ export default function BuyerDashboard() {
                       <Text style={Type.smallStrong}>{selectedItem.sellerName}</Text>
                       <Text style={Type.caption}>{selectedItem.wasteType} waste</Text>
                       <Text style={Type.caption}>
-                        {selectedItem.weightKg} kg · Rs {selectedItem.totalPrice}
+                        {selectedItem.weightKg} kg · {formatRs(selectedItem.totalPrice)}
                       </Text>
                     </View>
                   </Callout>
@@ -575,7 +576,7 @@ export default function BuyerDashboard() {
 
           <View style={styles.mapFooter}>
             <Button
-              label={`Buy Now · Rs ${selectedItem?.totalPrice ?? 0}`}
+              label={`Buy Now · ${formatRs(selectedItem?.totalPrice)}`}
               icon="cart-outline"
               onPress={() => {
                 setMapModalVisible(false);
@@ -606,7 +607,7 @@ export default function BuyerDashboard() {
           <DetailRow label="Weight" value={`${buyingItem?.weightKg ?? 0} kg`} />
           <DetailRow label="Seller" value={buyingItem?.sellerName ?? '—'} />
           <Divider />
-          <DetailRow label="Total" value={`Rs ${buyingItem?.totalPrice ?? 0}`} emphasis />
+          <DetailRow label="Total" value={formatRs(buyingItem?.totalPrice)} emphasis />
         </Card>
 
         <Text style={[Type.caption, styles.paymentLabel]}>PAYMENT METHOD</Text>
@@ -673,7 +674,7 @@ export default function BuyerDashboard() {
           <DetailRow label="Weight" value={`${offerItem?.weightKg ?? 0} kg`} />
           <DetailRow label="Seller" value={offerItem?.sellerName ?? '—'} />
           <Divider />
-          <DetailRow label="Asking price" value={`Rs ${offerItem?.totalPrice ?? 0}`} emphasis />
+          <DetailRow label="Asking price" value={formatRs(offerItem?.totalPrice)} emphasis />
         </Card>
 
         <TextField
