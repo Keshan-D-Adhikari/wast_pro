@@ -50,6 +50,8 @@ export default function SellerOffers() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() } as Offer))
+        // Offers a buyer withdrew earlier are not shown any more
+        .filter(o => o.status !== 'withdrawn')
         // Sort: pending first, then by offeredPrice descending so the highest offer is at the top
         .sort((a, b) => {
           if (a.status === 'pending' && b.status !== 'pending') return -1;
