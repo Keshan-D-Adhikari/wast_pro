@@ -14,6 +14,7 @@ import { LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { IdBadge } from "@/components/ui/id-badge";
 import { userCode } from "../../../utils/shortId";
+import { formatKgTotal } from "../../../utils/donut";
 import { UserProfile } from "../../../types";
 
 export default function BuyerProfile() {
@@ -90,7 +91,7 @@ export default function BuyerProfile() {
 
   const weightLabel = stats.totalWeight >= 1000
     ? (stats.totalWeight / 1000).toFixed(1) + ' t'
-    : stats.totalWeight + ' kg';
+    : formatKgTotal(stats.totalWeight) + ' kg';
 
   return (
     <View style={styles.root}>

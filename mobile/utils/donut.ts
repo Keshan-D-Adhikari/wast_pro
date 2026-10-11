@@ -31,3 +31,9 @@ export function formatKg(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '0';
   return String(Number(value.toFixed(3)));
 }
+
+/** A total weight for a profile: rounded to 2 decimals, trailing zeros dropped (0.17, 1.5, 2). */
+export function formatKgTotal(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  return String(Number(value.toFixed(2)));
+}

@@ -15,6 +15,7 @@ import { LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { IdBadge } from "@/components/ui/id-badge";
 import { userCode } from "../../../utils/shortId";
+import { formatKgTotal } from "../../../utils/donut";
 import { DEFAULT_BIN_ID } from "../../../iotConfig";
 import { UserProfile } from "../../../types";
 
@@ -132,7 +133,7 @@ export default function SellerProfile() {
         <SectionTitle>Your sales</SectionTitle>
         <View style={styles.tileRow}>
           <StatTile value={earnedLabel} label="Total earned" icon="wallet-outline" />
-          <StatTile value={`${stats.totalWeight} kg`} label="Waste sold" icon="scale-outline" />
+          <StatTile value={`${formatKgTotal(stats.totalWeight)} kg`} label="Waste sold" icon="scale-outline" />
         </View>
 
         {/* Environmental impact */}

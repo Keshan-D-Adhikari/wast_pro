@@ -1,4 +1,4 @@
-import { donutSlices, formatKg } from './donut';
+import { donutSlices, formatKg, formatKgTotal } from './donut';
 
 describe('donutSlices', () => {
   it('gives every slice no arc when the total is zero', () => {
@@ -37,5 +37,19 @@ describe('formatKg', () => {
     expect(formatKg(0)).toBe('0');
     expect(formatKg(-0.86)).toBe('0');
     expect(formatKg(NaN)).toBe('0');
+  });
+});
+
+describe('formatKgTotal', () => {
+  it('rounds a summed weight to 2 decimals and drops trailing zeros', () => {
+    expect(formatKgTotal(0.16999999999999998)).toBe('0.17');
+    expect(formatKgTotal(1.5)).toBe('1.5');
+    expect(formatKgTotal(2)).toBe('2');
+    expect(formatKgTotal(0.076 + 0.05)).toBe('0.13');
+  });
+
+  it('shows 0 for nothing or invalid', () => {
+    expect(formatKgTotal(0)).toBe('0');
+    expect(formatKgTotal(NaN)).toBe('0');
   });
 });
