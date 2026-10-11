@@ -33,3 +33,22 @@ export function filterOrders(orders, { search = "", status = "all" } = {}) {
     return matchesStatus && matchesTerm;
   });
 }
+
+/** Rows for the bin list: `items` are { id, owner, bin } from normalizeBins, `summaries` maps id -> summarizeBin. */
+export function filterBins(items, summaries, { search = "", status = "all" } = {}) {
+  const term = search.trim().toLowerCase();
+  return items.filter((item) => {
+    const s = summaries[item.id];
+    const matchesStatus =
+      status === "all" ||
+      (status === "on" && s?.live) ||
+      (status === "off" && !s?.live) ||
+      (status === "attention" && s?.attention);
+    const matchesTerm =
+      !term ||
+      item.id.toLowerCase().includes(term) ||
+      item.bin?.location?.toLowerCase().includes(term) ||
+      item.owner?.toLowerCase().includes(term);
+    return matchesStatus && matchesTerm;
+  });
+}

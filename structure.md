@@ -280,7 +280,7 @@ Routes (`src/App.jsx`): a gate shows Login when signed out, "Not an admin" when 
 | Route | Page | Content |
 |-------|------|---------|
 | `/` | `Overview.jsx` | KPI cards: total users, sellers, buyers, available listings, total / pending-or-confirmed / completed orders, completed revenue (bounded read, capped at 500 orders) |
-| `/bins` | `BinStatus.jsx` | Live readings of the default bin (`bin001`), Bin ON/OFF and freshness |
+| `/bins` | `BinStatus.jsx` | List of every bin in the IoT database (search, ON/OFF/needs-attention filter); selecting one opens its live readings, Bin ON/OFF and freshness |
 | `/users` | `Users.jsx` | Search and filter, enable/disable accounts, set which `binId` a seller sees (via a prompt) |
 | `/marketplace` | `Marketplace.jsx` | All listings with filters, delete a listing |
 | `/orders` | `Orders.jsx` | All orders with filters, change order status |
@@ -461,7 +461,7 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 | Suite | Tool | Count | What it covers |
 |-------|------|-------|----------------|
 | Mobile unit | Jest + jest-expo | 60 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
-| Admin unit | Vitest | 21 | filters, telemetry parsing |
+| Admin unit | Vitest | 27 | filters, telemetry parsing |
 | Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 119 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
 Rules tests live in `mobile/tests/rules/` (`offers`, `users-and-orders`, `listings`, `validation`,
@@ -537,4 +537,4 @@ fast-forwarded to `development` and `main` once checked. CI runs on all three.
 - One bin per seller; listings are whole compartments (no partial quantity).
 - No email verification, App Check or rate limiting.
 - Tests cover logic, rules and components; there are no end-to-end screen tests or Cloud Function tests.
-- Admin has no CSV/PDF export, and the Bin Status page shows only the default bin.
+- Admin has no CSV/PDF export.

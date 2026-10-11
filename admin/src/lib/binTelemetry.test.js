@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeBin, parseOverweight, parseLevel, parseWeightKg, toEpochMs, describeFreshness, formatAge, STALE_AFTER_MS } from "./binTelemetry";
+import { normalizeBin, normalizeBins, summarizeBin, parseOverweight, parseLevel, parseWeightKg, toEpochMs, describeFreshness, formatAge, STALE_AFTER_MS } from "./binTelemetry";
 
 describe("parseLevel", () => {
   it("maps the firmware level words and percentages", () => {
@@ -74,5 +74,37 @@ describe("overweight flag", () => {
     const bin = normalizeBin({ compartments: { plastic: { level: "50%", weight: 9000, overweight: true }, food: { level: "EMPTY", weight: 0, overweight: false } } });
     expect(bin.plastic.overweight).toBe(true);
     expect(bin.food.overweight).toBe(false);
+  });
+});
+
+describe("normalizeBins", () => {
+  it("turns the bins node into a list sorted by id (numbers in order)", () => {
+    const list = normalizeBins({
+      bin10: { compartments: { plastic: { level: "EMPTY", weight: 0 } }, lastUpdated: 1790000000000, owner: "u1" },
+      bin2: { compartments: { plastic: { level: "50%", weight: 100 } }, lastUpdated: 1790000000000, location: "Campus" },
+    });
+    expect(list.map((b) => b.id)).toEqual(["bin2", "bin10"]);
+    expect(list[1].owner).toBe("u1");
+    expect(list[0].bin.location).toBe("Campus");
+  });
+
+  it("returns an empty list for no data", () => {
+    expect(normalizeBins(null)).toEqual([]);
+  });
+});
+
+describe("summarizeBin", () => {
+  const now = 1790000100000;
+  it("reports live, the fullest compartment and whether it needs attention", () => {
+    const bin = normalizeBin({
+      compartments: { plastic: { level: "FULL", weight: 1 }, food: { level: "50%", weight: 1 }, metal: { level: "EMPTY", weight: 0 } },
+      lastUpdated: now - 10000,
+    });
+    expect(summarizeBin(bin, now)).toEqual({ live: true, maxLevel: 100, attention: true });
+  });
+
+  it("is offline when the data is old and quiet when nothing is wrong", () => {
+    const bin = normalizeBin({ compartments: { plastic: { level: "50%", weight: 1 } }, lastUpdated: now - 10 * 60 * 1000 });
+    expect(summarizeBin(bin, now)).toEqual({ live: false, maxLevel: 50, attention: false });
   });
 });

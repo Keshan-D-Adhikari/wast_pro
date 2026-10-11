@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database";
 import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../iotConfig";
-import { IconBin, IconAlert, IconPulse, IconLeaf } from "../components/Icons";
-import { normalizeBin, describeFreshness } from "../lib/binTelemetry";
+import { IconBin, IconAlert, IconPulse, IconLeaf, IconSearch } from "../components/Icons";
+import { normalizeBin, normalizeBins, summarizeBin, describeFreshness } from "../lib/binTelemetry";
+import { filterBins } from "../lib/filters";
 
 const COMPARTMENTS = ["plastic", "food", "metal"];
 
@@ -26,7 +27,8 @@ function statusLabel(status) {
   return upper.charAt(0) + upper.slice(1).toLowerCase();
 }
 
-export default function BinStatus() {
+/** One bin: its three compartments, live. */
+function BinDetail({ binId, onBack }) {
   const [liveBin, setLiveBin] = useState(null);
   const [liveLoading, setLiveLoading] = useState(true);
   const [mockPreset, setMockPreset] = useState("normal");
@@ -52,7 +54,7 @@ export default function BinStatus() {
   useEffect(() => {
     if (USE_MOCK_IOT) return;
 
-    const binNodeRef = ref(iotDb, `bins/${BIN_ID}`);
+    const binNodeRef = ref(iotDb, `bins/${binId}`);
     return onValue(
       binNodeRef,
       (snapshot) => {
@@ -61,12 +63,15 @@ export default function BinStatus() {
       },
       () => setLiveLoading(false)
     );
-  }, []);
+  }, [binId]);
 
   return (
     <section>
       <div className="page-header">
         <div>
+          <button type="button" className="load-more-btn" style={{ margin: "0 0 0.75rem" }} onClick={onBack}>
+            ← All bins
+          </button>
           <h1>Live Smart Bin Telemetry</h1>
           <p className="subtitle">Real-time ultrasonic fill level, weight, and moisture readings from IoT ESP32 firmware</p>
         </div>
@@ -122,10 +127,10 @@ export default function BinStatus() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
           <div className="bin-id-badge">
             <IconBin size={16} />
-            <span>Prototype {BIN_ID}</span>
+            <span>Bin {binId}</span>
           </div>
           <span style={{ fontSize: "0.9rem", color: "var(--ink-500)" }}>
-            Hardware Node: <code>bins/{BIN_ID}</code>
+            Hardware Node: <code>bins/{binId}</code>
           </span>
         </div>
 
@@ -161,7 +166,7 @@ export default function BinStatus() {
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconBin size={24} /></div>
           <h3>No sensor data reported</h3>
-          <p>No telemetry recorded yet at <code>bins/{BIN_ID}</code> from the ESP32 firmware.</p>
+          <p>No telemetry recorded yet at <code>bins/{binId}</code> from the ESP32 firmware.</p>
         </div>
       )}
 
@@ -219,6 +224,145 @@ export default function BinStatus() {
             );
           })}
         </div>
+      )}
+    </section>
+  );
+}
+
+const PAGE_SIZE = 25;
+
+/** Every bin in the IoT database; pick one to see its live readings. */
+export default function BinStatus() {
+  const [selectedId, setSelectedId] = useState(null);
+  const [rawBins, setRawBins] = useState(null);
+  const [loading, setLoading] = useState(!USE_MOCK_IOT);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [shown, setShown] = useState(PAGE_SIZE);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (USE_MOCK_IOT) return;
+    return onValue(
+      ref(iotDb, "bins"),
+      (snapshot) => {
+        setRawBins(snapshot.exists() ? snapshot.val() : null);
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+  }, []);
+
+  if (selectedId) return <BinDetail binId={selectedId} onBack={() => setSelectedId(null)} />;
+
+  const items = USE_MOCK_IOT
+    ? [{ id: BIN_ID, owner: undefined, bin: normalizeBin({ ...MOCK_BIN_DATA_NORMAL, lastUpdated: now, location: "Demo" }) }]
+    : normalizeBins(rawBins);
+  const summaries = Object.fromEntries(
+    items.map((i) => [i.id, USE_MOCK_IOT ? { live: true, maxLevel: 0, attention: false } : summarizeBin(i.bin, now)])
+  );
+  const filtered = filterBins(items, summaries, { search, status });
+  const visible = filtered.slice(0, shown);
+  const liveCount = items.filter((i) => summaries[i.id].live).length;
+  const attentionCount = items.filter((i) => summaries[i.id].attention).length;
+
+  return (
+    <section>
+      <div className="page-header">
+        <div>
+          <h1>Smart Bins</h1>
+          <p className="subtitle">
+            {items.length} bin{items.length === 1 ? "" : "s"} · {liveCount} ON · {items.length - liveCount} OFF
+            {attentionCount > 0 ? ` · ${attentionCount} need attention` : ""}. Select a bin to see its live readings.
+          </p>
+        </div>
+      </div>
+
+      <div className="toolbar">
+        <div className="search-input-wrapper">
+          <span className="search-icon"><IconSearch size={16} /></span>
+          <input
+            type="search"
+            placeholder="Search by bin ID, location or owner…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setShown(PAGE_SIZE); }}
+          />
+        </div>
+        <div className="select-filter-wrapper">
+          <select className="select-filter" value={status} onChange={(e) => { setStatus(e.target.value); setShown(PAGE_SIZE); }}>
+            <option value="all">All bins</option>
+            <option value="on">ON (live)</option>
+            <option value="off">OFF</option>
+            <option value="attention">Needs attention</option>
+          </select>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="empty-state-box">
+          <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
+          <p>Connecting to IoT telemetry stream…</p>
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="empty-state-box">
+          <div className="empty-state-icon"><IconBin size={24} /></div>
+          <h3>{items.length === 0 ? "No bins reporting" : "No bins found"}</h3>
+          <p>{items.length === 0 ? <>Nothing recorded under <code>bins</code> yet.</> : "No bin matches your search or filter."}</p>
+        </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <div className="table-card">
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bin</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Fullest compartment</th>
+                  <th>Last update</th>
+                  <th style={{ textAlign: "right" }}>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map(({ id, bin }) => {
+                  const s = summaries[id];
+                  return (
+                    <tr key={id} style={{ cursor: "pointer" }} onClick={() => setSelectedId(id)}>
+                      <td style={{ fontWeight: 600 }}><code>{id}</code></td>
+                      <td>{bin.location || "—"}</td>
+                      <td>
+                        <span className={`badge ${s.live ? "status-completed" : "status-pending"}`}>{s.live ? "ON" : "OFF"}</span>
+                        {s.attention && <span className="badge status-cancelled" style={{ marginLeft: "0.4rem" }}>Needs attention</span>}
+                      </td>
+                      <td>{s.maxLevel}%</td>
+                      <td>{describeFreshness(bin.lastUpdated, now).label}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button type="button" className="btn-sm-success" onClick={(e) => { e.stopPropagation(); setSelectedId(id); }}>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!loading && filtered.length > shown && (
+        <button type="button" className="load-more-btn" onClick={() => setShown((n) => n + PAGE_SIZE)}>
+          Show more bins
+        </button>
       )}
     </section>
   );

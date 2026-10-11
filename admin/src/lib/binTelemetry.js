@@ -98,3 +98,24 @@ export function describeFreshness(lastUpdated, now = Date.now()) {
   const live = age <= STALE_AFTER_MS;
   return { live, label: `${live ? "Updated" : "Last update"} ${formatAge(age)}` };
 }
+
+/** Every bin under the IoT database's `bins` node -> a sorted list of { id, owner, bin }. */
+export function normalizeBins(rawBins) {
+  if (!rawBins || typeof rawBins !== "object") return [];
+  return Object.entries(rawBins)
+    .map(([id, raw]) => ({
+      id,
+      owner: typeof raw?.owner === "string" ? raw.owner : undefined,
+      bin: normalizeBin(raw),
+    }))
+    .filter((b) => b.bin)
+    .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+}
+
+/** One-line state of a bin for the list: is it reporting, how full is the fullest compartment, does it need attention. */
+export function summarizeBin(bin, now = Date.now()) {
+  const comps = ["plastic", "food", "metal"].map((t) => bin[t] || {});
+  const maxLevel = Math.max(0, ...comps.map((c) => Number(c.level) || 0));
+  const attention = comps.some((c) => c.overweight || (c.status || "").toUpperCase() === "FULL");
+  return { live: describeFreshness(bin.lastUpdated, now).live, maxLevel, attention };
+}

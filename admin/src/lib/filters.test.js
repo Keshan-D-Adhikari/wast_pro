@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterUsers, filterListings, filterOrders } from "./filters";
+import { filterUsers, filterListings, filterOrders, filterBins } from "./filters";
 
 describe("filterUsers", () => {
   const users = [
@@ -65,5 +65,30 @@ describe("filterOrders", () => {
 
   it("returns nothing when nothing matches", () => {
     expect(filterOrders(orders, { search: "nobody" })).toEqual([]);
+  });
+});
+
+describe("filterBins", () => {
+  const items = [
+    { id: "bin001", owner: "user001", bin: { location: "Horizon Campus" } },
+    { id: "bin002", owner: "user002", bin: { location: "Colombo Fort" } },
+    { id: "bin003", bin: {} },
+  ];
+  const summaries = {
+    bin001: { live: true, attention: false },
+    bin002: { live: false, attention: true },
+    bin003: { live: true, attention: true },
+  };
+
+  it("searches by id, location and owner", () => {
+    expect(filterBins(items, summaries, { search: "fort" }).map((b) => b.id)).toEqual(["bin002"]);
+    expect(filterBins(items, summaries, { search: "BIN003" }).map((b) => b.id)).toEqual(["bin003"]);
+    expect(filterBins(items, summaries, { search: "user001" }).map((b) => b.id)).toEqual(["bin001"]);
+  });
+
+  it("filters by on, off and needs attention", () => {
+    expect(filterBins(items, summaries, { status: "on" }).map((b) => b.id)).toEqual(["bin001", "bin003"]);
+    expect(filterBins(items, summaries, { status: "off" }).map((b) => b.id)).toEqual(["bin002"]);
+    expect(filterBins(items, summaries, { status: "attention" }).map((b) => b.id)).toEqual(["bin002", "bin003"]);
   });
 });
