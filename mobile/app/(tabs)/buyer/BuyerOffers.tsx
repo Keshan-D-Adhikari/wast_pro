@@ -129,6 +129,9 @@ export default function BuyerOffers() {
     ]);
   };
 
+  const pendingOffers = offers.filter(o => o.status === 'pending');
+  const answeredOffers = offers.filter(o => o.status !== 'pending');
+
   const OfferCard = ({ offer }: { offer: Offer }) => {
     const accent = wasteAccent(offer.wasteType as any);
     const date = offer.createdAt?.toDate ? offer.createdAt.toDate().toLocaleDateString() : 'Just now';
@@ -218,8 +221,19 @@ export default function BuyerOffers() {
           />
         ) : (
           <>
-            <SectionTitle meta={`${offers.length} total`}>Your offers</SectionTitle>
-            {offers.map(o => <OfferCard key={o.id} offer={o} />)}
+            {/* An offer leaves "Pending" as soon as the seller accepts or rejects it */}
+            {pendingOffers.length > 0 && (
+              <>
+                <SectionTitle meta={`${pendingOffers.length} pending`}>Pending offers</SectionTitle>
+                {pendingOffers.map(o => <OfferCard key={o.id} offer={o} />)}
+              </>
+            )}
+            {answeredOffers.length > 0 && (
+              <>
+                <SectionTitle meta={`${answeredOffers.length} answered`}>Offer history</SectionTitle>
+                {answeredOffers.map(o => <OfferCard key={o.id} offer={o} />)}
+              </>
+            )}
           </>
         )}
       </Screen>
