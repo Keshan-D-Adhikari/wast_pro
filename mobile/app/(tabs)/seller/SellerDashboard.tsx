@@ -424,7 +424,7 @@ export default function SellerDashboard() {
         </Card>
         <TextField
           icon="business-outline"
-          placeholder="Company or place name (e.g. Horizon Campus, Malabe)"
+          placeholder="Company or place name"
           value={placeQuery}
           onChangeText={(t) => { setPlaceQuery(t); setPlaceError(''); }}
           onSubmitEditing={handlePlaceSearch}
