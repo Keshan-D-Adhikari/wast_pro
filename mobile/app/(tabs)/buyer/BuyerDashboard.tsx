@@ -668,6 +668,7 @@ export default function BuyerDashboard() {
           setOfferAmountError('');
         }}
         scrollable
+        avoidKeyboard
       >
         <Card tone="brand" elevation={0} style={styles.summaryCard}>
           <DetailRow label="Waste type" value={offerItem?.wasteType ?? '—'} />
