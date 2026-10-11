@@ -25,3 +25,9 @@ export function donutSlices(values: number[], circumference: number, gap: number
     return slice;
   });
 }
+
+/** A weight as the bin reports it: up to 3 decimals, trailing zeros dropped (0.076, 1.5, 0). */
+export function formatKg(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  return String(Number(value.toFixed(3)));
+}

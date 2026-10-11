@@ -17,6 +17,7 @@ import { useAuthUser } from "../../../hooks/useAuthUser";
 import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { iotDb, DEFAULT_BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../../../iotConfig";
 import { normalizeBin, describeFreshness } from "../../../utils/binTelemetry";
+import { formatKg } from "../../../utils/donut";
 import { ref as dbRef, onValue } from "firebase/database";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
@@ -328,7 +329,7 @@ export default function SellerDashboard() {
             <Text style={Type.caption}>IN BINS NOW</Text>
             <View style={styles.summaryValueRow}>
               <Ionicons name="scale-outline" size={16} color={Palette.brand[600]} />
-              <Text style={styles.summaryValue}>{totalWeight.toFixed(1)} kg</Text>
+              <Text style={styles.summaryValue}>{formatKg(totalWeight)} kg</Text>
             </View>
           </View>
         </Card>

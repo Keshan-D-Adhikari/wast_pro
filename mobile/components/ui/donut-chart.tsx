@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Palette, Space } from '@/constants/design';
-import { donutSlices } from '../../utils/donut';
+import { donutSlices, formatKg } from '../../utils/donut';
 
 export type DonutItem = { label: string; value: number; color: string };
 
@@ -25,7 +25,7 @@ export function DonutChart({ items, unit = 'kg', centerLabel = 'Total in bin', e
   const isEmpty = total <= 0;
 
   return (
-    <View accessible accessibilityLabel={isEmpty ? emptyLabel : `${total.toFixed(1)} ${unit} total. ${items.map((i, n) => `${i.label} ${slices[n].percent} percent`).join(', ')}`}>
+    <View accessible accessibilityLabel={isEmpty ? emptyLabel : `${formatKg(total)} ${unit} total. ${items.map((i, n) => `${i.label} ${slices[n].percent} percent`).join(', ')}`}>
       <View style={[styles.ringWrap, { width: size, height: size }]}>
         <Svg width={size} height={size} style={styles.svg}>
           <Circle cx={size / 2} cy={size / 2} r={radius} stroke={Palette.ink[100]} strokeWidth={STROKE} fill="none" />
@@ -54,7 +54,7 @@ export function DonutChart({ items, unit = 'kg', centerLabel = 'Total in bin', e
             <Text style={styles.emptyText}>{emptyLabel}</Text>
           ) : (
             <>
-              <Text style={styles.total}>{total.toFixed(1)} {unit}</Text>
+              <Text style={styles.total}>{formatKg(total)} {unit}</Text>
               <Text style={styles.caption}>{centerLabel}</Text>
             </>
           )}
@@ -66,7 +66,7 @@ export function DonutChart({ items, unit = 'kg', centerLabel = 'Total in bin', e
           <View key={item.label} style={styles.row}>
             <View style={[styles.dot, { backgroundColor: item.color }]} />
             <Text style={styles.rowLabel}>{item.label}</Text>
-            <Text style={styles.rowValue}>{item.value > 0 ? item.value.toFixed(1) : '0'} {unit}</Text>
+            <Text style={styles.rowValue}>{formatKg(item.value)} {unit}</Text>
             <Text style={styles.rowPercent}>{slices[n].percent}%</Text>
           </View>
         ))}
