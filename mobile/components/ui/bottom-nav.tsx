@@ -22,7 +22,7 @@ const SELLER_TABS: Tab[] = [
 ];
 
 const BUYER_TABS: Tab[] = [
-  { key: 'home', label: 'Browse', icon: 'search-outline', activeIcon: 'search', route: '/(tabs)/buyer/BuyerDashboard' },
+  { key: 'home', label: 'Marketplace', icon: 'search-outline', activeIcon: 'search', route: '/(tabs)/buyer/BuyerDashboard' },
   { key: 'orders', label: 'Purchases', icon: 'cart-outline', activeIcon: 'cart', route: '/(tabs)/buyer/BuyerOrders' },
   { key: 'profile', label: 'Profile', icon: 'person-outline', activeIcon: 'person', route: '/(tabs)/buyer/BuyerProfile' },
 ];

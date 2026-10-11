@@ -450,7 +450,7 @@ export default function BuyerDashboard() {
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
-        <ScreenHeader title="Browse waste" subtitle="Find recyclable waste near you" right={<NotificationBell />} />
+        <ScreenHeader title="Marketplace" subtitle="Find recyclable waste near you" right={<NotificationBell />} />
 
         <TextField
           icon="search-outline"
