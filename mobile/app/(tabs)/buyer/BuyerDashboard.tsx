@@ -25,6 +25,7 @@ import {
   doc,
   serverTimestamp,
   getDoc,
+  updateDoc,
   writeBatch
 } from "firebase/firestore";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -67,6 +68,10 @@ export default function BuyerDashboard() {
   const [mapModalVisible, setMapModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
+
+  // Where the buyer keeps the smart bin they collected, saved on their profile and shown on the map.
+  const [binLocation, setBinLocation] = useState<UserLocation | null>(null);
+  const [savingBinLocation, setSavingBinLocation] = useState(false);
 
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
   // `any` here is deliberate: MapView's ref type differs between the native
@@ -114,6 +119,37 @@ export default function BuyerDashboard() {
     // IIFE above would never reach React
     return () => unsubscribe?.();
   }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    return onSnapshot(
+      doc(db, "users", authUser.uid),
+      (snap) => setBinLocation((snap.data()?.binLocation as UserLocation | undefined) ?? null),
+      (error) => console.error("Bin location fetch error:", error)
+    );
+  }, [authUser]);
+
+  // Save the phone's current position as the place the buyer keeps the smart bin.
+  const handleSetBinLocation = async () => {
+    if (!authUser) return;
+    setSavingBinLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location needed', 'Allow location access so we can place the smart bin on the map.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      await updateDoc(doc(db, "users", authUser.uid), {
+        binLocation: { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+      });
+    } catch (error) {
+      console.error("Could not save bin location:", error);
+      Alert.alert('Error', 'Could not save the smart bin location. Please try again.');
+    } finally {
+      setSavingBinLocation(false);
+    }
+  };
 
   // Derived from items + searchText — no effect needed, just recompute on render.
   const filteredItems = items.filter(item => {
@@ -452,6 +488,31 @@ export default function BuyerDashboard() {
       <Screen withBottomNav>
         <ScreenHeader title="Marketplace" subtitle="Find recyclable waste near you" right={<NotificationBell />} />
 
+        <SectionTitle meta={binLocation ? 'Saved' : 'Not set'}>Smart bin location</SectionTitle>
+        <Card style={styles.binMapCard} elevation={1}>
+          <MapView
+            key={binLocation ? `${binLocation.latitude},${binLocation.longitude}` : 'no-bin-location'}
+            provider={APP_MAP_PROVIDER}
+            style={styles.binMap}
+            initialRegion={{
+              latitude: binLocation?.latitude ?? userLocation?.latitude ?? 6.9271,
+              longitude: binLocation?.longitude ?? userLocation?.longitude ?? 79.8612,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+          >
+            {binLocation && <Marker coordinate={binLocation} pinColor={Palette.brand[600]} />}
+          </MapView>
+        </Card>
+        <Button
+          label={binLocation ? 'Update smart bin location to where I am now' : 'Set smart bin location to where I am now'}
+          icon="locate-outline"
+          variant="secondary"
+          onPress={handleSetBinLocation}
+          loading={savingBinLocation}
+          style={styles.binLocationBtn}
+        />
+
         <TextField
           icon="search-outline"
           placeholder="Search waste (plastic, metal, food…)"
@@ -708,6 +769,9 @@ export default function BuyerDashboard() {
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
+  binMapCard: { padding: 0, overflow: 'hidden', height: 170 },
+  binMap: { width: '100%', height: '100%' },
+  binLocationBtn: { marginTop: Space.md, marginBottom: Space.lg },
   root: { flex: 1, backgroundColor: Palette.background },
   flex: { flex: 1 },
 

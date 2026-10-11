@@ -214,7 +214,7 @@ own bottom navigation (`BottomNav`).
 | `(tabs)/seller/SellerOrders.tsx` | Seller orders | Tabs Ongoing / Completed / Cancelled; Confirm, Decline, Mark completed; shows buyer rating |
 | `(tabs)/seller/SellerOffers.tsx` | Seller offers | Accept (creates an order in a transaction) or reject offers |
 | `(tabs)/seller/SellerProfile.tsx`, `EditProfile.tsx` | Profile | Stats (earned, weight) and profile editor |
-| `(tabs)/buyer/BuyerDashboard.tsx` | Marketplace | Search, type filter, distance, route map, Buy Now (cash or card), Make an Offer, notification bell |
+| `(tabs)/buyer/BuyerDashboard.tsx` | Marketplace | Smart bin location map (the buyer saves where they keep the bin), search, type filter, distance, route map, Buy Now (cash or card), Make an Offer, notification bell |
 | `(tabs)/buyer/BuyerOrders.tsx` | Buyer orders | Tabs, cancel, pay accepted-offer order by card, route map, star rating |
 | `(tabs)/buyer/BuyerOffers.tsx` | Buyer offers | Offers made; after the seller accepts, Buy or Decline |
 | `(tabs)/buyer/BuyerProfile.tsx`, `EditProfile.tsx` | Profile | Profile and editor |
@@ -463,7 +463,7 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 |-------|------|-------|----------------|
 | Mobile unit | Jest + jest-expo | 66 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
 | Admin unit | Vitest | 41 | filters, telemetry parsing |
-| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 123 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
+| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 125 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
 Rules tests live in `mobile/tests/rules/` (`offers`, `users-and-orders`, `listings`, `validation`,
 `seller-orders`) and run through `run.mjs`. They need Java 21.
