@@ -47,6 +47,8 @@ export interface UserProfile {
   binId?: string;
   /** Where the smart bin physically is (the firmware sends no GPS). Set by the seller from the dashboard. */
   binLocation?: { latitude: number; longitude: number };
+  /** The company or place name the buyer picked for where the smart bin is kept. */
+  binPlaceName?: string;
 }
 
 export interface MarketplaceItem {

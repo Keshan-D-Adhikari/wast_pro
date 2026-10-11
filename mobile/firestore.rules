@@ -56,13 +56,16 @@ service cloud.firestore {
 
     // If binLocation is being set it must be a real coordinate pair.
     function isValidBinLocation() {
-      return !('binLocation' in request.resource.data) ||
+      return (!('binLocation' in request.resource.data) ||
         (request.resource.data.binLocation is map &&
           request.resource.data.binLocation.keys().hasOnly(['latitude', 'longitude']) &&
           request.resource.data.binLocation.latitude is number &&
           request.resource.data.binLocation.longitude is number &&
           request.resource.data.binLocation.latitude >= -90 && request.resource.data.binLocation.latitude <= 90 &&
-          request.resource.data.binLocation.longitude >= -180 && request.resource.data.binLocation.longitude <= 180);
+          request.resource.data.binLocation.longitude >= -180 && request.resource.data.binLocation.longitude <= 180)) &&
+        // the optional place name the owner picked for it
+        (!('binPlaceName' in request.resource.data) ||
+          (request.resource.data.binPlaceName is string && request.resource.data.binPlaceName.size() <= 120));
     }
 
     // What an admin may correct on someone's profile: name, phone, location and points, each a sane
@@ -91,7 +94,7 @@ service cloud.firestore {
       allow update: if
         (isOwner(uid) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['fullName', 'phone', 'location', 'photoURL', 'updatedAt', 'binLocation']) &&
+            .hasOnly(['fullName', 'phone', 'location', 'photoURL', 'updatedAt', 'binLocation', 'binPlaceName']) &&
           isValidBinLocation()) ||
         (isAdmin() &&
           request.resource.data.diff(resource.data).affectedKeys()

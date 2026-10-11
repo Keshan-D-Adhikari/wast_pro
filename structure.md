@@ -214,7 +214,7 @@ own bottom navigation (`BottomNav`).
 | `(tabs)/seller/SellerOrders.tsx` | Seller orders | Tabs Ongoing / Completed / Cancelled; Confirm, Decline, Mark completed; shows buyer rating |
 | `(tabs)/seller/SellerOffers.tsx` | Seller offers | Accept (creates an order in a transaction) or reject offers |
 | `(tabs)/seller/SellerProfile.tsx`, `EditProfile.tsx` | Profile | Stats (earned, weight) and profile editor |
-| `(tabs)/buyer/BuyerDashboard.tsx` | Marketplace | Smart bin location map (the buyer saves where they keep the bin), search, type filter, distance, route map, Buy Now (cash or card), Make an Offer, notification bell |
+| `(tabs)/buyer/BuyerDashboard.tsx` | Marketplace | Smart bin location map (the buyer searches a company or place by name and picks the result; no GPS), search, type filter, distance, route map, Buy Now (cash or card), Make an Offer, notification bell |
 | `(tabs)/buyer/BuyerOrders.tsx` | Buyer orders | Tabs, cancel, pay accepted-offer order by card, route map, star rating |
 | `(tabs)/buyer/BuyerOffers.tsx` | Buyer offers | Offers made; after the seller accepts, Buy or Decline |
 | `(tabs)/buyer/BuyerProfile.tsx`, `EditProfile.tsx` | Profile | Profile and editor |
@@ -256,6 +256,7 @@ The two `EditProfile.tsx` files are 5-line wrappers around `components/profile-e
 | `utils/orderNotifications.ts` | Message and type of the notification a seller's action sends to the buyer |
 | `utils/passwordReset.ts` | Messages for the reset-email result (same message for unknown email, so accounts cannot be probed) |
 | `utils/donut.ts` | Donut slice geometry and `formatKg` (up to 3 decimals) |
+| `utils/placeSearch.ts` | Company / place name search (OpenStreetMap Nominatim, Sri Lanka only, no API key) used by the buyer to set where the smart bin is kept |
 | `utils/shortId.ts` | Short support IDs derived from the document id: `USR-7K3F9A` (user), `ORD-A1B2C3` (order); the bin keeps its own id such as `bin001`. Same rule in `admin/src/lib/shortId.js` |
 | `utils/money.ts` | `roundMoney` and `formatRs` (`Rs 120`, `Rs 7.20`) |
 | `types.ts` | Shared types: `UserProfile`, `MarketplaceItem`, `Order`, `Offer`, `AppNotification`, `BinData`, `BinCompartment`, `UserLocation`, `WasteType` |
@@ -328,7 +329,7 @@ Deploy: `firebase deploy --only firestore:rules` (and `firestore:indexes`) from 
 ### `users/{uid}`
 `fullName`, `email`, `role` (`seller` | `buyer` | `admin`), `phone`, `location` (text), `photoURL`,
 `points`, `createdAt`, `updatedAt`, `disabled` (admin only), `binId` (admin only, which bin the seller sees),
-`binLocation { latitude, longitude }` (set by the seller from the dashboard).
+`binLocation { latitude, longitude }` (a seller saves it from the dashboard; a buyer picks it by searching a place name), `binPlaceName` (the company or place the buyer picked).
 
 ### `marketplace/{listingId}` — waste listings
 `sellerUid`, `sellerName`, `wasteType` (`plastic` | `food` | `metal`), `weightKg`, `pricePerKg`,
@@ -461,9 +462,9 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 
 | Suite | Tool | Count | What it covers |
 |-------|------|-------|----------------|
-| Mobile unit | Jest + jest-expo | 66 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
+| Mobile unit | Jest + jest-expo | 70 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
 | Admin unit | Vitest | 41 | filters, telemetry parsing |
-| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 125 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
+| Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 127 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
 Rules tests live in `mobile/tests/rules/` (`offers`, `users-and-orders`, `listings`, `validation`,
 `seller-orders`) and run through `run.mjs`. They need Java 21.

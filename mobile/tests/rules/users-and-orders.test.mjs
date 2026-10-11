@@ -68,6 +68,12 @@ await t('a seller cannot assign themselves a bin', () => assertFails(updateDoc(d
 await t('a buyer cannot assign someone a bin', () => assertFails(updateDoc(doc(as('buyer1'), 'users/seller1'), { binId: 'bin002' })));
 await t('seller saves where their bin is (valid coordinates)', () => assertSucceeds(updateDoc(doc(as('seller1'), 'users/seller1'), { binLocation: { latitude: 6.9271, longitude: 79.8612 } })));
 await t('buyer saves where they keep the smart bin (valid coordinates)', () => assertSucceeds(updateDoc(doc(as('buyer1'), 'users/buyer1'), { binLocation: { latitude: 6.9271, longitude: 79.8612 } })));
+await t('buyer saves a bin location with the company name they picked', () =>
+  assertSucceeds(updateDoc(doc(as('buyer1'), 'users/buyer1'), { binLocation: { latitude: 6.9, longitude: 79.8 }, binPlaceName: 'Acme Recyclers' })));
+await t('the place name must be text of a sane length', async () => {
+  await assertFails(updateDoc(doc(as('buyer1'), 'users/buyer1'), { binPlaceName: 123 }));
+  await assertFails(updateDoc(doc(as('buyer1'), 'users/buyer1'), { binPlaceName: 'x'.repeat(121) }));
+});
 await t("a buyer cannot set someone else's bin location", () => assertFails(updateDoc(doc(as('buyer1'), 'users/seller1'), { binLocation: { latitude: 6.9, longitude: 79.8 } })));
 await t('rejects an out-of-range latitude', () => assertFails(updateDoc(doc(as('seller1'), 'users/seller1'), { binLocation: { latitude: 200, longitude: 79.8 } })));
 await t('rejects coordinates that are not numbers', () => assertFails(updateDoc(doc(as('seller1'), 'users/seller1'), { binLocation: { latitude: '6.9', longitude: '79.8' } })));
