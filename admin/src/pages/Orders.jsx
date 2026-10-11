@@ -1,29 +1,41 @@
-import { useMemo, useState } from "react";
-import { doc, updateDoc } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import { collection, doc, limit, onSnapshot, or, query, updateDoc, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
-import { filterOrders } from "../lib/filters";
-import { usePaginatedCollection } from "../lib/usePaginatedCollection";
+import { filterOrders, filterPeople, groupOrdersByUser } from "../lib/filters";
 import { IconSearch, IconOrders } from "../components/Icons";
 
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
 
-export default function Orders() {
-  const { docs: rawOrders, loading, hasMore, loadMore } = usePaginatedCollection("orders");
-  const [search, setSearch] = useState("");
+// The people list is built from at most this many orders.
+const ORDER_SCAN_LIMIT = 500;
+
+const rs = (value) =>
+  `Rs. ${value != null ? Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}`;
+
+const newestFirst = (a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
+
+/** All orders one user is part of (as buyer or as seller), with a status filter and status change. */
+function UserOrders({ person, onBack }) {
+  const [rawOrders, setRawOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const orders = useMemo(
-    () =>
-      [...rawOrders].sort(
-        (a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)
+  useEffect(() => {
+    return onSnapshot(
+      query(
+        collection(db, "orders"),
+        or(where("buyerUid", "==", person.uid), where("sellerUid", "==", person.uid))
       ),
-    [rawOrders]
-  );
+      (snapshot) => {
+        setRawOrders(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+  }, [person.uid]);
 
-  const filtered = useMemo(
-    () => filterOrders(orders, { search, status: statusFilter }),
-    [orders, search, statusFilter]
-  );
+  const orders = useMemo(() => [...rawOrders].sort(newestFirst), [rawOrders]);
+  const filtered = useMemo(() => filterOrders(orders, { status: statusFilter }), [orders, statusFilter]);
 
   const handleStatusChange = async (order, status) => {
     if (status === order.status) return;
@@ -34,30 +46,19 @@ export default function Orders() {
     <section>
       <div className="page-header">
         <div>
-          <h1>Order Management</h1>
+          <button type="button" className="load-more-btn" style={{ margin: "0 0 0.75rem" }} onClick={onBack}>
+            ← All users
+          </button>
+          <h1>{person.name}</h1>
           <p className="subtitle">
-            Showing {filtered.length} of {orders.length} transaction orders placed across the platform
+            Showing {filtered.length} of {orders.length} orders where this {person.role} is involved
           </p>
         </div>
       </div>
 
       <div className="toolbar">
-        <div className="search-input-wrapper">
-          <span className="search-icon"><IconSearch size={16} /></span>
-          <input
-            type="search"
-            placeholder="Search by buyer or seller name…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
         <div className="select-filter-wrapper">
-          <select
-            className="select-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
+          <select className="select-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">All Statuses</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -71,7 +72,7 @@ export default function Orders() {
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
-          <p>Loading transactions and orders…</p>
+          <p>Loading orders…</p>
         </div>
       )}
 
@@ -79,7 +80,7 @@ export default function Orders() {
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconOrders size={24} /></div>
           <h3>No orders found</h3>
-          <p>No transaction matches your search query or filter selection.</p>
+          <p>No order matches the selected status.</p>
         </div>
       )}
 
@@ -104,16 +105,14 @@ export default function Orders() {
                   return (
                     <tr key={o.id}>
                       <td>
-                        <span className={`badge waste-${typeCls}`}>
-                          {o.wasteType || "Waste"}
-                        </span>
+                        <span className={`badge waste-${typeCls}`}>{o.wasteType || "Waste"}</span>
                       </td>
                       <td style={{ fontWeight: 600 }}>{o.weightKg} kg</td>
-                      <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>
-                        Rs. {o.totalPrice != null ? o.totalPrice.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}
+                      <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>{rs(o.totalPrice)}</td>
+                      <td style={{ fontWeight: o.buyerUid === person.uid ? 700 : 500 }}>{o.buyerName || "—"}</td>
+                      <td style={{ fontWeight: o.sellerUid === person.uid ? 700 : 400, color: "var(--ink-700)" }}>
+                        {o.sellerName || "—"}
                       </td>
-                      <td style={{ fontWeight: 500 }}>{o.buyerName || "—"}</td>
-                      <td style={{ color: "var(--ink-700)" }}>{o.sellerName || "—"}</td>
                       <td>
                         <span style={{ fontSize: "0.86rem", textTransform: "capitalize", color: "var(--ink-700)" }}>
                           {o.paymentMethod || "Cash"}
@@ -142,11 +141,122 @@ export default function Orders() {
           </div>
         </div>
       )}
+    </section>
+  );
+}
 
-      {!loading && hasMore && (
-        <button type="button" className="load-more-btn" onClick={loadMore}>
-          Load more orders
-        </button>
+/** Orders grouped by user (buyers and sellers); pick a user to see their orders. */
+export default function Orders() {
+  const [selected, setSelected] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    return onSnapshot(
+      query(collection(db, "orders"), limit(ORDER_SCAN_LIMIT)),
+      (snapshot) => {
+        setOrders(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+  }, []);
+
+  const people = useMemo(() => groupOrdersByUser(orders), [orders]);
+  const filtered = useMemo(() => filterPeople(people, search), [people, search]);
+
+  if (selected) {
+    const current = people.find((p) => p.uid === selected.uid) ?? selected;
+    return <UserOrders person={current} onBack={() => setSelected(null)} />;
+  }
+
+  return (
+    <section>
+      <div className="page-header">
+        <div>
+          <h1>Order Management</h1>
+          <p className="subtitle">
+            {people.length} user{people.length === 1 ? "" : "s"} across {orders.length} order
+            {orders.length === 1 ? "" : "s"}. Select a user to see their orders.
+          </p>
+        </div>
+      </div>
+
+      <div className="toolbar">
+        <div className="search-input-wrapper">
+          <span className="search-icon"><IconSearch size={16} /></span>
+          <input
+            type="search"
+            placeholder="Search by user name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {loading && (
+        <div className="empty-state-box">
+          <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
+          <p>Loading transactions and orders…</p>
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="empty-state-box">
+          <div className="empty-state-icon"><IconOrders size={24} /></div>
+          <h3>{people.length === 0 ? "No orders yet" : "No users found"}</h3>
+          <p>{people.length === 0 ? "No order has been placed yet." : "No user matches your search."}</p>
+        </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <div className="table-card">
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Orders</th>
+                  <th>Ongoing</th>
+                  <th>Completed</th>
+                  <th>Cancelled</th>
+                  <th>Completed value</th>
+                  <th style={{ textAlign: "right" }}>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => (
+                  <tr key={p.uid} style={{ cursor: "pointer" }} onClick={() => setSelected(p)}>
+                    <td style={{ fontWeight: 600 }}>{p.name}</td>
+                    <td><span className={`badge role-${p.role}`}>{p.role}</span></td>
+                    <td>{p.total}</td>
+                    <td><span className="badge status-pending">{p.ongoing}</span></td>
+                    <td><span className="badge status-completed">{p.completed}</span></td>
+                    <td><span className="badge status-cancelled">{p.cancelled}</span></td>
+                    <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>{rs(p.value)}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <button
+                        type="button"
+                        className="btn-sm-success"
+                        onClick={(e) => { e.stopPropagation(); setSelected(p); }}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!loading && orders.length >= ORDER_SCAN_LIMIT && (
+        <p className="subtitle" style={{ marginTop: "1rem" }}>
+          Showing users from the first {ORDER_SCAN_LIMIT} orders. Search for a user to narrow down.
+        </p>
       )}
     </section>
   );

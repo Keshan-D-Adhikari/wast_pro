@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterUsers, filterListings, filterOrders, filterBins, groupListingsBySeller, filterSellers } from "./filters";
+import { filterUsers, filterListings, filterOrders, filterBins, groupListingsBySeller, filterSellers, groupOrdersByUser, filterPeople } from "./filters";
 
 describe("filterUsers", () => {
   const users = [
@@ -116,5 +116,30 @@ describe("groupListingsBySeller", () => {
     const groups = groupListingsBySeller(listings);
     expect(filterSellers(groups, "nim").map((g) => g.sellerUid)).toEqual(["s2"]);
     expect(filterSellers(groups, "").length).toBe(2);
+  });
+});
+
+describe("groupOrdersByUser", () => {
+  const orders = [
+    { id: "1", buyerUid: "b1", buyerName: "Amal", sellerUid: "s1", sellerName: "Nimal", status: "completed", totalPrice: 100 },
+    { id: "2", buyerUid: "b1", buyerName: "Amal", sellerUid: "s1", sellerName: "Nimal", status: "pending", totalPrice: 50 },
+    { id: "3", buyerUid: "b2", buyerName: "Kamal", sellerUid: "s1", sellerName: "Nimal", status: "cancelled", totalPrice: 20 },
+    { id: "4", buyerUid: "b1", buyerName: "Amal", sellerUid: "s1", sellerName: "Nimal", status: "confirmed", totalPrice: 5 },
+  ];
+
+  it("counts each order once for its buyer and once for its seller", () => {
+    const people = groupOrdersByUser(orders);
+    expect(people.map((p) => p.name)).toEqual(["Amal", "Kamal", "Nimal"]);
+    const amal = people.find((p) => p.uid === "b1");
+    expect(amal).toMatchObject({ role: "buyer", total: 3, ongoing: 2, completed: 1, cancelled: 0, value: 100 });
+    const nimal = people.find((p) => p.uid === "s1");
+    expect(nimal).toMatchObject({ role: "seller", total: 4, ongoing: 2, completed: 1, cancelled: 1, value: 100 });
+  });
+
+  it("skips orders with no user id and filters people by name", () => {
+    expect(groupOrdersByUser([{ id: "x", status: "pending" }])).toEqual([]);
+    const people = groupOrdersByUser(orders);
+    expect(filterPeople(people, "nim").map((p) => p.uid)).toEqual(["s1"]);
+    expect(filterPeople(people, "").length).toBe(3);
   });
 });

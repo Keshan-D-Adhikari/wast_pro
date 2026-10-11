@@ -283,7 +283,7 @@ Routes (`src/App.jsx`): a gate shows Login when signed out, "Not an admin" when 
 | `/bins` | `BinStatus.jsx` | List of every bin in the IoT database (search, ON/OFF/needs-attention filter); selecting one opens its live readings, Bin ON/OFF and freshness |
 | `/users` | `Users.jsx` | Search and filter, edit a user (name, phone, location, points), set which `binId` a seller sees |
 | `/marketplace` | `Marketplace.jsx` | Sellers list (listings, available, sold, total value); selecting a seller opens their listings with type/status filters and delete |
-| `/orders` | `Orders.jsx` | All orders with filters, change order status |
+| `/orders` | `Orders.jsx` | Users list (buyers and sellers with order counts and completed value); selecting one opens their orders with a status filter and status change |
 
 Other files:
 
@@ -461,7 +461,7 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 | Suite | Tool | Count | What it covers |
 |-------|------|-------|----------------|
 | Mobile unit | Jest + jest-expo | 60 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
-| Admin unit | Vitest | 33 | filters, telemetry parsing |
+| Admin unit | Vitest | 35 | filters, telemetry parsing |
 | Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 123 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
 Rules tests live in `mobile/tests/rules/` (`offers`, `users-and-orders`, `listings`, `validation`,
