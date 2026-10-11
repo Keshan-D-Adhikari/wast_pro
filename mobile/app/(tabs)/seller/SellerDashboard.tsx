@@ -7,17 +7,19 @@ import {
   TextInput,
 } from "react-native";
 import * as Location from "expo-location";
+import { useRouter } from "expo-router";
 import MapView, { Marker, APP_MAP_PROVIDER } from "../../../components/platform-map";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 // Firebase Imports
 import { db } from "../../../firebaseConfig";
 import { useAuthUser } from "../../../hooks/useAuthUser";
-import { doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, where, updateDoc } from "firebase/firestore";
 import { iotDb, DEFAULT_BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../../../iotConfig";
 import { normalizeBin, describeFreshness } from "../../../utils/binTelemetry";
 import { formatKg } from "../../../utils/donut";
+import { notificationRoute } from "../../../utils/notificationRoute";
 import { ref as dbRef, onValue } from "firebase/database";
 
 import { Palette, Space, Radius, Shadow, Type, wasteAccent } from "@/constants/design";
@@ -46,6 +48,7 @@ const EMPTY_BIN: BinData = {
 
 export default function SellerDashboard() {
   const user = useAuthUser();
+  const router = useRouter();
 
   // States
   const [loading, setLoading] = useState(true);
@@ -81,10 +84,6 @@ export default function SellerDashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
-  // Tracks which bins we've already sent an "over 80%" notification for.
-  // A ref (not state) because it's pure bookkeeping — never rendered — and
-  // keeping it out of state avoids re-running the notify effect on every change.
-  const notifiedBinsRef = useRef<WasteType[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -103,7 +102,10 @@ export default function SellerDashboard() {
       where("toUid", "==", user.uid)
     );
     const unsubscribeNotifs = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
+      // Bin full / overweight is shown on the dashboard itself, not as notifications (this also hides old ones).
+      const list = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as AppNotification))
+        .filter(n => n.type !== 'bin_full');
       // Client-side sort by createdAt descending
       list.sort((a, b) => {
         const timeA = a.createdAt?.toMillis() || 0;
@@ -134,47 +136,6 @@ export default function SellerDashboard() {
       setLoading(false);
     });
   }, [binId]);
-
-  // Automated Bin Full Notifications — driven by the firmware's own `status`
-  // and `overweight` fields (see constants/bin-status.ts) rather than a
-  // level percentage re-derived in the app, so the alert matches exactly
-  // what the ESP32 itself decided.
-  useEffect(() => {
-    // Never alert from stale data: an old FULL reading from an offline bin
-    // would otherwise raise a "bin is full" notification right now.
-    if (!user || !freshness.live) return;
-
-    const checkAndNotify = async (
-      type: WasteType,
-      status: string | undefined,
-      overweight: boolean | undefined
-    ) => {
-      const shouldAlert = isBinFull(status) || !!overweight;
-
-      if (shouldAlert && !notifiedBinsRef.current.includes(type)) {
-        try {
-          const reason = overweight ? 'is overweight' : 'is full';
-          await addDoc(collection(db, "notifications"), {
-            toUid: user.uid,
-            type: "bin_full",
-            message: `${type.charAt(0).toUpperCase() + type.slice(1)} bin ${reason}`,
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-          notifiedBinsRef.current = [...notifiedBinsRef.current, type];
-        } catch (error) {
-          console.error("Error sending bin notification:", error);
-        }
-      } else if (!shouldAlert && notifiedBinsRef.current.includes(type)) {
-        // Reset notification state once the firmware clears the condition
-        notifiedBinsRef.current = notifiedBinsRef.current.filter(t => t !== type);
-      }
-    };
-
-    checkAndNotify("plastic", binData.plastic?.status, binData.plastic?.overweight);
-    checkAndNotify("food", binData.food?.status, binData.food?.overweight);
-    checkAndNotify("metal", binData.metal?.status, binData.metal?.overweight);
-  }, [binData, user, freshness.live]);
 
   // Save the phone's current position as the bin's location (the seller is standing at the bin).
   const handleSetBinLocation = async () => {
@@ -490,8 +451,20 @@ export default function SellerDashboard() {
           notifications.map((notif) => {
             const isAlert = notif.type === 'order_cancelled';
             const tone = isAlert ? Palette.status.danger : Palette.status.success;
+            const route = notificationRoute(notif.type, 'seller');
             return (
-              <View key={notif.id} style={styles.notifItem}>
+              <TouchableOpacity
+                key={notif.id}
+                style={styles.notifItem}
+                activeOpacity={route ? 0.6 : 1}
+                disabled={!route}
+                accessibilityRole={route ? 'button' : undefined}
+                onPress={() => {
+                  if (!route) return;
+                  setNotifModalVisible(false);
+                  router.push(route);
+                }}
+              >
                 <View style={[styles.notifIcon, { backgroundColor: tone.tint }]}>
                   <Ionicons
                     name={isAlert ? "alert-circle" : "notifications"}
@@ -508,7 +481,7 @@ export default function SellerDashboard() {
                   </Text>
                 </View>
                 {!notif.read && <View style={styles.unreadDot} />}
-              </View>
+              </TouchableOpacity>
             );
           })
         )}

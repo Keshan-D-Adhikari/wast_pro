@@ -460,7 +460,7 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 
 | Suite | Tool | Count | What it covers |
 |-------|------|-------|----------------|
-| Mobile unit | Jest + jest-expo | 57 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
+| Mobile unit | Jest + jest-expo | 60 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
 | Admin unit | Vitest | 21 | filters, telemetry parsing |
 | Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 119 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 

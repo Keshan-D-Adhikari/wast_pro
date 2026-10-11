@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { useAuthUser } from '../../hooks/useAuthUser';
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
 import { Sheet } from '@/components/ui/sheet';
 import { AppNotification } from '../../types';
+import { notificationRoute } from '../../utils/notificationRoute';
 
 /** Bell button with an unread badge; opens the signed-in user's notifications in a sheet. */
-export function NotificationBell() {
+export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer' }) {
   const user = useAuthUser();
+  const router = useRouter();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -65,8 +68,20 @@ export function NotificationBell() {
           items.map((n) => {
             const bad = n.type === 'order_cancelled';
             const tone = bad ? Palette.status.danger : Palette.status.success;
+            const route = notificationRoute(n.type, role);
             return (
-              <View key={n.id} style={styles.item}>
+              <TouchableOpacity
+                key={n.id}
+                style={styles.item}
+                activeOpacity={route ? 0.6 : 1}
+                disabled={!route}
+                accessibilityRole={route ? 'button' : undefined}
+                onPress={() => {
+                  if (!route) return;
+                  setOpen(false);
+                  router.push(route);
+                }}
+              >
                 <View style={[styles.icon, { backgroundColor: tone.tint }]}>
                   <Ionicons name={bad ? 'alert-circle' : 'notifications'} size={16} color={tone.base} />
                 </View>
@@ -77,7 +92,7 @@ export function NotificationBell() {
                   </Text>
                 </View>
                 {!n.read && <View style={styles.dot} />}
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
