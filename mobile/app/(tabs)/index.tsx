@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     ...Shadow[2],
   },
   logo: { width: 56, height: 56 },
-  name: { ...Type.h1, fontSize: 28, color: Palette.brand[900] },
+  name: { ...Type.h1, fontSize: 30, color: Palette.brand[900] },
   tagline: { ...Type.small, marginTop: Space.sm, color: Palette.brand[600], fontWeight: '600' },
   footer: {
     ...Type.caption,

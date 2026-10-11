@@ -86,6 +86,6 @@ const styles = StyleSheet.create({
   full: { alignSelf: 'stretch', paddingHorizontal: Space.xl },
   compact: { height: 44, paddingHorizontal: Space.xl, alignSelf: 'flex-start' },
   content: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
-  label: { ...Type.bodyStrong, fontWeight: '700' },
+  label: { ...Type.bodyStrong, fontSize: 16, fontWeight: '700' },
   disabled: { opacity: 0.45 },
 });

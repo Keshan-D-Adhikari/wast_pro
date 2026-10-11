@@ -37,6 +37,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Palette.ink[200], marginBottom: Space.lg },
   tab: { flex: 1, alignItems: 'center', paddingVertical: Space.md, borderBottomWidth: 3, borderBottomColor: 'transparent', marginBottom: -1 },
   tabActive: { borderBottomColor: Palette.brand[600] },
-  label: { color: Palette.ink[500], fontSize: 14 },
+  label: { color: Palette.ink[500], fontSize: 15 },
   labelActive: { color: Palette.ink[900] },
 });

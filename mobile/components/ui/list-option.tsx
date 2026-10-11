@@ -101,6 +101,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: Space.xs,
   },
-  tileValue: { fontSize: 18, fontWeight: '800', lineHeight: 23 },
+  tileValue: { fontSize: 20, fontWeight: '800', lineHeight: 25 },
   tileLabel: { ...Type.caption, textAlign: 'center', color: Palette.ink[500] },
 });

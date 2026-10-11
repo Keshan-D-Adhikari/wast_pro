@@ -119,21 +119,21 @@ export const Shadow = {
 
 export const Type = {
   /** Screen titles */
-  h1: { fontSize: 26, fontWeight: '800' as const, lineHeight: 32, color: Palette.ink[900] },
+  h1: { fontSize: 28, fontWeight: '800' as const, lineHeight: 34, color: Palette.ink[900] },
   /** Card titles, modal titles */
-  h2: { fontSize: 19, fontWeight: '700' as const, lineHeight: 25, color: Palette.ink[900] },
+  h2: { fontSize: 21, fontWeight: '700' as const, lineHeight: 27, color: Palette.ink[900] },
   /** Section headings */
-  h3: { fontSize: 16, fontWeight: '700' as const, lineHeight: 21, color: Palette.ink[900] },
+  h3: { fontSize: 18, fontWeight: '700' as const, lineHeight: 23, color: Palette.ink[900] },
   /** Default body copy */
-  body: { fontSize: 15, fontWeight: '400' as const, lineHeight: 21, color: Palette.ink[700] },
-  bodyStrong: { fontSize: 15, fontWeight: '600' as const, lineHeight: 21, color: Palette.ink[900] },
+  body: { fontSize: 17, fontWeight: '400' as const, lineHeight: 23, color: Palette.ink[700] },
+  bodyStrong: { fontSize: 17, fontWeight: '600' as const, lineHeight: 23, color: Palette.ink[900] },
   /** Secondary copy, list metadata */
-  small: { fontSize: 13, fontWeight: '400' as const, lineHeight: 18, color: Palette.ink[500] },
-  smallStrong: { fontSize: 13, fontWeight: '600' as const, lineHeight: 18, color: Palette.ink[700] },
+  small: { fontSize: 15, fontWeight: '400' as const, lineHeight: 20, color: Palette.ink[500] },
+  smallStrong: { fontSize: 15, fontWeight: '600' as const, lineHeight: 20, color: Palette.ink[700] },
   /** Field labels, badges */
-  caption: { fontSize: 11, fontWeight: '600' as const, lineHeight: 15, color: Palette.ink[500] },
+  caption: { fontSize: 13, fontWeight: '600' as const, lineHeight: 17, color: Palette.ink[500] },
   /** Numeric emphasis — prices, stats */
-  metric: { fontSize: 22, fontWeight: '800' as const, lineHeight: 27, color: Palette.brand[600] },
+  metric: { fontSize: 24, fontWeight: '800' as const, lineHeight: 29, color: Palette.brand[600] },
 } as const;
 
 /** Height reserved for the fixed bottom navigation bar. */
