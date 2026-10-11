@@ -43,7 +43,12 @@ export default function BuyerOffers() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setOffers(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Offer)));
+      // A withdrawn offer is one the buyer took back, so it is not listed any more.
+      setOffers(
+        snapshot.docs
+          .map(d => ({ id: d.id, ...d.data() } as Offer))
+          .filter(o => o.status !== 'withdrawn')
+      );
       setLoading(false);
     }, (err) => {
       console.error('BuyerOffers error:', err);
@@ -159,8 +164,8 @@ export default function BuyerOffers() {
 
         <DetailRow label="Seller" value={offer.sellerName} />
         <DetailRow label="Weight" value={`${offer.weightKg} kg`} />
-        <DetailRow label="Asking price" value={`Rs ${offer.askingPrice}`} />
-        <DetailRow label="Your offer" value={`Rs ${offer.offeredPrice}`} emphasis />
+        <DetailRow label="Asking price" value={formatRs(offer.askingPrice)} />
+        <DetailRow label="Your offer" value={formatRs(offer.offeredPrice)} emphasis />
         <DetailRow label="Date" value={date} />
 
         {offer.status === 'accepted' && (() => {

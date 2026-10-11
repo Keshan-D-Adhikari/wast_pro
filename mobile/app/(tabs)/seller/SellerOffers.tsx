@@ -16,6 +16,7 @@ import {
 import { db, auth } from '../../../firebaseConfig';
 import { useAuthUser } from '../../../hooks/useAuthUser';
 import { Offer, Order } from '../../../types';
+import { formatRs } from '../../../utils/money';
 
 import { Palette, Space, Radius, Type, wasteAccent } from '@/constants/design';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
@@ -237,8 +238,8 @@ export default function SellerOffers() {
         <Divider />
 
         <DetailRow label="Buyer" value={offer.buyerName} />
-        <DetailRow label="Asking price" value={`Rs ${offer.askingPrice}`} />
-        <DetailRow label="Offered price" value={`Rs ${offer.offeredPrice}`} emphasis />
+        <DetailRow label="Asking price" value={formatRs(offer.askingPrice)} />
+        <DetailRow label="Offered price" value={formatRs(offer.offeredPrice)} emphasis />
         <DetailRow label="Date" value={date} />
 
         {isPending && (
