@@ -13,6 +13,9 @@ import { Card, SectionTitle } from "@/components/ui/card";
 import { ListOption, StatTile } from "@/components/ui/list-option";
 import { LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { IdBadge } from "@/components/ui/id-badge";
+import { userCode } from "../../../utils/shortId";
+import { DEFAULT_BIN_ID } from "../../../iotConfig";
 import { UserProfile } from "../../../types";
 
 export default function SellerProfile() {
@@ -109,6 +112,8 @@ export default function SellerProfile() {
 
           <Text style={styles.name} numberOfLines={1}>{userData?.fullName || "Seller"}</Text>
           <Text style={Type.small}>{userData?.email || "No Email"}</Text>
+          <IdBadge label="Your ID" code={userCode(auth.currentUser?.uid)} />
+          <IdBadge label="Smart bin" code={userData?.binId || DEFAULT_BIN_ID} />
 
           <View style={styles.rolePill}>
             <Ionicons name="trash-outline" size={12} color={Palette.brand[700]} />

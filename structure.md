@@ -256,6 +256,7 @@ The two `EditProfile.tsx` files are 5-line wrappers around `components/profile-e
 | `utils/orderNotifications.ts` | Message and type of the notification a seller's action sends to the buyer |
 | `utils/passwordReset.ts` | Messages for the reset-email result (same message for unknown email, so accounts cannot be probed) |
 | `utils/donut.ts` | Donut slice geometry and `formatKg` (up to 3 decimals) |
+| `utils/shortId.ts` | Short support IDs derived from the document id: `USR-7K3F9A` (user), `ORD-A1B2C3` (order); the bin keeps its own id such as `bin001`. Same rule in `admin/src/lib/shortId.js` |
 | `utils/money.ts` | `roundMoney` and `formatRs` (`Rs 120`, `Rs 7.20`) |
 | `types.ts` | Shared types: `UserProfile`, `MarketplaceItem`, `Order`, `Offer`, `AppNotification`, `BinData`, `BinCompartment`, `UserLocation`, `WasteType` |
 
@@ -460,8 +461,8 @@ pending ──seller confirm──► confirmed ──seller complete──► c
 
 | Suite | Tool | Count | What it covers |
 |-------|------|-------|----------------|
-| Mobile unit | Jest + jest-expo | 60 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
-| Admin unit | Vitest | 37 | filters, telemetry parsing |
+| Mobile unit | Jest + jest-expo | 64 | distance, bin status and telemetry, order actions, order tabs, order notifications, password-reset messages, donut maths and `formatKg`, money formatting, colour contrast, password field |
+| Admin unit | Vitest | 41 | filters, telemetry parsing |
 | Firestore rules | Firebase emulator + `@firebase/rules-unit-testing` | 123 | every collection: who can read/create/update/delete, buy and cancel atomicity, offers, validation, seller order actions, ratings, notification spoofing |
 
 Rules tests live in `mobile/tests/rules/` (`offers`, `users-and-orders`, `listings`, `validation`,

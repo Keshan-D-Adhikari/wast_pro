@@ -3,6 +3,7 @@ import { collection, doc, limit, onSnapshot, or, query, updateDoc, where } from 
 import { db } from "../firebaseConfig";
 import { filterOrders, filterPeople, groupOrdersByUser } from "../lib/filters";
 import { IconSearch, IconOrders } from "../components/Icons";
+import { orderCode, userCode } from "../lib/shortId";
 
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
 
@@ -90,6 +91,7 @@ function UserOrders({ person, onBack }) {
             <table>
               <thead>
                 <tr>
+                  <th>Order ID</th>
                   <th>Waste Type</th>
                   <th>Weight</th>
                   <th>Total Amount</th>
@@ -104,6 +106,7 @@ function UserOrders({ person, onBack }) {
                   const typeCls = (o.wasteType || "").toLowerCase();
                   return (
                     <tr key={o.id}>
+                      <td><code>{orderCode(o.id)}</code></td>
                       <td>
                         <span className={`badge waste-${typeCls}`}>{o.wasteType || "Waste"}</span>
                       </td>
@@ -188,7 +191,7 @@ export default function Orders() {
           <span className="search-icon"><IconSearch size={16} /></span>
           <input
             type="search"
-            placeholder="Search by user name…"
+            placeholder="Search by name, user ID (USR-…) or order ID (ORD-…)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -216,6 +219,7 @@ export default function Orders() {
             <table>
               <thead>
                 <tr>
+                  <th>User ID</th>
                   <th>User</th>
                   <th>Role</th>
                   <th>Orders</th>
@@ -229,6 +233,7 @@ export default function Orders() {
               <tbody>
                 {filtered.map((p) => (
                   <tr key={p.uid} style={{ cursor: "pointer" }} onClick={() => setSelected(p)}>
+                    <td><code>{userCode(p.uid)}</code></td>
                     <td style={{ fontWeight: 600 }}>{p.name}</td>
                     <td><span className={`badge role-${p.role}`}>{p.role}</span></td>
                     <td>{p.total}</td>

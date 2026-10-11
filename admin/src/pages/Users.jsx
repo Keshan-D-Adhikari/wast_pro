@@ -5,6 +5,7 @@ import { filterUsers, orderUsersAdminsFirst } from "../lib/filters";
 import { validateUserEdit } from "../lib/userEdit";
 import { usePaginatedCollection } from "../lib/usePaginatedCollection";
 import { IconSearch, IconUsers } from "../components/Icons";
+import { userCode } from "../lib/shortId";
 
 // Sellers without an assigned bin see the default prototype bin.
 const DEFAULT_BIN = "bin001";
@@ -28,6 +29,11 @@ export default function Users() {
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+
+  // While the admin is searching, keep loading until the whole directory is available to search.
+  useEffect(() => {
+    if (search.trim() && hasMore && !loading) loadMore();
+  }, [search, hasMore, loading, loadMore, pagedUsers.length]);
 
   const filtered = useMemo(
     () => filterUsers(users, { search, role: roleFilter }),
@@ -97,7 +103,7 @@ export default function Users() {
           <span className="search-icon"><IconSearch size={16} /></span>
           <input
             type="search"
-            placeholder="Search by user name or email…"
+            placeholder="Search by name, email or user ID (USR-…)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -138,6 +144,7 @@ export default function Users() {
             <table>
               <thead>
                 <tr>
+                  <th>User ID</th>
                   <th>Full Name</th>
                   <th>Email Address</th>
                   <th>Role</th>
@@ -152,6 +159,7 @@ export default function Users() {
               <tbody>
                 {filtered.map((u) => (
                   <tr key={u.id}>
+                    <td><code>{userCode(u.id)}</code></td>
                     <td style={{ fontWeight: 600 }}>{u.fullName || "—"}</td>
                     <td style={{ color: "var(--ink-700)" }}>{u.email || "—"}</td>
                     <td>

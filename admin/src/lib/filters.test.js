@@ -160,3 +160,24 @@ describe("orderUsersAdminsFirst", () => {
     expect(result.map((u) => u.id)).toEqual(["2", "9", "1", "3"]);
   });
 });
+
+describe("search by short id", () => {
+  it("finds a user by their USR code", () => {
+    const users = [
+      { id: "JSErfAcDVJXt", fullName: "Kesh", email: "k@x.com", role: "seller" },
+      { id: "AbCdEfGhIjKl", fullName: "Nuwan", email: "n@x.com", role: "buyer" },
+    ];
+    expect(filterUsers(users, { search: "USR-JSERFA" }).map((u) => u.fullName)).toEqual(["Kesh"]);
+    expect(filterUsers(users, { search: "abcdef" }).map((u) => u.fullName)).toEqual(["Nuwan"]);
+  });
+
+  it("finds the people in an order by its ORD code", () => {
+    const orders = [
+      { id: "Q1w2E3r4", buyerUid: "b1", buyerName: "Amal", sellerUid: "s1", sellerName: "Nimal", status: "pending", totalPrice: 5 },
+      { id: "Z9y8X7w6", buyerUid: "b2", buyerName: "Kamal", sellerUid: "s1", sellerName: "Nimal", status: "pending", totalPrice: 5 },
+    ];
+    const people = groupOrdersByUser(orders);
+    expect(filterPeople(people, "ORD-Q1W2E3").map((p) => p.uid).sort()).toEqual(["b1", "s1"]);
+    expect(filterOrders(orders, { search: "ord-z9y8x7" }).map((o) => o.id)).toEqual(["Z9y8X7w6"]);
+  });
+});

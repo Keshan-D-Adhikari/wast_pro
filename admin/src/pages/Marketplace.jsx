@@ -3,6 +3,7 @@ import { collection, deleteDoc, doc, limit, onSnapshot, query, where } from "fir
 import { db } from "../firebaseConfig";
 import { filterListings, filterSellers, groupListingsBySeller } from "../lib/filters";
 import { IconSearch, IconMarketplace, IconTrash } from "../components/Icons";
+import { userCode } from "../lib/shortId";
 
 // The sellers list is built from this many of the newest-written listings at most.
 const SELLER_SCAN_LIMIT = 500;
@@ -179,7 +180,7 @@ export default function Marketplace() {
           <span className="search-icon"><IconSearch size={16} /></span>
           <input
             type="search"
-            placeholder="Search by seller name…"
+            placeholder="Search by seller name or user ID (USR-…)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -207,6 +208,7 @@ export default function Marketplace() {
             <table>
               <thead>
                 <tr>
+                  <th>User ID</th>
                   <th>Seller</th>
                   <th>Listings</th>
                   <th>Available</th>
@@ -218,6 +220,7 @@ export default function Marketplace() {
               <tbody>
                 {filtered.map((s) => (
                   <tr key={s.sellerUid} style={{ cursor: "pointer" }} onClick={() => setSelected(s)}>
+                    <td><code>{userCode(s.sellerUid)}</code></td>
                     <td style={{ fontWeight: 600 }}>{s.sellerName}</td>
                     <td>{s.total}</td>
                     <td><span className="badge status-completed">{s.available}</span></td>

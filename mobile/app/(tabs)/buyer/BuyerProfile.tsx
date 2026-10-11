@@ -12,6 +12,8 @@ import { Card, SectionTitle } from "@/components/ui/card";
 import { ListOption, StatTile } from "@/components/ui/list-option";
 import { LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { IdBadge } from "@/components/ui/id-badge";
+import { userCode } from "../../../utils/shortId";
 import { UserProfile } from "../../../types";
 
 export default function BuyerProfile() {
@@ -120,6 +122,7 @@ export default function BuyerProfile() {
 
           <Text style={styles.name} numberOfLines={2}>{userData?.fullName || "Buyer"}</Text>
           <Text style={Type.small}>{user?.email || "No Email"}</Text>
+          <IdBadge label="Your ID" code={userCode(user?.uid)} />
 
           <View style={styles.rolePill}>
             <Ionicons name="repeat-outline" size={12} color={Palette.brand[700]} />

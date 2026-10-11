@@ -1,3 +1,5 @@
+import { matchesCode, orderCode, userCode } from "./shortId";
+
 /** Shared row-filtering helpers, pulled out of the table pages so they're testable in isolation. */
 
 export function filterUsers(users, { search = "", role = "all" } = {}) {
@@ -7,7 +9,8 @@ export function filterUsers(users, { search = "", role = "all" } = {}) {
     const matchesTerm =
       !term ||
       u.fullName?.toLowerCase().includes(term) ||
-      u.email?.toLowerCase().includes(term);
+      u.email?.toLowerCase().includes(term) ||
+      matchesCode(userCode(u.id), term);
     return matchesRole && matchesTerm;
   });
 }
@@ -29,7 +32,8 @@ export function filterOrders(orders, { search = "", status = "all" } = {}) {
     const matchesTerm =
       !term ||
       o.buyerName?.toLowerCase().includes(term) ||
-      o.sellerName?.toLowerCase().includes(term);
+      o.sellerName?.toLowerCase().includes(term) ||
+      matchesCode(orderCode(o.id), term);
     return matchesStatus && matchesTerm;
   });
 }
@@ -77,7 +81,9 @@ export function groupListingsBySeller(listings) {
 
 export function filterSellers(sellers, search = "") {
   const term = search.trim().toLowerCase();
-  return sellers.filter((s) => !term || s.sellerName.toLowerCase().includes(term));
+  return sellers.filter(
+    (s) => !term || s.sellerName.toLowerCase().includes(term) || matchesCode(userCode(s.sellerUid), term)
+  );
 }
 
 /**
@@ -89,8 +95,9 @@ export function groupOrdersByUser(orders) {
   const people = new Map();
   const add = (uid, name, role, order) => {
     if (!uid) return;
-    const p = people.get(uid) ?? { uid, name: name || "Unknown user", role, total: 0, ongoing: 0, completed: 0, cancelled: 0, value: 0 };
+    const p = people.get(uid) ?? { uid, name: name || "Unknown user", role, total: 0, ongoing: 0, completed: 0, cancelled: 0, value: 0, orderIds: [] };
     p.total += 1;
+    p.orderIds.push(order.id);
     if (order.status === "completed") {
       p.completed += 1;
       p.value += Number(order.totalPrice) || 0;
@@ -110,7 +117,13 @@ export function groupOrdersByUser(orders) {
 
 export function filterPeople(people, search = "") {
   const term = search.trim().toLowerCase();
-  return people.filter((p) => !term || p.name.toLowerCase().includes(term));
+  return people.filter(
+    (p) =>
+      !term ||
+      p.name.toLowerCase().includes(term) ||
+      matchesCode(userCode(p.uid), term) ||
+      (p.orderIds || []).some((id) => matchesCode(orderCode(id), term))
+  );
 }
 
 /** Merges the paginated users with the admin accounts and puts admins first, then everyone else by name. */

@@ -17,6 +17,7 @@ import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { StarRating } from "@/components/ui/star-rating";
 import { formatRs } from "../../../utils/money";
+import { orderCode } from "../../../utils/shortId";
 import { OrderTabs } from "@/components/ui/order-tabs";
 import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
 import { Order } from "../../../types";
@@ -169,6 +170,7 @@ export default function SellerOrders() {
 
         <Divider />
 
+        <DetailRow label="Order ID" value={orderCode(order.id)} />
         <DetailRow label="Buyer" value={order.buyerName || '—'} />
         <DetailRow label="Weight" value={`${order.weightKg} kg`} />
         <DetailRow label="Date" value={date} />
