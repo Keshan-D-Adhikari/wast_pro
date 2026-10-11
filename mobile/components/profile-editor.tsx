@@ -240,7 +240,7 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
   };
 
   return (
-    <Screen>
+    <Screen keyboardAware>
       <ScreenHeader title="Edit profile" back />
 
       <TouchableOpacity
