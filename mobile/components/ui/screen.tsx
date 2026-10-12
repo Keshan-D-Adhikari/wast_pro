@@ -74,6 +74,7 @@ export function ScreenHeader({ title, subtitle, back = false, right }: ScreenHea
   return (
     <View style={styles.header}>
       {back && (
+        // BUTTON: "Go back"
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backBtn}

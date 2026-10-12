@@ -32,6 +32,9 @@ const tone: Record<Variant, { bg: string; fg: string; border?: string; shadow: b
   ghost: { bg: 'transparent', fg: Palette.ink[500], shadow: false },
 };
 
+// FUNCTION: Button
+// Runs when: any screen draws a button.
+// What it does: the one shared button used in the whole app (label, icon, loading spinner).
 // A '?' after a prop name means it is optional. The '=' values are the defaults.
 /** Single button component for every tappable action in the app. */
 export function Button({

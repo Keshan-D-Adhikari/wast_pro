@@ -24,6 +24,7 @@ interface WasteTypeConfig {
   label: string;
 }
 
+// PRICES: the fixed selling price per kg for each waste type.
 const priceConfig: Record<WasteType, WasteTypeConfig> = {
   plastic: {
     pricePerKg: 45,
@@ -142,6 +143,9 @@ export default function AddWaste() {
   const availableKg = (type: WasteType): number => getCompartment(type).weight ?? 0;
   const fillLevel = (type: WasteType): number => getCompartment(type).level ?? 0;
 
+  // FUNCTION: handleWeightChange
+  // Runs when: the seller types a weight.
+  // What it does: calculates the total price: weight x price per kg.
   // Runs on every key press in a weight box.
   const handleWeightChange = (type: WasteType, value: string) => {
     const cleaned = value.replace(/[^0-9.]/g, '');
@@ -164,6 +168,9 @@ export default function AddWaste() {
   const selectedCount = Object.values(wasteItems)
     .filter(item => item.selected).length;
 
+  // FUNCTION: handleSubmit
+  // Runs when: the "Post to marketplace" button is pressed.
+  // What it does: checks the weights, then saves one listing per waste type in Firestore.
   // Called when the seller presses Post to marketplace. It checks the data first, then saves.
   const handleSubmit = async () => {
     const selectedItems = Object.entries(wasteItems)
@@ -188,6 +195,7 @@ export default function AddWaste() {
     // currently measured in each bin compartment
     for (const [type, item] of selectedItems) {
       const maxWeight = availableKg(type);
+      // CHECK: the seller cannot list more weight than the bin measured.
       if (parseFloat(item.weight) > maxWeight) {
         Alert.alert(
           'Error',
@@ -222,6 +230,7 @@ export default function AddWaste() {
       };
 
       for (const [type, item] of selectedItems) {
+        // FIRESTORE: the listing is saved in the "marketplace" collection here.
         await addDoc(collection(db, 'marketplace'), {
           sellerUid: auth.currentUser!.uid,
           sellerName: sellerName || "Unknown Seller",
@@ -352,6 +361,7 @@ export default function AddWaste() {
           </>
         )}
 
+        {/* BUTTON: "Post to marketplace" */}
         <Button
           label="Post to marketplace"
           icon="storefront-outline"

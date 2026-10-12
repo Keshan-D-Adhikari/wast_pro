@@ -58,6 +58,7 @@ export function Sheet({ visible, title, onClose, children, scrollable = false, a
 
           <View style={styles.header}>
             <Text style={Type.h2}>{title}</Text>
+            {/* BUTTON: "Close" */}
             <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityLabel="Close">
               <Ionicons name="close" size={24} color={Palette.ink[500]} />
             </TouchableOpacity>

@@ -34,6 +34,9 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // FUNCTION: handleLogin
+  // Runs when: the "Log In" button is pressed.
+  // What it does: checks the email and password with Firebase, reads the role, then opens the seller or buyer dashboard.
   /* ================= FIREBASE LOGIN FUNCTION ================= */
   // Runs when the user taps "Log In" (or presses "go" on the keyboard).
   // "async" lets us use "await" to wait for Firebase without freezing the app.
@@ -46,6 +49,7 @@ export default function Login() {
     try {
       setLoading(true);
 
+      // FIREBASE AUTH: the email and password are checked here.
       // 1. Login via Firebase Auth (Server unreachable error does not appear here)
       // This throws an error if the email or password is wrong.
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -69,6 +73,7 @@ export default function Login() {
           return;
         }
 
+        // ROLE CHECK: a seller goes to the Seller Dashboard, anyone else to the Buyer Dashboard.
         // 3. Sending to the relevant Dashboard according to the role
         if (userRole === 'seller') {
           router.replace('/(tabs)/seller/SellerDashboard');
@@ -88,6 +93,9 @@ export default function Login() {
     }
   };
 
+  // FUNCTION: handleForgotPassword
+  // Runs when: the "Forgot password?" link is pressed.
+  // What it does: asks Firebase to send a password reset email to the typed address.
   /* ================= PASSWORD RESET ================= */
   // Sends Firebase's "reset your password" email to the address in the email box.
   const handleForgotPassword = async () => {
@@ -171,6 +179,7 @@ export default function Login() {
             />
 
             {/* "Forgot password?" link. hitSlop makes the tap area bigger than the text. */}
+            {/* BUTTON: "Forgot password" */}
             <TouchableOpacity
               onPress={handleForgotPassword}
               style={styles.forgotRow}
@@ -182,9 +191,11 @@ export default function Login() {
             </TouchableOpacity>
 
             {/* Main login button. It shows a spinner while loading is true. */}
+            {/* BUTTON: "Log In" */}
             <Button label="Log In" onPress={handleLogin} loading={loading} />
 
             {/* Link to the registration screen. push keeps Login underneath, so Back returns here. */}
+            {/* BUTTON: "Don’t have an account Create one" */}
             <TouchableOpacity
               onPress={() => router.push('/(tabs)/CreateAccount')}
               style={styles.signupRow}

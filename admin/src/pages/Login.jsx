@@ -10,6 +10,9 @@ export default function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // FUNCTION: handleSubmit
+  // Runs when: the "Sign in" button is pressed.
+  // What it does: signs the admin in with Firebase.
   // Runs when the form is submitted. async/await waits for Firebase without freezing the page.
   const handleSubmit = async (e) => {
     e.preventDefault();

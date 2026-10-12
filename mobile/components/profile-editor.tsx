@@ -122,6 +122,9 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     ? SRI_LANKAN_LOCATIONS.filter(loc => loc.toLowerCase().includes(location.trim().toLowerCase())).slice(0, 6)
     : [];
 
+  // FUNCTION: handlePickImage
+  // Runs when: the profile photo is pressed.
+  // What it does: lets the user take a photo or pick one from the gallery.
   // Asks the user to take a photo or choose one, then uploads it.
   // Each option first asks for the needed permission.
   const handlePickImage = async () => {
@@ -167,6 +170,9 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     ]);
   };
 
+  // FUNCTION: uploadImage
+  // Runs when: a photo has been chosen.
+  // What it does: uploads the photo to Firebase Storage and saves its link in the profile.
   // Uploads the picked image to Firebase Storage and saves its link in Firestore.
   // Steps: 1 file path, 2 image to blob, 3 upload, 4 get link, 5 save link.
   const uploadImage = async (uri: string) => {
@@ -216,6 +222,9 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     }
   };
 
+  // FUNCTION: handleSave
+  // Runs when: the "Save changes" button is pressed.
+  // What it does: checks the phone number and saves the name, phone and location in Firestore.
   // Validates the phone number, then saves the profile to Firestore.
   const handleSave = async () => {
     if (!auth.currentUser) return;
@@ -257,6 +266,7 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
       <ScreenHeader title="Edit profile" back />
 
       {/* Round photo with a camera badge. Tap to change. Shows a spinner while uploading. */}
+      {/* BUTTON: "Change profile photo" */}
       <TouchableOpacity
         onPress={handlePickImage}
         style={styles.avatarWrap}
@@ -337,6 +347,7 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
         </View>
 
         {/* Save button */}
+        {/* BUTTON: "Save changes" */}
         <Button label="Save changes" onPress={handleSave} loading={loading} />
       </Card>
     </Screen>

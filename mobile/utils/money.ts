@@ -5,6 +5,9 @@ export function roundMoney(value: number): number {
   return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
 }
 
+// FUNCTION: formatRs
+// Runs when: a price is shown.
+// What it does: formats a price as text, for example "Rs 120" or "Rs 7.20".
 /** "Rs 120" for whole amounts, "Rs 7.20" otherwise. Also cleans up amounts already stored with float noise. */
 // Example: 120 gives 'Rs 120', 7.2 gives 'Rs 7.20', null gives 'Rs 0'.
 export function formatRs(value: number | null | undefined): string {

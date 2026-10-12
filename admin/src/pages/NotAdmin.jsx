@@ -34,6 +34,7 @@ export default function NotAdmin() {
           </p>
 
           {/* Sign out so they can try another account. */}
+          {/* BUTTON: "Sign out and return" */}
           <button type="button" className="btn-primary" onClick={logout} style={{ background: "var(--ink-700)" }}>
             <IconSignOut size={16} />
             <span>Sign out and return</span>

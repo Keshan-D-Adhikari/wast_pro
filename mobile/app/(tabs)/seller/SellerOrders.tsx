@@ -64,6 +64,9 @@ export default function SellerOrders() {
 
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // FUNCTION: run
+  // Runs when: any order button is pressed.
+  // What it does: shows the spinner, runs the work, and shows an error message if it fails.
   // Helper that runs one action safely: mark the order as busy, run the work,
   // show an alert if it fails, and always clear the busy mark at the end.
   const run = async (order: Order, work: () => Promise<void>, failMessage: string) => {
@@ -78,6 +81,9 @@ export default function SellerOrders() {
     }
   };
 
+  // FUNCTION: notifyBuyer
+  // Runs when: the seller confirms, completes or declines an order.
+  // What it does: saves a notification for the buyer in Firestore.
   // Tell the buyer what happened. Best effort: a failed notification must not undo the order change.
   // Tell the buyer what happened. Best effort: a failed notification must not undo the order change.
   const notifyBuyer = async (order: Order, event: SellerOrderEvent) => {
@@ -96,6 +102,9 @@ export default function SellerOrders() {
     }
   };
 
+  // FUNCTION: handleConfirm
+  // Runs when: the "Confirm order" button is pressed.
+  // What it does: sets the order status to confirmed and notifies the buyer.
   // Seller taps Confirm: set the order status to confirmed, then tell the buyer.
   const handleConfirm = (order: Order) =>
     run(order, async () => {
@@ -103,6 +112,9 @@ export default function SellerOrders() {
       await notifyBuyer(order, 'confirmed');
     }, 'Could not confirm this order.');
 
+  // FUNCTION: handleComplete
+  // Runs when: the "Mark completed" button is pressed.
+  // What it does: marks a cash order as paid, sets the status to completed and notifies the buyer.
   // Seller taps Mark completed. For cash orders the seller must confirm the cash was received.
   const handleComplete = (order: Order) => {
     const collectsCash = completingCollectsCash(order);
@@ -128,6 +140,9 @@ export default function SellerOrders() {
     );
   };
 
+  // FUNCTION: handleDecline
+  // Runs when: the "Decline" button is pressed.
+  // What it does: cancels the order and puts the listing back on the marketplace in one batch, then notifies the buyer.
   // Seller taps Decline. The order is cancelled and the waste goes back on the marketplace.
   const handleDecline = (order: Order) => {
     Alert.alert(
@@ -164,6 +179,9 @@ export default function SellerOrders() {
     .filter((o) => o.status === 'completed')
     .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
+  // FUNCTION: OrderCard
+  // Runs when: once for each order in the list.
+  // What it does: draws one order card with its details and buttons.
   // One card for one order, with the buttons the seller is allowed to use.
   const OrderCard = ({ order }: { order: Order }) => {
     const accent = wasteAccent(order.wasteType);
@@ -210,6 +228,7 @@ export default function SellerOrders() {
         {sellerActionsFor(order).length > 0 && (
           <View style={styles.actions}>
             {sellerActionsFor(order).includes('decline') && (
+              // BUTTON: "Decline"
               <Button
                 label="Decline"
                 icon="close-circle-outline"
@@ -220,6 +239,7 @@ export default function SellerOrders() {
               />
             )}
             {sellerActionsFor(order).includes('confirm') && (
+              // BUTTON: "Confirm order"
               <Button
                 label="Confirm order"
                 icon="checkmark-circle-outline"
@@ -229,6 +249,7 @@ export default function SellerOrders() {
               />
             )}
             {sellerActionsFor(order).includes('complete') && (
+              // BUTTON: "Mark completed"
               <Button
                 label="Mark completed"
                 icon="checkmark-done-outline"
@@ -251,6 +272,7 @@ export default function SellerOrders() {
           subtitle="Purchases buyers made from you"
           back
           right={
+            // BUTTON: "Offers"
             <Button
               label="Offers"
               icon="pricetag-outline"

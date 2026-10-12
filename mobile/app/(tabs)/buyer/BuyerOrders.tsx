@@ -67,6 +67,9 @@ export default function BuyerOrders() {
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
 
+  // FUNCTION: handlePayOrder
+  // Runs when: the "Pay by card" button is pressed.
+  // What it does: pays an accepted-offer order by card with Stripe, then marks it paid.
   // Pay by card for an order that was created unpaid (an accepted offer):
   // same Stripe Checkout flow as a direct purchase in BuyerDashboard.tsx.
   const handlePayOrder = async (order: Order) => {
@@ -147,6 +150,9 @@ export default function BuyerOrders() {
     return () => unsubscribe();
   }, [authUser]);
 
+  // FUNCTION: handleCancelOrder
+  // Runs when: the "Cancel" button is pressed.
+  // What it does: cancels the order and puts the listing back on the marketplace in one batch, then notifies the seller.
   // Cancels an order. Steps: 1 ask the buyer, 2 cancel + restore the listing in one
   // atomic batch, 3 notify the seller.
   const handleCancelOrder = async (order: Order) => {
@@ -214,6 +220,9 @@ export default function BuyerOrders() {
     );
   };
 
+  // FUNCTION: handleOrderMap
+  // Runs when: the "View location" button is pressed.
+  // What it does: opens a map with the buyer and the pickup point.
   // Steps: 1 check the order has coordinates, 2 ask permission, 3 read GPS,
   // 4 save both points, 5 open the map.
   // Opens map showing route to seller bin location
@@ -273,6 +282,9 @@ export default function BuyerOrders() {
   // Sum of all orders that are not cancelled. "|| 0" protects against missing prices.
   const totalSpent = orders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
+  // FUNCTION: handleRate
+  // Runs when: the buyer taps a star on a completed order.
+  // What it does: saves the rating (1 to 5) on the order.
   // Saves the star rating on the order. The stars can only be set once (see OrderCard).
   const handleRate = async (order: Order, rating: number) => {
     try {
@@ -283,6 +295,9 @@ export default function BuyerOrders() {
     }
   };
 
+  // FUNCTION: OrderCard
+  // Runs when: once for each order in the list.
+  // What it does: draws one order card with its details and buttons.
   // One order card. isLatest highlights the newest ongoing order with a green edge.
   const OrderCard = ({ order, isLatest }: { order: Order; isLatest: boolean }) => {
     const accent = wasteAccent(order.wasteType);
@@ -327,6 +342,7 @@ export default function BuyerOrders() {
         )}
 
         {order.offerId && order.paymentStatus === 'pending' && order.status === 'confirmed' && (
+          // BUTTON: "Pay by card"
           <Button
             label="Pay by card"
             icon="card-outline"
@@ -338,6 +354,7 @@ export default function BuyerOrders() {
 
         <View style={styles.actions}>
           {order.status === 'pending' && (
+            // BUTTON: "Cancel"
             <Button
               label="Cancel"
               icon="close-circle-outline"
@@ -346,6 +363,7 @@ export default function BuyerOrders() {
               style={styles.actionFlex}
             />
           )}
+          {/* BUTTON: "View location" */}
           <Button
             label="View location"
             icon="location-outline"
@@ -366,6 +384,7 @@ export default function BuyerOrders() {
           subtitle="Orders you placed with sellers"
           back
           right={
+            // BUTTON: "Offers"
             <Button
               label="Offers"
               icon="pricetag-outline"

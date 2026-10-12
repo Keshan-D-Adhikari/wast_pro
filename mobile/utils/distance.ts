@@ -1,3 +1,6 @@
+// FUNCTION: calculateDistance
+// Runs when: a distance is needed.
+// What it does: gives the distance in km between two GPS points (Haversine formula).
 // Distance between two GPS points. Used to show how far a buyer is from a seller's bin.
 //
 // Haversine in simple words: the Earth is a ball, so a straight line on a flat map is wrong.

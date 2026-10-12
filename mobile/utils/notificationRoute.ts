@@ -1,5 +1,8 @@
 import type { Href } from 'expo-router';
 
+// FUNCTION: notificationRoute
+// Runs when: a notification is tapped.
+// What it does: gives the screen to open (Orders or Offers).
 /**
  * The screen a notification should open when it is tapped, or null when there
  * is nothing to open (bin alerts are about the bin on the dashboard itself).

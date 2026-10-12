@@ -43,6 +43,7 @@ export function TextField({
           secureTextEntry={passwordToggle ? !passwordVisible : inputProps.secureTextEntry}
         />
         {passwordToggle && (
+          // BUTTON: "Hide password / Show password"
           <TouchableOpacity
             onPress={() => setPasswordVisible((v) => !v)}
             hitSlop={8}

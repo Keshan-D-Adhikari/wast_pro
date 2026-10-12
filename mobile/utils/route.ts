@@ -50,6 +50,9 @@ export function routeUrl(from: LatLng, to: LatLng): string {
   );
 }
 
+// FUNCTION: fetchRoadRoute
+// Runs when: the route map opens.
+// What it does: gets the road route between two points from the OSRM service.
 // Asks OSRM for the route. Returns null on any server error so the map can use a straight line.
 export async function fetchRoadRoute(from: LatLng, to: LatLng, signal?: AbortSignal): Promise<RoadRoute | null> {
   const response = await fetch(routeUrl(from, to), { headers: { Accept: 'application/json' }, signal });

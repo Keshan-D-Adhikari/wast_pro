@@ -46,6 +46,9 @@ function UserOrders({ person, onBack }) {
   const orders = useMemo(() => [...rawOrders].sort(newestFirst), [rawOrders]);
   const filtered = useMemo(() => filterOrders(orders, { status: statusFilter }), [orders, statusFilter]);
 
+  // FUNCTION: handleStatusChange
+  // Runs when: the admin picks a status in the dropdown.
+  // What it does: updates the order status in Firestore.
   // Admin picked a new status in a row's dropdown: save it on orders/<id>. The listener refreshes the table.
   const handleStatusChange = async (order, status) => {
     if (status === order.status) return;
@@ -56,6 +59,7 @@ function UserOrders({ person, onBack }) {
     <section>
       <div className="page-header">
         <div>
+          {/* BUTTON: "← All users" */}
           <button type="button" className="load-more-btn" style={{ margin: "0 0 0.75rem" }} onClick={onBack}>
             ← All users
           </button>
@@ -255,6 +259,7 @@ export default function Orders() {
                     <td><span className="badge status-cancelled">{p.cancelled}</span></td>
                     <td style={{ fontWeight: 700, color: "var(--brand-700)" }}>{rs(p.value)}</td>
                     <td style={{ textAlign: "right" }}>
+                      {/* BUTTON: "View" */}
                       <button
                         type="button"
                         className="btn-sm-success"

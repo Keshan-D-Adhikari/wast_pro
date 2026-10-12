@@ -8,6 +8,7 @@ import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// FIREBASE KEYS: the values come from the .env file, not from the code.
 // Project keys. They are read from the .env file. Expo only exposes variables
 // that start with EXPO_PUBLIC_ to the app code. These keys only identify our
 // project. Real security comes from the Firestore and Storage rules.
@@ -21,6 +22,7 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
+// FIREBASE CONNECT: the app connects to the main Firebase project here.
 // 1. Start the Firebase app. Every other Firebase service is attached to it.
 const app = initializeApp(firebaseConfig);
 

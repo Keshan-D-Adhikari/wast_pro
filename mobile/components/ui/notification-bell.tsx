@@ -10,6 +10,9 @@ import { Sheet } from '@/components/ui/sheet';
 import { AppNotification } from '../../types';
 import { notificationRoute } from '../../utils/notificationRoute';
 
+// FUNCTION: NotificationBell
+// Runs when: a screen shows the bell icon.
+// What it does: shows the unread count and the list of notifications.
 // Prop: role says if the user is a seller or buyer, so a tap opens the right orders/offers screen.
 /** Bell button with an unread badge; opens the signed-in user's notifications in a sheet. */
 export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer' }) {
@@ -38,6 +41,9 @@ export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer'
   // How many notifications the user has not seen yet.
   const unread = items.filter((n) => !n.read).length;
 
+  // FUNCTION: openSheet
+  // Runs when: the bell is pressed.
+  // What it does: opens the notifications list and marks them as read.
   // Opens the sheet and marks every unread notification as read in Firestore.
   const openSheet = async () => {
     setOpen(true);
@@ -53,6 +59,7 @@ export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer'
   return (
     <>
       {/* The bell button. hitSlop makes the tap area a bit bigger than the icon */}
+      {/* BUTTON: "Notifications" */}
       <TouchableOpacity
         style={styles.btn}
         hitSlop={8}

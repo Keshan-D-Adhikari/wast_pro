@@ -44,6 +44,9 @@ export default function Users() {
     [users, search, roleFilter]
   );
 
+  // FUNCTION: openEdit
+  // Runs when: the "Edit" button is pressed.
+  // What it does: opens the edit form filled with that user.
   // Open the edit window: copy the user's current values into the form, clear old errors.
   const openEdit = (u) => {
     setEditing(u);
@@ -57,6 +60,9 @@ export default function Users() {
     setSaveError("");
   };
 
+  // FUNCTION: saveEdit
+  // Runs when: the edit form is saved.
+  // What it does: checks the values and updates the user in Firestore.
   // Save button. Check the form first (validateUserEdit in lib/userEdit.js). If it is valid,
   // update the users/<id> document. serverTimestamp() lets the server write the time.
   // The listener updates the table by itself after the save.
@@ -82,6 +88,9 @@ export default function Users() {
   // { ...f } copies the old form values so the other fields are kept.
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
+  // FUNCTION: assignBin
+  // Runs when: the "Set bin" button is pressed.
+  // What it does: saves which smart bin (binId) that seller sees.
   // Link a seller to a smart bin (a key under bins/ in the IoT database). Empty = use the default bin.
   const assignBin = async (u) => {
     const next = window.prompt(
@@ -183,6 +192,7 @@ export default function Users() {
                         <>
                           <code>{u.binId || DEFAULT_BIN}</code>
                           {!u.binId && <span style={{ color: "var(--ink-500)", fontSize: "0.75rem" }}> (default)</span>}{" "}
+                          {/* BUTTON: "Set bin" */}
                           <button type="button" className="btn-sm-success" onClick={() => assignBin(u)}>
                             Set bin
                           </button>
@@ -202,6 +212,7 @@ export default function Users() {
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
+                      {/* BUTTON: "Edit" */}
                       <button type="button" className="btn-sm-success" style={{ marginRight: "0.4rem" }} onClick={() => openEdit(u)}>
                         Edit
                       </button>
@@ -215,6 +226,7 @@ export default function Users() {
       )}
 
       {!loading && hasMore && (
+        // BUTTON: "Load more accounts"
         <button type="button" className="load-more-btn" onClick={loadMore}>
           Load more accounts
         </button>
@@ -254,6 +266,7 @@ export default function Users() {
             {saveError && <p className="field-error">{saveError}</p>}
 
             <div className="modal-actions">
+              {/* BUTTON: "Cancel" */}
               <button type="button" className="load-more-btn" style={{ margin: 0 }} disabled={saving} onClick={() => setEditing(null)}>
                 Cancel
               </button>

@@ -7,6 +7,7 @@
 
 /* ================= COLOURS ================= */
 
+// COLOURS: every colour used in the app.
 export const Palette = {
   /** Brand green — the app's primary identity */
   brand: {

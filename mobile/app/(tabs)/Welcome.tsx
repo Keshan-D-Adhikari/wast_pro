@@ -40,6 +40,7 @@ export default function Welcome() {
         </View>
 
         {/* router.push adds Login on top, so the user can swipe or press Back to return here */}
+        {/* BUTTON: "Get Started" */}
         <Button
           label="Get Started"
           icon="arrow-forward"

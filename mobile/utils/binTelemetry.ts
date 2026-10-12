@@ -22,6 +22,9 @@ const TYPES: WasteType[] = ['plastic', 'food', 'metal'];
 
 type RawCompartment = { level?: unknown; weight?: unknown; overweight?: unknown } | undefined | null;
 
+// FUNCTION: parseLevel
+// Runs when: bin data arrives.
+// What it does: turns the level text ("EMPTY", "50%", "FULL") into a number and a status.
 /*
  * Reads the fill level.
  * In: a number (45) or text ('EMPTY', 'FULL', '50%', 'ERROR').
@@ -51,6 +54,9 @@ function fromPercent(p: number): { level: number; status: string } {
   return { level, status: 'EMPTY' };
 }
 
+// FUNCTION: parseWeightKg
+// Runs when: bin data arrives.
+// What it does: turns the weight from grams into kg.
 /*
  * Turns a raw weight (grams) into kilograms, rounded to 3 decimals.
  * Example: 1500 gives 1.5. Bad or negative values give 0.
@@ -73,6 +79,9 @@ function normalizeCompartment(raw: RawCompartment): BinCompartment {
   return { level, status, weight: parseWeightKg(raw.weight), overweight: parseOverweight(raw.overweight) };
 }
 
+// FUNCTION: normalizeBin
+// Runs when: bin data arrives.
+// What it does: cleans the raw bin data for the three compartments.
 /** Raw `bins/<id>` value from the firmware -> BinData. Returns null when there is no data. */
 export function normalizeBin(raw: unknown): BinData | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -101,6 +110,9 @@ export function toEpochMs(raw: unknown): number | null {
   return null;
 }
 
+// FUNCTION: describeFreshness
+// Runs when: the dashboard is drawn.
+// What it does: says if the bin is ON (updated in the last 2 minutes) or OFF.
 /*
  * Says if the bin data is recent.
  * In: the last update time (ms) and optionally 'now' (handy for tests).

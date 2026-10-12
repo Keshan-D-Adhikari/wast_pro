@@ -105,6 +105,7 @@ export default function BuyerDashboard() {
       } catch (err) { console.warn('Location unavailable:', err); }
 
       const q = query(collection(db, "marketplace"), where("status", "==", "available"));
+      // FIRESTORE: the available listings arrive here, live.
       // onSnapshot = a LIVE listener. Firestore calls this function now, and again every
       // time the data changes (a new listing, or one gets sold). No manual refresh needed.
       // The second function is the error callback.
@@ -271,6 +272,7 @@ export default function BuyerDashboard() {
       // time, so if another buyer got there first this whole batch is rejected
       // (no order is created) instead of both buyers "buying" the same listing.
       const orderRef = doc(collection(db, "orders"));
+      // FIRESTORE BATCH: the new order and the "sold" listing are saved together here.
       const batch = writeBatch(db);
       batch.set(orderRef, orderData);
       batch.update(doc(db, "marketplace", buyingItem.id), {

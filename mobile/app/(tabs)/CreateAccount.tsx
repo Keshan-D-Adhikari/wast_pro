@@ -49,6 +49,9 @@ export default function CreateAccount() {
 
   const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
+  // FUNCTION: handleContinue
+  // Runs when: the "Create Account" button is pressed.
+  // What it does: creates the login account, saves the profile with the chosen role, then opens the dashboard.
   // ⬅️ The main function of registration
   const handleContinue = async () => {
     // 1. Basic Validation (check if empty)
@@ -64,6 +67,7 @@ export default function CreateAccount() {
     setLoading(true); // To show the spinning wheel on the button
 
     try {
+      // FIREBASE AUTH: the new login account is created here.
       // 2.Creating a User via Firebase Authentication
       // This will take your email to the Firebase 'Users' tab.
       // Firebase also signs the new user in automatically. It rejects weak
@@ -71,6 +75,7 @@ export default function CreateAccount() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+      // FIRESTORE: the profile (name, email, role) is saved in the "users" collection here.
       // 3. Saving additional user details in the Firestore Database
       //A new document named user.uid is created inside the 'users' collection.
       // Auth cannot store a role, so we keep it here. Login reads it later to choose
@@ -203,9 +208,11 @@ export default function CreateAccount() {
             />
 
             {/* Submit button. It shows a spinner while loading is true. */}
+            {/* BUTTON: "Create Account" */}
             <Button label="Create Account" onPress={handleContinue} loading={loading} />
 
             {/* For people who already have an account */}
+            {/* BUTTON: "Already registered Log in" */}
             <TouchableOpacity
               onPress={() => router.push('/(tabs)/Login')}
               style={styles.loginRow}

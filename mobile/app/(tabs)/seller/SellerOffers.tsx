@@ -73,6 +73,9 @@ export default function SellerOffers() {
     return () => unsubscribe();
   }, [authUser]);
 
+  // FUNCTION: handleAccept
+  // Runs when: the "Accept" button is pressed.
+  // What it does: accepts the offer, marks the listing sold and creates the order in one transaction, then notifies the buyers.
   // Called when the seller taps Accept. First ask for confirmation with an alert.
   const handleAccept = (offer: Offer) => {
     Alert.alert(
@@ -88,6 +91,7 @@ export default function SellerOffers() {
             try {
               // Use a transaction to atomically: mark offer accepted, mark listing sold, create order
               const orderRef = doc(collection(db, 'orders'));
+              // FIRESTORE TRANSACTION: the offer, the listing and the new order change together here.
               await runTransaction(db, async (tx) => {
                 const listingRef = doc(db, 'marketplace', offer.listingId);
                 const listingSnap = await tx.get(listingRef);
@@ -187,6 +191,9 @@ export default function SellerOffers() {
     );
   };
 
+  // FUNCTION: handleReject
+  // Runs when: the "Reject" button is pressed.
+  // What it does: sets the offer to rejected and notifies the buyer.
   // Called when the seller taps Reject. The listing stays available for other offers.
   const handleReject = (offer: Offer) => {
     Alert.alert(
@@ -228,6 +235,9 @@ export default function SellerOffers() {
   const pendingOffers = offers.filter(o => o.status === 'pending');
   const otherOffers = offers.filter(o => o.status !== 'pending');
 
+  // FUNCTION: OfferCard
+  // Runs when: once for each offer in the list.
+  // What it does: draws one offer card with the Accept and Reject buttons.
   // One card for one offer. highest is true for the first (best) pending offer.
   const OfferCard = ({ offer, highest }: { offer: Offer; highest: boolean }) => {
     const accent = wasteAccent(offer.wasteType as any);
@@ -261,6 +271,7 @@ export default function SellerOffers() {
 
         {isPending && (
           <View style={styles.actionRow}>
+            {/* BUTTON: "Reject" */}
             <Button
               label="Reject"
               variant="danger"
@@ -268,6 +279,7 @@ export default function SellerOffers() {
               loading={isProcessing}
               onPress={() => handleReject(offer)}
             />
+            {/* BUTTON: "Accept" */}
             <Button
               label="Accept"
               style={styles.actionBtn}

@@ -65,6 +65,9 @@ export default function BuyerProfile() {
 
   const user = auth.currentUser;
 
+  // FUNCTION: handleLogout
+  // Runs when: the "Log out" row is pressed.
+  // What it does: signs out of Firebase and goes back to the Welcome screen.
   // Firebase logout — clears the session stored in AsyncStorage
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -103,6 +106,7 @@ export default function BuyerProfile() {
         <ScreenHeader
           title="Profile"
           right={
+            // BUTTON: "Settings"
             <TouchableOpacity
               style={styles.settingsBtn}
               hitSlop={8}
@@ -181,24 +185,28 @@ export default function BuyerProfile() {
 
         {/* Settings */}
         <SectionTitle>Account settings</SectionTitle>
+        {/* BUTTON: "Browse marketplace" */}
         <ListOption
           icon="storefront-outline"
           title="Browse marketplace"
           subtitle="Find recyclable waste near you"
           onPress={() => router.push("/(tabs)/buyer/BuyerDashboard")}
         />
+        {/* BUTTON: "Edit profile" */}
         <ListOption
           icon="person-outline"
           title="Edit profile"
           subtitle="Company name, phone and address"
           onPress={() => router.push("/(tabs)/buyer/EditProfile")}
         />
+        {/* BUTTON: "My purchases" */}
         <ListOption
           icon="cart-outline"
           title="My purchases"
           subtitle="Track your orders"
           onPress={() => router.push("/(tabs)/buyer/BuyerOrders")}
         />
+        {/* BUTTON: "Log out" */}
         <ListOption
           icon="log-out-outline"
           title="Log out"

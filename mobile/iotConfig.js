@@ -80,6 +80,7 @@ const iotFirebaseConfig = {
 const iotApp = getApps().find(app => app.name === 'iot')
   ?? initializeApp(iotFirebaseConfig, 'iot');
 
+// FIREBASE CONNECT (smart bin): the Realtime Database of the bin project.
 // Realtime Database handle. Screens subscribe to it to get live bin data.
 export const iotDb = getDatabase(iotApp);
 

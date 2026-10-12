@@ -15,6 +15,7 @@ const REFRESH_MS = 30000;
 // this page stays bounded as the data grows.
 const REVENUE_ORDER_CAP = 500;
 
+// FIRESTORE: counts documents on the server (used for the dashboard numbers).
 // Asks Firestore to count the documents of a query on the server. This returns only a
 // number, so we do not download every document. Costs far less than reading them all.
 const count = async (q) => (await getCountFromServer(q)).data().count;

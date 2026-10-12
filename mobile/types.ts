@@ -71,6 +71,7 @@ export interface MarketplaceItem {
   createdAt?: Timestamp;
 }
 
+// TYPE: the fields of one order.
 export interface Order {
   id: string;
   listingId: string;

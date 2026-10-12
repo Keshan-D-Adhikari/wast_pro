@@ -70,6 +70,9 @@ export default function SellerProfile() {
     fetchProfileData();
   }, []);
 
+  // FUNCTION: handleLogout
+  // Runs when: the "Log out" row is pressed.
+  // What it does: signs out of Firebase and goes back to the Welcome screen.
   // Asks for confirmation, then logs the seller out.
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -172,6 +175,7 @@ export default function SellerProfile() {
         {/* Settings */}
         <SectionTitle>Account settings</SectionTitle>
         {/* Each ListOption is a tappable row that opens another seller screen */}
+        {/* BUTTON: "Dashboard" */}
         <ListOption
           icon="grid-outline"
           title="Dashboard"
@@ -179,18 +183,21 @@ export default function SellerProfile() {
           onPress={() => router.push("/(tabs)/seller/SellerDashboard")}
         />
         {/* router.push adds a new screen on top, so the back button returns here. */}
+        {/* BUTTON: "Edit profile" */}
         <ListOption
           icon="person-outline"
           title="Edit profile"
           subtitle="Name, phone and address"
           onPress={() => router.push("/(tabs)/seller/EditProfile")}
         />
+        {/* BUTTON: "My orders" */}
         <ListOption
           icon="receipt-outline"
           title="My orders"
           subtitle="Purchases buyers made from you"
           onPress={() => router.push("/(tabs)/seller/SellerOrders")}
         />
+        {/* BUTTON: "Log out" */}
         <ListOption
           icon="log-out-outline"
           title="Log out"

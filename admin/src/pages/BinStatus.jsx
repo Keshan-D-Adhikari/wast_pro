@@ -75,6 +75,7 @@ function BinDetail({ binId, onBack }) {
     <section>
       <div className="page-header">
         <div>
+          {/* BUTTON: "← All bins" */}
           <button type="button" className="load-more-btn" style={{ margin: "0 0 0.75rem" }} onClick={onBack}>
             ← All bins
           </button>
@@ -108,6 +109,7 @@ function BinDetail({ binId, onBack }) {
             </div>
 
             <div style={{ display: "flex", gap: "0.65rem" }}>
+              {/* BUTTON: "Preset Normal Low / Half" */}
               <button
                 type="button"
                 className={mockPreset === "normal" ? "btn-sm-success" : "load-more-btn"}
@@ -116,6 +118,7 @@ function BinDetail({ binId, onBack }) {
               >
                 Preset: Normal (Low / Half)
               </button>
+              {/* BUTTON: "Preset Alert Full / Overweight" */}
               <button
                 type="button"
                 className={mockPreset === "alert" ? "btn-sm-danger" : "load-more-btn"}
@@ -355,6 +358,7 @@ export default function BinStatus() {
                       <td>{s.maxLevel}%</td>
                       <td>{describeFreshness(bin.lastUpdated, now).label}</td>
                       <td style={{ textAlign: "right" }}>
+                        {/* BUTTON: "View" */}
                         <button type="button" className="btn-sm-success" onClick={(e) => { e.stopPropagation(); setSelectedId(id); }}>
                           View
                         </button>
@@ -369,6 +373,7 @@ export default function BinStatus() {
       )}
 
       {!loading && filtered.length > shown && (
+        // BUTTON: "Show more bins"
         <button type="button" className="load-more-btn" onClick={() => setShown((n) => n + PAGE_SIZE)}>
           Show more bins
         </button>

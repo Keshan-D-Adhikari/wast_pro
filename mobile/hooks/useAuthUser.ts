@@ -12,6 +12,9 @@ const DEAD_SESSION_CODES = [
   'auth/invalid-user-token',
 ];
 
+// FUNCTION: useAuthUser
+// Runs when: a protected screen opens.
+// What it does: gives the signed-in user, or sends the person to Login if nobody is signed in.
 /**
  * The signed-in Firebase user, kept up to date, for screens that need one.
  *

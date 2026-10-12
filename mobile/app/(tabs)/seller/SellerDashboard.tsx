@@ -143,6 +143,7 @@ export default function SellerDashboard() {
   useEffect(() => {
     if (USE_MOCK_IOT) return;
 
+    // FIREBASE (smart bin): the live bin data (level and weight) arrives here.
     // onValue is the Realtime Database live listener. It returns an unsubscribe function,
     // so returning it here makes React stop the listener as the cleanup. binId in the
     // list below restarts it if the seller's bin changes.
@@ -185,6 +186,9 @@ export default function SellerDashboard() {
   const placeError = placeAnswered ? placeState.error : '';
   const placeSearching = placeLongEnough && !placeAnswered;
 
+  // FUNCTION: handleSelectPlace
+  // Runs when: the seller taps a place in the search results.
+  // What it does: saves that place as the bin location in the seller profile.
   // The seller picked a result: save it as where the bin is.
   // The seller picked a result: save it as where the bin is.
   const handleSelectPlace = async (place: PlaceResult) => {
@@ -236,9 +240,13 @@ export default function SellerDashboard() {
     })();
   }, [user, binLat, binLng]);
 
+  // OVERWEIGHT: the names of the compartments that are over the weight limit.
   // Names of compartments that the firmware marked as over the weight limit.
   const overweightLabels = COMPARTMENTS.filter((c) => binData[c.type]?.overweight).map((c) => c.label);
 
+  // FUNCTION: handleReportSubmit
+  // Runs when: the "Submit report" button is pressed.
+  // What it does: checks the text and shows a confirmation message.
   // Called when the seller sends the issue form. It only checks the text and shows a message;
   // the report is not saved anywhere yet.
   const handleReportSubmit = () => {
@@ -251,6 +259,9 @@ export default function SellerDashboard() {
     setIssueDescription("");
   };
 
+  // FUNCTION: markAllAsRead
+  // Runs when: the notification bell is pressed.
+  // What it does: marks every unread notification as read in Firestore.
   // Mark every unread notification as read. Called when the notification sheet opens.
   const markAllAsRead = async () => {
     try {
@@ -268,6 +279,9 @@ export default function SellerDashboard() {
     0
   );
 
+  // FUNCTION: BinCard
+  // Runs when: once for each compartment (plastic, food, metal).
+  // What it does: draws one compartment card with the level, status, weight and overweight warning.
   // Bin Card UI Component
   // One card for one compartment. It is built inside the screen so it can read binData.
   const BinCard = ({ type, label, icon }: { type: WasteType; label: string; icon: keyof typeof Ionicons.glyphMap }) => {
@@ -342,6 +356,7 @@ export default function SellerDashboard() {
               {sellerData?.fullName || "Member"} 👋
             </Text>
           </View>
+          {/* BUTTON: "Notifications" */}
           <TouchableOpacity
             style={styles.notifBtn}
             hitSlop={8}
@@ -390,6 +405,7 @@ export default function SellerDashboard() {
               Hardware simulation active. Toggle preset to test fill levels & alerts:
             </Text>
             <View style={styles.demoToggleRow}>
+              {/* BUTTON: "Set mock preset to normal" */}
               <TouchableOpacity
                 style={[styles.demoToggleBtn, mockPreset === 'normal' && styles.demoToggleBtnActive]}
                 onPress={() => setMockPreset('normal')}
@@ -400,6 +416,7 @@ export default function SellerDashboard() {
                   Preset: Normal (Low/Half)
                 </Text>
               </TouchableOpacity>
+              {/* BUTTON: "Set mock preset to alert" */}
               <TouchableOpacity
                 style={[styles.demoToggleBtn, mockPreset === 'alert' && styles.demoToggleBtnActiveAlert]}
                 onPress={() => setMockPreset('alert')}
@@ -501,6 +518,7 @@ export default function SellerDashboard() {
         {placeResults.length > 0 && (
           <Card style={styles.placeList} elevation={1}>
             {placeResults.map((place, index) => (
+              // BUTTON: "Use ... as the bin location"
               <TouchableOpacity
                 key={`${place.latitude},${place.longitude},${index}`}
                 style={[styles.placeRow, index > 0 && styles.placeRowDivider]}
@@ -520,6 +538,7 @@ export default function SellerDashboard() {
         )}
 
         {/* Report Button */}
+        {/* BUTTON: "Report bin maintenance issue" */}
         <Button
           label="Report bin maintenance issue"
           icon="warning-outline"
@@ -547,6 +566,7 @@ export default function SellerDashboard() {
           value={issueDescription}
           onChangeText={setIssueDescription}
         />
+        {/* BUTTON: "Submit report" */}
         <Button label="Submit report" variant="danger" onPress={handleReportSubmit} />
       </Sheet>
 

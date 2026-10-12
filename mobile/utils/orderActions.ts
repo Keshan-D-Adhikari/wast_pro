@@ -9,6 +9,9 @@ import type { Order } from '../types';
  */
 export type SellerOrderAction = 'confirm' | 'decline' | 'complete';
 
+// FUNCTION: sellerActionsFor
+// Runs when: a seller order card is drawn.
+// What it does: decides which buttons to show: Confirm, Decline or Mark completed.
 // In: the order (only status and awaitingBuyer matter). Out: the list of allowed actions.
 // An empty list means the seller sees no buttons.
 export function sellerActionsFor(order: Pick<Order, 'status' | 'awaitingBuyer'>): SellerOrderAction[] {

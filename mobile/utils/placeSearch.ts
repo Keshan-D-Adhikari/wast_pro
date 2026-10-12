@@ -65,6 +65,9 @@ export function placeSuggestUrl(text: string): string {
   return `https://photon.komoot.io/api/?q=${q}&limit=6&lang=en&bbox=${SRI_LANKA_BBOX}`;
 }
 
+// FUNCTION: searchPlaces
+// Runs when: the seller types a place name.
+// What it does: gets place suggestions in Sri Lanka from the Photon service.
 // In: the typed text and an optional AbortSignal (lets the screen cancel an old request
 // when the user keeps typing). Out: a list of places. Throws if the server fails.
 export async function searchPlaces(text: string, signal?: AbortSignal): Promise<PlaceResult[]> {

@@ -94,6 +94,7 @@ export default function Layout() {
               <span className="admin-role-tag">Administrator</span>
             </div>
           </div>
+          {/* BUTTON: "Sign out" */}
           <button type="button" className="btn-signout" onClick={logout}>
             <IconSignOut size={16} />
             <span>Sign out</span>
@@ -106,6 +107,7 @@ export default function Layout() {
         <header className="topbar">
           <div className="topbar-left">
             {/* Toggle the mobile menu. The icon switches between menu and close. */}
+            {/* BUTTON: "Close navigation menu / Open navigation menu" */}
             <button
               type="button"
               className="mobile-menu-btn"

@@ -2,6 +2,9 @@ import type { Order } from '../types';
 
 export type SellerOrderEvent = 'confirmed' | 'completed' | 'declined';
 
+// FUNCTION: buyerNotificationFor
+// Runs when: the seller acts on an order.
+// What it does: makes the notification type and message for the buyer.
 /** The notification a seller's action on an order sends to the buyer. */
 // In: the event and some order details. Out: the notification type and message.
 // Example message: 'Nimal confirmed your order for 2 kg of plastic waste.'

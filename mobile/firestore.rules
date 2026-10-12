@@ -114,6 +114,7 @@ service cloud.firestore {
         (!changed.hasAny(['points']) || (d.points is int && d.points >= 0 && d.points <= 1000000));
     }
 
+    // RULES: users - who can read and change a profile.
     // users collection: ONE DOCUMENT PER PERSON
     //  read   - the owner or an admin only (a profile has email and phone).
     //  create - the owner creates their own profile at sign up, only as seller or buyer. They cannot
@@ -224,6 +225,7 @@ service cloud.firestore {
         (!changed.hasAny(['wasteType']) || request.resource.data.wasteType in ['plastic', 'food', 'metal']);
     }
 
+    // RULES: marketplace - who can read, create, change and delete a listing.
     // marketplace collection: ONE DOCUMENT PER LISTING
     //  read   - any signed in user (buyers browse listings).
     //  create - a signed in user for themselves (sellerUid is their own uid) with a valid new listing.
@@ -245,6 +247,7 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (resource.data.sellerUid == request.auth.uid || isAdmin());
     }
 
+    // RULES: orders - who can read, create and update an order.
     // orders collection: ONE DOCUMENT PER ORDER
     //  read   - the buyer, the seller or an admin.
     //  create - the buyer (direct purchase) or the seller (from an accepted offer). See below.
@@ -363,6 +366,7 @@ service cloud.firestore {
         (offer.sellerUid == request.auth.uid && offer.buyerUid == toUid);
     }
 
+    // RULES: notifications - who can read and send a notification.
     match /notifications/{notifId} {
       allow read: if isSignedIn() && (resource.data.toUid == request.auth.uid || isAdmin());
       // The allowed kinds of notification, one block each:
@@ -401,6 +405,7 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.toUid == request.auth.uid;
     }
 
+    // RULES: offers - who can read, create and answer an offer.
     // offers collection: ONE DOCUMENT PER PRICE OFFER (the wording below explains the details)
     //  read   - the buyer, the seller or an admin.
     //  create - the buyer, for themselves, with a positive price, for a listing that is still available.

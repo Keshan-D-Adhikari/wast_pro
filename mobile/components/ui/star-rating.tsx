@@ -20,6 +20,7 @@ export function StarRating({ value, onRate, size = 22 }: Props) {
           <Ionicons name={n <= value ? 'star' : 'star-outline'} size={size} color={GOLD} />
         );
         return onRate ? (
+          // BUTTON: "Rate ... star..."
           <TouchableOpacity
             key={n}
             onPress={() => onRate(n)}

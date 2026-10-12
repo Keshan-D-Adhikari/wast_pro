@@ -29,6 +29,7 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
+  // ADMIN CHECK: true only when the profile role is "admin".
   const isAdmin = profile?.role === "admin";
 
   return (
