@@ -1,0 +1,17 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a"
+      },
+      "env": {
+        "EXPO_PUBLIC_DISABLE_MAPS": "true"
+      }
+    }
+  }
+}

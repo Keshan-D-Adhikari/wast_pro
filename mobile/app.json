@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "SmartWaste Pro",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,8 +12,9 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.keshan.smartwastepro",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -54,6 +55,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a9c1db8a-952c-43b7-87ab-47859fb8e329"
+      }
+    },
+    "owner": "keshan2000"
   }
 }

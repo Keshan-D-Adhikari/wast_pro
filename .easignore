@@ -1,0 +1,38 @@
+# Files that are NOT uploaded to EAS Build.
+# When this file exists, EAS uses it instead of the .gitignore files.
+# mobile/.env is uploaded on purpose: the build needs the EXPO_PUBLIC_ Firebase values.
+
+# dependencies and build output
+node_modules/
+**/node_modules/
+.expo/
+dist/
+web-build/
+/mobile/ios
+/mobile/android
+
+# not needed to build the mobile app
+/admin/
+/screenshots/
+*.pdf
+*.pptx
+*.log
+
+# keys and private files
+serviceAccountKey.json
+*.serviceAccountKey.json
+google-services.json
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+.env.local
+.env*.local
+mobile/functions/.env
+
+# hidden folders (editor and tooling settings)
+.*/
+*.tsbuildinfo
+.DS_Store
