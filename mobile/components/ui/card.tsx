@@ -1,11 +1,7 @@
-// Layout building blocks: Card (white box), SectionTitle (heading), Divider (line)
-// and DetailRow (label on the left, value on the right). Used on almost every screen.
-
 import { ReactNode } from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
 
-// Props: children = whatever is placed inside, elevation = shadow level, tone = background colour.
 type CardProps = {
   children: ReactNode;
   /** 1 = resting (default), 2 = raised, 0 = flat with a hairline border. */
@@ -32,7 +28,6 @@ export function Card({ children, elevation = 1, tone = 'surface', style }: CardP
   );
 }
 
-// Props: children = the title text, meta = small text on the right, tight = less space above.
 type SectionTitleProps = {
   children: ReactNode;
   /** Small muted text on the right, e.g. a count or "3 available". */
@@ -78,8 +73,6 @@ export function DetailRow({
   );
 }
 
-// card/brandCard/flat = the Card looks, sectionRow/sectionTight = heading layout,
-// divider = the line, detailRow/detailValueStrong = label and value rows.
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Palette.surface,

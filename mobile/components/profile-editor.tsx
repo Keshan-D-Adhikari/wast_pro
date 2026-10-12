@@ -1,11 +1,3 @@
-// ProfileEditor: a form to edit the user's own profile. Shared by the seller and buyer.
-//
-// Who uses it: a logged-in user, from EditProfile (seller or buyer route).
-// What it does: change name, phone and address, and change the profile photo.
-//
-// Firestore: users/{uid}  READ (fill the form) and UPDATE (save changes, photoURL).
-// Firebase Storage: profilePhotos/{uid}.jpg  UPLOAD (the profile picture).
-// Keyboard: the Screen has keyboardAware so the keyboard does not cover the fields.
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL, StorageError } from 'firebase/storage';
@@ -21,7 +13,6 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 
-// Place names used for the address suggestions (simple local list, no network).
 const SRI_LANKAN_LOCATIONS = [
   'Colombo', 'Colombo 01 – Fort', 'Colombo 02 – Slave Island', 'Colombo 03 – Kollupitiya',
   'Colombo 04 – Bambalapitiya', 'Colombo 05 – Havelock Town', 'Colombo 06 – Wellawatte',
@@ -81,21 +72,15 @@ const formatSriLankanPhone = (value: string) => {
  * with a different `variant`; only the name label and success copy differ.
  */
 export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
-  // router.back() is used after saving to return to the profile screen.
   const router = useRouter();
-  // True for the buyer, so we can show buyer wording.
   const isBuyer = variant === 'buyer';
 
-  // Form field values. Each one is state, so typing redraws the field.
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
-  // loading: saving the form. uploading: the photo is being uploaded.
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  // photoURL: the current profile picture link (null = none yet).
-  // phoneError: message under the phone box. showSuggestions: show the address list.
   const [photoURL, setPhotoURL] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -103,12 +88,10 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
   // Runs once when the screen opens: loads the saved profile into the form.
   useEffect(() => {
     const fetchUserData = async () => {
-      // Need a logged in user to know which document to read.
       if (!auth.currentUser) return;
       try {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
         if (userDoc.exists()) {
-          // Fill each field. "|| ''" avoids "undefined" if a field is missing.
           const data = userDoc.data();
           setName(data.fullName || '');
           setEmail(data.email || '');
@@ -135,7 +118,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     setShowSuggestions(true);
   };
 
-  // Suggestions: up to 6 places that contain the typed text (case ignored).
   const suggestions = location.trim().length > 0
     ? SRI_LANKAN_LOCATIONS.filter(loc => loc.toLowerCase().includes(location.trim().toLowerCase())).slice(0, 6)
     : [];
@@ -152,8 +134,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
             Alert.alert('Permission needed', 'Camera access is required');
             return;
           }
-          // allowsEditing + aspect [1, 1] lets the user crop a square. quality 0.7 makes
-          // the file smaller (0 to 1).
           const result = await ImagePicker.launchCameraAsync({
             allowsEditing: true,
             aspect: [1, 1],
@@ -194,7 +174,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     try {
       setUploading(true);
 
-      // Step 1: one file per user. The same name is overwritten on a new upload.
       const storageRef = ref(storage, 'profilePhotos/' + auth.currentUser.uid + '.jpg');
 
       // Convert to blob using XMLHttpRequest — fetch() does not handle
@@ -241,8 +220,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
   const handleSave = async () => {
     if (!auth.currentUser) return;
     
-    // Step 1: an empty phone is allowed. If given, it must be a Sri Lankan mobile:
-    // +94 then 7 then 8 more digits.
     let normalizedPhone = '';
     if (phone.trim()) {
       normalizedPhone = normalizePhone(phone);
@@ -253,8 +230,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
       }
     }
 
-    // Step 2: show the spinner and save. updateDoc changes only the listed fields.
-    // serverTimestamp() lets the server write the time.
     setLoading(true);
     try {
       await updateDoc(doc(db, 'users', auth.currentUser.uid), {
@@ -269,7 +244,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
           ? 'Buyer profile details have been updated! ✅'
           : 'Your profile details have been updated! ✅'
       );
-      // Go back to the previous screen (the profile).
       router.back();
     } catch (error: unknown) {
       Alert.alert('Error', 'Failed to update profile: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -278,7 +252,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     }
   };
 
-  // Screen layout.
   return (
     <Screen keyboardAware>
       <ScreenHeader title="Edit profile" back />
@@ -307,7 +280,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
       </TouchableOpacity>
       <Text style={styles.avatarHint}>Tap to change photo</Text>
 
-      {/* The form card */}
       <Card>
         <TextField
           label={isBuyer ? 'Company / Full Name' : 'Full Name'}
@@ -334,7 +306,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
           error={phoneError}
         />
 
-        {/* Address box with a suggestion list under it (zIndex puts the list above other fields) */}
         <View style={{ zIndex: 1 }}>
           <TextField
             label="Location / Address"
@@ -372,7 +343,6 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
   );
 }
 
-// Styles for this screen. Groups: photo, then address suggestions.
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({

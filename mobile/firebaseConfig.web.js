@@ -1,11 +1,6 @@
 // FIREBASE SETUP FOR THE WEB BUILD
 // Expo picks this file instead of firebaseConfig.js when the app runs in a
 // browser (the ".web.js" ending is the signal). Imports of '../firebaseConfig'
-// therefore work on every platform without changing any screen code.
-// Differences from the phone version:
-//   - getAuth() is used, because browsers already save the login in their own
-//     storage (no AsyncStorage needed).
-//   - the Cloud Functions client is not exported here.
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";

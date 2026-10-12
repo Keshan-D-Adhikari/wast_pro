@@ -4,7 +4,6 @@
  * (mobile/utils/shortId.ts), so a code a user reads out from the app matches
  * the one shown here.
  */
-// Codes are 6 characters long, for example USR-A1B2C3.
 const CODE_LENGTH = 6;
 
 // Removes non-letters/digits from the id, takes the first 6, upper-cases them.

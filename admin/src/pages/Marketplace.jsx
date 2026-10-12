@@ -1,8 +1,3 @@
-// Marketplace.jsx: lets the admin watch the marketplace.
-// Screen 1 (Marketplace): one row per seller, with how many listings they have (total, available, sold).
-// Screen 2 (SellerListings): all listings of the chosen seller. The admin can remove a listing.
-// Firestore collection: "marketplace". Reads live with onSnapshot; the only write is deleteDoc.
-// Deleting is allowed for admins by firestore.rules.
 import { useEffect, useMemo, useState } from "react";
 import { collection, deleteDoc, doc, limit, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
@@ -21,7 +16,6 @@ const rs = (value) =>
 // and onBack (function to return to the seller list).
 /** One seller's listings, with the type / status filters and Remove. */
 function SellerListings({ seller, onBack }) {
-  // listings = this seller's documents; the two filters are the dropdown values.
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -41,7 +35,6 @@ function SellerListings({ seller, onBack }) {
     );
   }, [seller.sellerUid]);
 
-  // useMemo: re-filter only when the listings or the dropdown values change.
   const filtered = useMemo(
     () => filterListings(listings, { status: statusFilter, wasteType: typeFilter }),
     [listings, statusFilter, typeFilter]
@@ -55,7 +48,6 @@ function SellerListings({ seller, onBack }) {
 
   return (
     <section>
-      {/* Back button, seller name and count */}
       <div className="page-header">
         <div>
           <button type="button" className="load-more-btn" style={{ margin: "0 0 0.75rem" }} onClick={onBack}>
@@ -68,7 +60,6 @@ function SellerListings({ seller, onBack }) {
         </div>
       </div>
 
-      {/* Filters: waste type and status */}
       <div className="toolbar">
         <div className="select-filter-wrapper">
           <select className="select-filter" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
@@ -88,7 +79,6 @@ function SellerListings({ seller, onBack }) {
         </div>
       </div>
 
-      {/* Loading spinner */}
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
@@ -96,7 +86,6 @@ function SellerListings({ seller, onBack }) {
         </div>
       )}
 
-      {/* Empty state when no listing matches */}
       {!loading && filtered.length === 0 && (
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconMarketplace size={24} /></div>
@@ -105,7 +94,6 @@ function SellerListings({ seller, onBack }) {
         </div>
       )}
 
-      {/* Table of this seller's listings */}
       {!loading && filtered.length > 0 && (
         <div className="table-card">
           <div className="table-responsive">
@@ -120,7 +108,6 @@ function SellerListings({ seller, onBack }) {
                 </tr>
               </thead>
               <tbody>
-                {/* One row per listing, with a Remove button */}
                 {filtered.map((item) => {
                   const typeCls = (item.wasteType || "").toLowerCase();
                   return (
@@ -160,7 +147,6 @@ function SellerListings({ seller, onBack }) {
 // in the browser (groupListingsBySeller). Clicking a seller opens SellerListings.
 /** Marketplace listings grouped by seller; pick a seller to see and manage their listings. */
 export default function Marketplace() {
-  // selected = the seller being viewed (null shows the list).
   const [selected, setSelected] = useState(null);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -182,7 +168,6 @@ export default function Marketplace() {
   const sellers = useMemo(() => groupListingsBySeller(listings), [listings]);
   const filtered = useMemo(() => filterSellers(sellers, search), [sellers, search]);
 
-  // If a seller is selected show their listings instead of the list.
   if (selected) {
     // Keep showing the seller's latest name/counts while their listings change
     const current = sellers.find((s) => s.sellerUid === selected.sellerUid) ?? selected;
@@ -191,7 +176,6 @@ export default function Marketplace() {
 
   return (
     <section>
-      {/* Title and counts */}
       <div className="page-header">
         <div>
           <h1>Marketplace Listings</h1>
@@ -202,7 +186,6 @@ export default function Marketplace() {
         </div>
       </div>
 
-      {/* Search box (seller name or USR code) */}
       <div className="toolbar">
         <div className="search-input-wrapper">
           <span className="search-icon"><IconSearch size={16} /></span>
@@ -215,7 +198,6 @@ export default function Marketplace() {
         </div>
       </div>
 
-      {/* Loading spinner */}
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
@@ -223,7 +205,6 @@ export default function Marketplace() {
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && filtered.length === 0 && (
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconMarketplace size={24} /></div>
@@ -232,7 +213,6 @@ export default function Marketplace() {
         </div>
       )}
 
-      {/* Table: one row per seller. Clicking a row opens that seller's listings. */}
       {!loading && filtered.length > 0 && (
         <div className="table-card">
           <div className="table-responsive">
@@ -274,7 +254,6 @@ export default function Marketplace() {
         </div>
       )}
 
-      {/* Notice shown when the cap was reached, so the list may be incomplete */}
       {!loading && listings.length >= SELLER_SCAN_LIMIT && (
         <p className="subtitle" style={{ marginTop: "1rem" }}>
           Showing sellers from the first {SELLER_SCAN_LIMIT} listings. Search for a seller to narrow down.

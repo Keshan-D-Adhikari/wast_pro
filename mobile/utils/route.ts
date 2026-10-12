@@ -1,14 +1,10 @@
-// Used by the buyer's pickup map to draw a road line to the seller's bin.
-
 /**
  * Road route between two points, from OSRM's free public routing service (no API key).
  * The buyer's pickup map draws it; if the service is unreachable the map falls back
  * to a straight dashed line.
  */
-// A point on the map.
 export type LatLng = { latitude: number; longitude: number };
 
-// A route: the line to draw (points), its length in km and the travel time in minutes.
 export type RoadRoute = {
   points: LatLng[];
   distanceKm: number;
@@ -23,7 +19,6 @@ export function parseRoute(json: unknown): RoadRoute | null {
     | undefined;
   if ((json as { code?: string })?.code !== 'Ok' || !route) return null;
 
-  // OSRM gives the line as [longitude, latitude] pairs (longitude first).
   const coords = route.geometry?.coordinates;
   if (!Array.isArray(coords) || coords.length < 2) return null;
 
@@ -36,7 +31,6 @@ export function parseRoute(json: unknown): RoadRoute | null {
   }
   if (points.length < 2) return null;
 
-  // OSRM uses metres and seconds. We convert to km and minutes.
   const distance = Number(route.distance);
   const duration = Number(route.duration);
   return {

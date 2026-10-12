@@ -1,10 +1,6 @@
-// Five stars showing a rating. Used for order ratings and seller ratings.
-// If onRate is passed the stars can be tapped to give a rating, otherwise they are display only.
-
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// value = rating 0 to 5, onRate = called with 1-5 when a star is tapped, size = star size in pixels.
 type Props = {
   value: number;
   /** When given, the stars are tappable and call this with 1-5. */
@@ -12,7 +8,6 @@ type Props = {
   size?: number;
 };
 
-// Star colour.
 const GOLD = '#E0A800';
 
 // Each star is full when its number (1-5) is at most the value, otherwise an outline.
@@ -20,7 +15,6 @@ const GOLD = '#E0A800';
 export function StarRating({ value, onRate, size = 22 }: Props) {
   return (
     <View style={styles.row} accessibilityLabel={value ? `Rated ${value} out of 5` : 'Not rated yet'}>
-      {/* Make five stars. Tappable ones are wrapped in a button, read-only ones in a plain View */}
       {[1, 2, 3, 4, 5].map((n) => {
         const icon = (
           <Ionicons name={n <= value ? 'star' : 'star-outline'} size={size} color={GOLD} />

@@ -18,7 +18,6 @@ export function validateUserEdit({ fullName, phone, location, points }) {
   if (phoneText.length > 20) errors.phone = "Phone number is too long (20 characters at most).";
   if (locationText.length > 80) errors.location = "Location is too long (80 characters at most).";
 
-  // An empty points box counts as 0. Points must be a whole number from 0 to 1,000,000.
   const pointsNumber = pointsText === "" ? 0 : Number(pointsText);
   if (!Number.isInteger(pointsNumber) || pointsNumber < 0 || pointsNumber > 1000000) {
     errors.points = "Points must be a whole number from 0 to 1,000,000.";

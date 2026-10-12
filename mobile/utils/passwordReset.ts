@@ -1,7 +1,6 @@
 // Turns a Firebase error code into a friendly message for the 'forgot password' screen.
 // In: the error code (or nothing when the email was sent). Out: { ok, text }.
 // 'ok' decides if the message is shown as success or as an error.
-
 /**
  * Message to show after asking Firebase to send a password reset email.
  * An unknown email gets the same message as a known one, so the screen can't
@@ -15,7 +14,6 @@ export function passwordResetMessage(errorCode?: string): { ok: boolean; text: s
       return { ok: false, text: 'No connection. Check your internet and try again.' };
     case 'auth/too-many-requests':
       return { ok: false, text: 'Too many attempts. Please wait a few minutes and try again.' };
-    // No error, or unknown user: show the same success message (privacy).
     case undefined:
     case 'auth/user-not-found':
       return { ok: true, text: 'If an account exists for that email, a password reset link is on its way. Check your inbox and spam folder.' };

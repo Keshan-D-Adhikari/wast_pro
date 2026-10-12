@@ -1,13 +1,7 @@
-// Two small building blocks for profile screens:
-// ListOption = a tappable settings row (icon, title, arrow). StatTile = a small number card.
-// Used on SellerProfile and BuyerProfile.
-
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
 
-// Props: icon, title, optional subtitle, onPress (what happens on tap),
-// destructive = show in red, for actions like 'Log out'.
 type ListOptionProps = {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
@@ -20,7 +14,6 @@ type ListOptionProps = {
 // The arrow only shows when onPress exists. Without onPress the row cannot be tapped.
 /** Tappable settings row with a leading icon and chevron. */
 export function ListOption({ icon, title, subtitle, onPress, destructive }: ListOptionProps) {
-  // Pick the colour pair: red for destructive rows, green for normal rows.
   const tint = destructive ? Palette.status.danger : { base: Palette.brand[600], tint: Palette.brand[100] };
 
   return (
@@ -45,8 +38,6 @@ export function ListOption({ icon, title, subtitle, onPress, destructive }: List
   );
 }
 
-// Props: value = the big text (e.g. '12 kg'), label = small text below, icon = optional icon,
-// color = custom accent colours.
 type StatTileProps = {
   value: string;
   label: string;
@@ -58,7 +49,6 @@ type StatTileProps = {
 // numberOfLines and adjustsFontSizeToFit shrink long values to fit one line.
 /** Compact metric tile used in the profile stat and impact grids. */
 export function StatTile({ value, label, icon, color }: StatTileProps) {
-  // Use the given colours or the default green.
   const c = color ?? { base: Palette.brand[600], tint: Palette.brand[100] };
 
   return (
@@ -76,7 +66,6 @@ export function StatTile({ value, label, icon, color }: StatTileProps) {
   );
 }
 
-// row/icon/text = ListOption. tile/tileIcon/tileValue/tileLabel = StatTile.
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',

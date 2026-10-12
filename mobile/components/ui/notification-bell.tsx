@@ -1,7 +1,3 @@
-// The bell icon in screen headers. It shows an unread count and opens a list of notifications.
-// Data comes live from the Firestore 'notifications' collection (messages for the signed-in user).
-// Used on the seller and buyer dashboards.
-
 import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,17 +13,14 @@ import { notificationRoute } from '../../utils/notificationRoute';
 // Prop: role says if the user is a seller or buyer, so a tap opens the right orders/offers screen.
 /** Bell button with an unread badge; opens the signed-in user's notifications in a sheet. */
 export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer' }) {
-  // The signed-in user (or null while loading).
   const user = useAuthUser();
   const router = useRouter();
-  // State: items = the user's notifications, open = whether the sheet is showing.
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
 
   // Start listening to the user's notifications when we know who they are.
   useEffect(() => {
     if (!user) return;
-    // Only notifications addressed to this user.
     const q = query(collection(db, 'notifications'), where('toUid', '==', user.uid));
     // onSnapshot calls our function every time the data changes (live updates).
     // It returns an 'unsubscribe' function, and returning that from useEffect stops the listener on cleanup.
@@ -35,7 +28,6 @@ export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer'
       q,
       (snap) => {
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AppNotification));
-        // Newest first. A missing time counts as 0 (oldest).
         list.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
         setItems(list);
       },
@@ -69,7 +61,6 @@ export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer'
         onPress={openSheet}
       >
         <Ionicons name="notifications-outline" size={22} color={Palette.brand[700]} />
-        {/* Red count badge, shown as '9+' when there are more than 9 */}
         {unread > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
@@ -77,17 +68,13 @@ export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer'
         )}
       </TouchableOpacity>
 
-      {/* Bottom sheet with the list of notifications */}
       <Sheet visible={open} title="Notifications" onClose={() => setOpen(false)} scrollable>
         {items.length === 0 ? (
           <Text style={[Type.small, styles.empty]}>No notifications yet</Text>
         ) : (
           items.map((n) => {
-            // Cancelled orders are shown in red, everything else in green.
             const bad = n.type === 'order_cancelled';
             const tone = bad ? Palette.status.danger : Palette.status.success;
-            // Where to go on tap. If null, the item is not tappable. Each item shows an icon,
-            // the message, the time, and a small dot if it is unread.
             const route = notificationRoute(n.type, role);
             return (
               <TouchableOpacity
@@ -121,7 +108,6 @@ export function NotificationBell({ role = 'buyer' }: { role?: 'seller' | 'buyer'
   );
 }
 
-// btn/badge/badgeText = the bell and its count, the rest = items inside the sheet.
 const styles = StyleSheet.create({
   btn: {
     width: 42,

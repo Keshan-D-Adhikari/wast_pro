@@ -1,6 +1,3 @@
-// Layout.jsx: the frame around every admin page: a sidebar, a top bar and the page area.
-// The page itself (Overview, Users, ...) is drawn where <Outlet /> is placed.
-// This file reads no database data. It only uses the signed-in admin's profile (name).
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../useAuth";
@@ -16,7 +13,6 @@ import {
   IconPulse
 } from "../components/Icons";
 
-// Title and subtitle for the top bar, chosen by the current URL path.
 const PAGE_TITLES = {
   "/": { title: "Overview", subtitle: "Snapshot across users, marketplace, and platform orders" },
   "/bins": { title: "Bin Telemetry", subtitle: "Real-time IoT sensors from ESP32 smart waste bins" },
@@ -27,20 +23,15 @@ const PAGE_TITLES = {
 
 // Layout component. It is shown only to signed-in admins (see Gate in App.jsx).
 export default function Layout() {
-  // profile = the admin's users/<uid> document; logout signs out.
   const { profile, logout } = useAuth();
-  // mobileOpen = is the sidebar open on a small screen? useState keeps this between renders.
   const [mobileOpen, setMobileOpen] = useState(false);
-  // useLocation gives the current URL, so we can pick the right title.
   const location = useLocation();
 
-  // Unknown paths get a generic title.
   const currentInfo = PAGE_TITLES[location.pathname] || {
     title: "Admin Portal",
     subtitle: "SmartWaste Pro Platform Administration"
   };
 
-  // Show the name, or the email, or "Admin". The first letter is used in the round avatar.
   const displayName = profile?.fullName || profile?.email || "Admin";
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -111,7 +102,6 @@ export default function Layout() {
       </aside>
 
       {/* Main Container */}
-      {/* The right side: top bar with the page title, then the page content. */}
       <div className="main-wrapper">
         <header className="topbar">
           <div className="topbar-left">
@@ -137,7 +127,6 @@ export default function Layout() {
         </header>
 
         <main className="content-container">
-          {/* The current page is drawn here by React Router. */}
           <Outlet />
         </main>
       </div>

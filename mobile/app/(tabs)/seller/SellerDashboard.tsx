@@ -1,18 +1,3 @@
-// SELLER DASHBOARD SCREEN
-// Who uses it: a seller (waste provider). It is the "home" tab of the seller bottom navigation.
-// What it shows:
-//   - live fill level, weight and status of the three smart bin compartments
-//     (plastic, food, metal), with overweight and high moisture warnings
-//   - a donut chart of the waste weight, reward points, and the bin location on a map
-//   - a notifications list and a form to report a bin problem
-//   - a place search where the seller saves where the bin is
-// Data it uses:
-//   - Firestore users/{uid}   (read live; written: binLocation and binPlaceName)
-//   - Firestore notifications (read live where toUid == me; written: read = true)
-//   - Firestore marketplace   (read and batch-updated: location of the seller's available listings)
-//   - Realtime Database bins/{binId} (read live) sensor data sent by the ESP32 bin
-//   - Place search service in utils/placeSearch (a web request, not Firebase)
-// With USE_MOCK_IOT turned on (iotConfig) fake bin data is used instead of the sensors.
 import {
   View,
   Text,
@@ -54,14 +39,12 @@ import { Sheet } from "@/components/ui/sheet";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { AppNotification, BinData, UserProfile, WasteType } from "../../../types";
 
-// The three bin compartments, used to draw one card each.
 const COMPARTMENTS: { type: WasteType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { type: "plastic", label: "Plastic", icon: "cube-outline" },
   { type: "food", label: "Food", icon: "leaf-outline" },
   { type: "metal", label: "Metal", icon: "construct-outline" },
 ];
 
-// Bin data used before real readings arrive: everything is zero.
 const EMPTY_BIN: BinData = {
   plastic: { level: 0, weight: 0 },
   food: { level: 0, weight: 0, moisture: 0 },
@@ -73,21 +56,17 @@ export default function SellerDashboard() {
   const user = useAuthUser();
   const router = useRouter();
 
-  // State group: screen status. useState keeps a value and redraws the screen when it changes.
   // States
   const [loading, setLoading] = useState(true);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [issueDescription, setIssueDescription] = useState("");
   const [sellerData, setSellerData] = useState<UserProfile | null>(null);
 
-  // mockPreset picks the fake data set in demo mode. liveBinData holds the real sensor data.
   //Data for compartment 3 according to objective 1 of the proposal [citation: 38]
   const [mockPreset, setMockPreset] = useState<'normal' | 'alert'>('normal');
   const [liveBinData, setBinData] = useState<BinData>(EMPTY_BIN);
   // The bin this seller is linked to (set by an admin on their profile); everyone else sees the default prototype bin.
-  // The bin this seller is linked to (set by an admin on their profile); everyone else sees the default prototype bin.
   const binId = sellerData?.binId || DEFAULT_BIN_ID;
-  // Choose which bin data to show: fake data in demo mode, real sensor data otherwise.
   // In mock mode the bin data is derived from the selected preset during
   // render, rather than copied into state from an effect.
   const binData: BinData = USE_MOCK_IOT
@@ -96,36 +75,26 @@ export default function SellerDashboard() {
 
   // Re-evaluate "live vs offline" periodically so the badge turns Offline on
   // its own if the firmware stops uploading.
-  // Re-evaluate "live vs offline" periodically so the badge turns Offline on
-  // its own if the firmware stops uploading.
   const [now, setNow] = useState(() => Date.now());
-  // setInterval runs every 15 seconds. The cleanup (the returned function) stops the
-  // timer when the screen closes, so it does not keep running in the background.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(id);
   }, []);
-  // freshness says if the last sensor update is recent (live) and gives a label to show.
   const freshness = USE_MOCK_IOT
     ? { live: true, label: 'Demo data' }
     : describeFreshness(binData.lastUpdated, now);
   // The ESP32 firmware doesn't upload GPS coordinates (it only sends a place name), so the
   // seller saves where the bin is on their profile with the button under the map.
-  // The ESP32 firmware doesn't upload GPS coordinates (it only sends a place name), so the
-  // seller saves where the bin is on their profile with the button under the map.
   const binLocation = sellerData?.binLocation ?? null;
   const [savingLocation, setSavingLocation] = useState(false);
   // Choosing where the bin is: the seller types a company or place, then picks a result (no GPS).
-  // Choosing where the bin is: the seller types a company or place, then picks a result (no GPS).
   const [placeQuery, setPlaceQuery] = useState('');
-  // The suggestions that came back, and the text they are for (so an old answer is never shown for new text).
   // The suggestions that came back, and the text they are for (so an old answer is never shown for new text).
   const [placeState, setPlaceState] = useState<{ text: string; results: PlaceResult[]; error: string }>({
     text: '',
     results: [],
     error: '',
   });
-  // Notifications: how many are unread, the list, and whether the sheet is open.
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
@@ -133,10 +102,8 @@ export default function SellerDashboard() {
   // Effect: two LIVE Firestore listeners (onSnapshot). They run now and again each time the
   // data changes. They restart when the user changes.
   useEffect(() => {
-    // Wait until we know who the user is.
     if (!user) return;
 
-    // 1. Retrieve User Profile Data (Name, Points, bin id, bin location).
     //1. Retrieve User Profile Data (Name, Points)
     const userDocRef = doc(db, "users", user.uid);
     const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
@@ -145,7 +112,6 @@ export default function SellerDashboard() {
       }
     }, (error) => console.error("User fetch error:", error));
 
-    // 2. Notifications List (Sorted client-side to avoid index error)
     // 2. Notifications List (Sorted client-side to avoid index error)
     const q = query(
       collection(db, "notifications"),
@@ -166,7 +132,6 @@ export default function SellerDashboard() {
       setUnreadCount(list.filter(n => !n.read).length);
     });
 
-    // Cleanup: stop both listeners when the screen closes, so they do not keep running.
     return () => {
       unsubscribeUser();
       unsubscribeNotifs();
@@ -176,7 +141,6 @@ export default function SellerDashboard() {
   // Effect: live sensor data (fill level, weight) for this seller's bin, from the ESP32's Realtime Database.
   // Live sensor data (fill level, weight) for this seller's bin, from the ESP32's Realtime Database.
   useEffect(() => {
-    // Demo mode does not need a listener.
     if (USE_MOCK_IOT) return;
 
     // onValue is the Realtime Database live listener. It returns an unsubscribe function,
@@ -194,12 +158,8 @@ export default function SellerDashboard() {
   }, [binId]);
 
   // Suggest places as the seller types: wait for a short pause, then look the text up.
-  // Suggest places as the seller types: wait for a short pause, then look the text up.
   const placeText = placeQuery.trim();
-  // Effect: this is a "debounce". Each key press restarts a 450 ms timer, so we only
-  // search when the seller stops typing, and not once per letter.
   useEffect(() => {
-    // Search only after 3 letters.
     if (placeText.length < 3) return;
     let cancelled = false; // the text changed (or the screen closed) while we waited
     const timer = setTimeout(async () => {
@@ -213,14 +173,12 @@ export default function SellerDashboard() {
         }
       }
     }, 450);
-    // Cleanup runs when the text changes again: cancel the old timer and ignore its late answer.
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
   }, [placeText]);
 
-  // Work out what to show: only use search results if they belong to the current text.
   const placeLongEnough = placeText.length >= 3;
   const placeAnswered = placeLongEnough && placeState.text === placeText;
   const placeResults = placeAnswered ? placeState.results : [];
@@ -236,10 +194,8 @@ export default function SellerDashboard() {
       // Save the coordinates and the place name on the seller's own user document.
       await updateDoc(doc(db, "users", user.uid), {
         binLocation: { latitude: place.latitude, longitude: place.longitude },
-        // slice(0, 120) keeps the name short (the security rules limit its length).
         binPlaceName: place.name.slice(0, 120),
       });
-      // Clear the search box and close the keyboard.
       setPlaceQuery('');
       Keyboard.dismiss();
     } catch (error) {
@@ -250,8 +206,6 @@ export default function SellerDashboard() {
     }
   };
 
-  // A listing stores the place it is collected from, so listings made before the bin location was set or
-  // changed would send buyers to the old spot. Keep the seller's available listings at the bin's location.
   // A listing stores the place it is collected from, so listings made before the bin location was set or
   // changed would send buyers to the old spot. Keep the seller's available listings at the bin's location.
   const binLat = binLocation?.latitude;
@@ -309,7 +263,6 @@ export default function SellerDashboard() {
     }
   };
 
-  // Total kg in all three compartments.
   const totalWeight = COMPARTMENTS.reduce(
     (sum, c) => sum + (binData[c.type]?.weight || 0),
     0
@@ -318,19 +271,16 @@ export default function SellerDashboard() {
   // Bin Card UI Component
   // One card for one compartment. It is built inside the screen so it can read binData.
   const BinCard = ({ type, label, icon }: { type: WasteType; label: string; icon: keyof typeof Ionicons.glyphMap }) => {
-    // Read the values from the sensor data. || 0 protects us when a value is missing.
     const compartment = binData[type] || {};
     const level = compartment.level || 0;
     const weight = compartment.weight || 0;
     const moisture = compartment.moisture;
     const accent = wasteAccent(type);
-    // alert is true when the compartment is full or over its weight limit.
     const alert = isBinFull(compartment.status) || !!compartment.overweight;
     const statusColor = binStatusColor(compartment.status);
 
     return (
       <View style={styles.binCard}>
-        {/* Top row: waste icon and a red dot when the compartment is full or overweight */}
         <View style={styles.binTopRow}>
           <View style={[styles.binIcon, { backgroundColor: accent.tint }]}>
             <Ionicons name={icon} size={16} color={accent.base} />
@@ -342,7 +292,6 @@ export default function SellerDashboard() {
           )}
         </View>
 
-        {/* Name, fill level in % and a progress bar */}
         <Text style={styles.binLabel}>{label}</Text>
         <Text style={[styles.binLevel, { color: accent.base }]}>{level}%</Text>
 
@@ -355,7 +304,6 @@ export default function SellerDashboard() {
           />
         </View>
 
-        {/* Status pill, weight and warnings */}
         <View style={[styles.statusPill, { backgroundColor: statusColor.tint }]}>
           <Text style={[styles.statusPillText, { color: statusColor.base }]}>
             {binStatusLabel(compartment.status)}
@@ -375,7 +323,6 @@ export default function SellerDashboard() {
     );
   };
 
-  // Show a spinner until the first sensor reading arrives (not in demo mode).
   if (loading && !USE_MOCK_IOT) {
     return (
       <Screen>
@@ -384,12 +331,10 @@ export default function SellerDashboard() {
     );
   }
 
-  // Screen layout. Below: header, summary, bin cards, warnings, chart, map and sheets.
   return (
     <View style={styles.root}>
       <Screen withBottomNav keyboardAware>
         {/* Header */}
-        {/* Greeting on the left; the bell button on the right opens the notification sheet and marks all as read */}
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
             <Text style={Type.small}>Welcome back</Text>
@@ -471,19 +416,16 @@ export default function SellerDashboard() {
 
         {/* Bin Monitoring Section [cite: 38] */}
         <SectionTitle meta={USE_MOCK_IOT ? "DEMO / MOCK" : freshness.live ? "Bin ON" : "Bin OFF"}>Smart bin monitoring</SectionTitle>
-        {/* Three bin cards side by side */}
         <View style={styles.binRow}>
           {COMPARTMENTS.map((c) => (
             <BinCard key={c.type} type={c.type} label={c.label} icon={c.icon} />
           ))}
         </View>
-        {/* Bin id, how fresh the data is, last update time and place name */}
         <Text style={styles.lastUpdated}>
           {binId} · {freshness.label}
           {binData.lastUpdated ? ` · ${new Date(binData.lastUpdated).toLocaleString()}` : ''}
           {binData.location ? ` · ${binData.location}` : ''}
         </Text>
-        {/* Warning when the bin has not sent data for a while */}
         {!freshness.live && (
           <Notice
             icon="cloud-offline-outline"
@@ -522,7 +464,6 @@ export default function SellerDashboard() {
 
         {/* Map Section */}
         <SectionTitle meta={binLocation ? (sellerData?.binPlaceName || binData.location || 'Saved') : 'Not set'}>Smart bin location</SectionTitle>
-        {/* Map with a pin at the saved bin location. The key makes the map reload when the location changes. */}
         <Card style={styles.mapCard} elevation={1}>
           <MapView
             key={binLocation ? `${binLocation.latitude},${binLocation.longitude}` : 'no-bin-location'}
@@ -540,7 +481,6 @@ export default function SellerDashboard() {
             )}
           </MapView>
         </Card>
-        {/* Place search box. The seller types, picks a result below and it becomes the bin location */}
         <TextField
           icon="business-outline"
           placeholder="Company or place name"
@@ -551,7 +491,6 @@ export default function SellerDashboard() {
           error={placeError}
           containerStyle={styles.placeInput}
         />
-        {/* Search status messages */}
         {placeSearching && <Text style={[Type.caption, styles.placeStatus]}>Searching…</Text>}
 
         {placeAnswered && placeResults.length === 0 && !placeError && (
@@ -559,7 +498,6 @@ export default function SellerDashboard() {
             No place found. Try the company name with the town, or a nearby landmark.
           </Text>
         )}
-        {/* List of suggested places. Tapping one saves it (handleSelectPlace) */}
         {placeResults.length > 0 && (
           <Card style={styles.placeList} elevation={1}>
             {placeResults.map((place, index) => (
@@ -666,8 +604,6 @@ export default function SellerDashboard() {
   );
 }
 
-// Styles. Groups: header and notification button, summary strip, bin cards, map and
-// place search, report sheet, notification list, demo banner.
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({

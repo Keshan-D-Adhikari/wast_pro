@@ -1,24 +1,3 @@
-// BuyerDashboard: the buyer's home screen, the marketplace.
-//
-// Who uses it: a logged-in buyer. It is the first screen after buyer login.
-// What it does:
-//  - Shows every waste listing that is still "available", live.
-//  - Lets the buyer search and filter by waste type.
-//  - Shows a pickup route map to the seller's bin (road route when we can get it).
-//  - Buy Now: pay by cash on delivery, or by card through Stripe Checkout.
-//  - Make an Offer: send the seller a lower price to accept or reject.
-//
-// Where it fits: Login -> BuyerDashboard -> BuyerOrders (after buying)
-//                                        -> BuyerOffers (see offers, via the orders screen)
-//
-// Firestore collections:
-//  - marketplace    READ (live list) and UPDATE (status -> "sold" when bought)
-//  - orders         CREATE (one order per purchase)
-//  - offers         CREATE (a new offer, status "pending")
-//  - notifications  CREATE (tell the seller about a new order or offer)
-//  - users          READ (get the buyer's name)
-// Cloud Functions: createCheckoutSession and verifyCheckoutSession (Stripe, test mode).
-// Rules in firestore.rules decide which of these writes are allowed.
 import {
   View,
   Text,
@@ -67,9 +46,6 @@ import { Sheet } from "@/components/ui/sheet";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { ChipGroup } from "@/components/ui/chip";
 
-// Filter chips shown under the search box. "key" is compared with the listing's
-// wasteType (lower case). "as const" makes TypeScript treat these as fixed values,
-// so TypeFilterKey below becomes 'all' | 'plastic' | 'food' | 'metal'.
 const TYPE_FILTERS = [
   { key: 'all', label: 'All types' },
   { key: 'plastic', label: 'Plastic' },
@@ -82,21 +58,8 @@ type TypeFilterKey = typeof TYPE_FILTERS[number]['key'];
 // All the screen data lives in React state (useState). When a state value changes,
 // React draws the screen again with the new value.
 export default function BuyerDashboard() {
-  // Hooks for who is logged in and for moving between screens.
-  // useAuthUser gives the Firebase user, or null while the saved login is still loading.
-  // router.push() opens a new screen on top (the user can go back to this one).
   const authUser = useAuthUser();
   const router = useRouter();
-  // Main data and UI state.
-  //  loading         true until the first listings arrive
-  //  items           all available listings from Firestore
-  //  searchText / typeFilter   what the buyer typed or tapped
-  //  userLocation    buyer's GPS position (null if permission was not given)
-  //  selectedItem    the listing shown on the route map
-  //  buyingItem      the listing in the payment sheet
-  //  purchaseLoading true while a purchase or payment is running (shows a spinner)
-  //  *ModalVisible   whether the map or payment sheet is open
-  //  paymentMethod   '' until the buyer picks 'cash' or 'card'
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -109,8 +72,6 @@ export default function BuyerDashboard() {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
 
-  // Route map state: the straight-line distance text, and the road route when it
-  // arrives from the routing service (see utils/route.ts).
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
   const [roadRoute, setRoadRoute] = useState<RoadRoute | null>(null); // null = straight line only
   // `any` here is deliberate: MapView's ref type differs between the native
@@ -125,22 +86,14 @@ export default function BuyerDashboard() {
   const [offerAmountError, setOfferAmountError] = useState('');
   const [offerLoading, setOfferLoading] = useState(false);
 
-  // Effect 1: find the buyer's location and start the live marketplace listener.
-  // useEffect runs code after the screen is drawn. It runs again when something in the
-  // list at the end (the [authUser] array) changes. Here that means: when login is ready.
   useEffect(() => {
     // Wait for the saved session to be restored; querying while signed out is denied by the rules.
     if (!authUser) return;
 
-    // Holds the function that stops the Firestore listener, so cleanup can call it.
     let unsubscribe: (() => void) | undefined;
 
-    // An async function inside an effect must be wrapped like this, because the effect
-    // callback itself cannot be async. The (async () => {...})() runs it at once.
     (async () => {
       try {
-        // Step 1: ask permission for GPS, then read the position once.
-        // Low accuracy is fine here. We only need it to show "x km away".
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
           let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
@@ -148,7 +101,6 @@ export default function BuyerDashboard() {
         }
       } catch (err) { console.warn('Location unavailable:', err); }
 
-      // Step 2: build the query. Only listings whose status is "available" are shown.
       const q = query(collection(db, "marketplace"), where("status", "==", "available"));
       // onSnapshot = a LIVE listener. Firestore calls this function now, and again every
       // time the data changes (a new listing, or one gets sold). No manual refresh needed.
@@ -166,8 +118,6 @@ export default function BuyerDashboard() {
       });
     })();
 
-    // Cleanup: React calls the function we return when the screen closes. It stops the
-    // live listener so we do not leak memory or keep reading from Firestore.
     // Detach the listener on unmount — returning it from inside the async
     // IIFE above would never reach React
     return () => unsubscribe?.();
@@ -203,17 +153,14 @@ export default function BuyerDashboard() {
   // Steps: 1 validate the amount, 2 check the listing is still for sale,
   // 3 save the offer, 4 notify the seller.
   const handleSubmitOffer = async () => {
-    // Safety check: we need a logged in user and a chosen listing.
     if (!auth.currentUser || !offerItem) return;
 
-    // Step 1: the typed price must be a number greater than 0.
     const parsed = parseFloat(offerAmount);
     if (!offerAmount || isNaN(parsed) || parsed <= 0) {
       setOfferAmountError('Please enter a valid offer amount greater than 0.');
       return;
     }
 
-    // Show the spinner on the Submit button while we talk to Firestore.
     setOfferLoading(true);
     try {
       // Read the buyer's profile to get a display name for the seller to see.
@@ -230,8 +177,6 @@ export default function BuyerDashboard() {
         return;
       }
 
-      // Step 3: the offer document. status "pending" means the seller has not answered.
-      // The seller screen later changes it to accepted or rejected.
       const offerData: Omit<Offer, 'id'> = {
         listingId: offerItem.id,
         buyerUid: auth.currentUser.uid,
@@ -260,7 +205,6 @@ export default function BuyerDashboard() {
         offerId: offerRef.id,
       });
 
-      // Close the sheet and reset it, then tell the buyer it worked.
       setOfferModalVisible(false);
       setOfferItem(null);
       setOfferAmount('');
@@ -282,8 +226,6 @@ export default function BuyerDashboard() {
   // Final step of buying. Creates the order and marks the listing sold, then notifies.
   // method is 'cash' or 'card'. For card, this is only called AFTER Stripe confirmed
   // payment (see handleCardPayment), and cardLast4 is the last 4 digits for display.
-  //
-  // Steps: 1 read buyer name, 2 build order, 3 atomic batch, 4 notify seller, 5 finish UI.
   const confirmPurchase = async (method: 'cash' | 'card', cardLast4?: string | null) => {
     if (!auth.currentUser || !buyingItem) return;
 
@@ -294,9 +236,6 @@ export default function BuyerDashboard() {
       const buyerData = buyerDoc.data();
       const buyerName = buyerDoc.exists() ? (buyerData?.fullName || buyerData?.name) : "Guest Buyer";
 
-      // Step 2: the order data. Cash orders start "pending" (seller must confirm).
-      // Card orders are already paid, so they start "confirmed". serverTimestamp() lets
-      // the Firestore server write the time, so phone clocks cannot cheat.
       const orderData = {
         listingId: buyingItem.id,
         buyerUid: auth.currentUser.uid,
@@ -315,9 +254,6 @@ export default function BuyerDashboard() {
         cancelledAt: null
       };
 
-      // Step 3 (explained): writeBatch groups several writes so they all succeed or all
-      // fail together. This is called "atomic". Here it is important, because we must not
-      // create an order without marking the listing sold (or the other way round).
       // Create the order and flip the listing to sold in ONE atomic batch.
       // Firestore rules require the listing to still be 'available' at commit
       // time, so if another buyer got there first this whole batch is rejected
@@ -338,7 +274,6 @@ export default function BuyerDashboard() {
         throw e;
       }
 
-      // Step 4: tell the seller. This is a separate write after the batch.
       const notificationMsg = buyerName + ' placed an order for your '
         + buyingItem.wasteType + ' waste - '
         + formatRs(buyingItem.totalPrice)
@@ -355,8 +290,6 @@ export default function BuyerDashboard() {
         orderId: orderRef.id,
       });
 
-      // Step 5: close the sheet, reset the state, show a message for each payment type,
-      // then go to the orders screen. router.push adds the screen on top of this one.
       setPaymentModalVisible(false);
       setBuyingItem(null);
       setPaymentMethod('');
@@ -382,7 +315,6 @@ export default function BuyerDashboard() {
   // Card payment flow with Stripe Checkout, using Cloud Functions.
   // 1 Ask our server for a Checkout page URL. 2 Open it in the in-app browser.
   // 3 Read the result from the redirect URL. 4 Ask our server to verify the payment.
-  // 5 Only if paid, create the order with confirmPurchase('card').
   // Real card payment: a Cloud Function creates a Stripe Checkout Session
   // (test mode) server-side — the secret key never touches the client —
   // and the browser redirects back into the app via a custom-scheme URL, so
@@ -401,17 +333,13 @@ export default function BuyerDashboard() {
         listingId: buyingItem.id,
       }) as { data: { url: string; sessionId: string } };
 
-      // Step 2: open Stripe's page. When payment ends, Stripe redirects to our app's own
-      // URL (redirectUrl). openAuthSessionAsync closes the browser when that happens.
       const redirectUrl = Linking.createURL('payment-complete');
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
-      // If the buyer closed the browser, stop quietly.
       if (result.type !== 'success' || !result.url) {
         return; // user cancelled/dismissed the checkout page
       }
 
-      // Step 3: read ?status=...&session_id=... from the redirect URL.
       const { queryParams } = Linking.parse(result.url);
       if (queryParams?.status !== 'success' || !queryParams?.session_id) {
         Alert.alert('Payment cancelled', 'The payment was not completed.');
@@ -430,7 +358,6 @@ export default function BuyerDashboard() {
         return;
       }
 
-      // Step 5: payment is confirmed, so now save the order.
       await confirmPurchase('card', verification.last4);
     } catch (error: unknown) {
       Alert.alert('Payment failed', error instanceof Error ? error.message : 'Please try again.');
@@ -452,14 +379,12 @@ export default function BuyerDashboard() {
     try {
       setSelectedItem(item);
 
-      // Step 1: location permission. Without it we cannot draw the route.
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please allow location access');
         return;
       }
 
-      // Step 2: the buyer's current GPS position.
       const pos = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced
       });
@@ -471,7 +396,6 @@ export default function BuyerDashboard() {
 
       setUserLocation(buyer);
 
-      // Step 3: distance in km, shown while the road route is loading.
       const dist = calculateDistance(
         buyer.latitude, buyer.longitude,
         item.location.latitude, item.location.longitude
@@ -481,9 +405,6 @@ export default function BuyerDashboard() {
 
       setMapModalVisible(true);
 
-      // Step 4: the road route is slow (network call to a routing service), so the map
-      // opens first. When the route arrives, setRoadRoute redraws the line. If it fails,
-      // the straight line stays.
       // Ask for the road route in the background; the straight line shows until it arrives.
       fetchRoadRoute(buyer, item.location)
         .then((route) => setRoadRoute(route))
@@ -568,7 +489,6 @@ export default function BuyerDashboard() {
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
-        {/* Screen title, notification bell, search box and type chips */}
         <ScreenHeader title="Marketplace" subtitle="Find recyclable waste near you" right={<NotificationBell />} />
 
         <TextField
@@ -582,7 +502,6 @@ export default function BuyerDashboard() {
 
         <ChipGroup options={TYPE_FILTERS} value={typeFilter} onChange={setTypeFilter} />
 
-        {/* Loading spinner, empty message, or the list of listing cards */}
         {loading ? (
           <LoadingState message="Loading the marketplace…" />
         ) : filteredItems.length === 0 ? (
@@ -636,7 +555,6 @@ export default function BuyerDashboard() {
             </TouchableOpacity>
           </View>
 
-          {/* The map: markers for buyer and seller, and the route line */}
           <MapView
             ref={mapRef}
             provider={APP_MAP_PROVIDER}
@@ -651,7 +569,6 @@ export default function BuyerDashboard() {
                 { edgePadding: { top: 80, right: 60, bottom: 80, left: 60 }, animated: false }
               );
             }}
-            // Start view: centered between buyer and seller. The delta values set the zoom.
             initialRegion={userLocation && selectedItem ? {
               latitude: (userLocation.latitude + selectedItem.location.latitude) / 2,
               longitude: (userLocation.longitude + selectedItem.location.longitude) / 2,
@@ -716,15 +633,12 @@ export default function BuyerDashboard() {
             )}
           </MapView>
 
-          {/* Bottom bar with a Buy Now shortcut */}
           <View style={styles.mapFooter}>
             <Button
               label={`Buy Now · ${formatRs(selectedItem?.totalPrice)}`}
               icon="cart-outline"
               onPress={() => {
                 setMapModalVisible(false);
-                // Close the map first, then open the payment sheet after a short delay, because
-                // two modals cannot animate at the same moment.
                 setTimeout(() => {
                   if (selectedItem) {
                     handleBuyNow(selectedItem);
@@ -755,7 +669,6 @@ export default function BuyerDashboard() {
           <DetailRow label="Total" value={formatRs(buyingItem?.totalPrice)} emphasis />
         </Card>
 
-        {/* Choose payment method: two tappable cards (cash or card) */}
         <Text style={[Type.caption, styles.paymentLabel]}>PAYMENT METHOD</Text>
 
         <View style={styles.payRow}>
@@ -825,7 +738,6 @@ export default function BuyerDashboard() {
           <DetailRow label="Asking price" value={formatRs(offerItem?.totalPrice)} emphasis />
         </Card>
 
-        {/* Offer price input. The replace() removes anything that is not a digit or a dot. */}
         <TextField
           label="Your offer (Rs)"
           icon="pricetag-outline"
@@ -848,7 +760,6 @@ export default function BuyerDashboard() {
         />
       </Sheet>
 
-      {/* Bottom tab bar for buyers (Home tab is active) */}
       <BottomNav role="buyer" active="home" />
     </View>
   );
@@ -856,15 +767,12 @@ export default function BuyerDashboard() {
 
 /* ================= STYLES ================= */
 
-// Styles. StyleSheet.create builds the style objects once. Space, Radius, Palette
-// and Type come from constants/design, so the whole app looks the same.
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Palette.background },
   flex: { flex: 1 },
 
   search: { marginBottom: Space.md },
 
-  // Listing card styles
   listingCard: { marginBottom: Space.lg },
   offerBtn: { marginTop: Space.sm },
   listingHeader: { flexDirection: 'row', alignItems: 'center', gap: Space.md },

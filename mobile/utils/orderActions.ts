@@ -1,5 +1,3 @@
-// Rules for which buttons a seller sees on an order card, and when cash is collected.
-
 import type { Order } from '../types';
 
 /**
@@ -9,7 +7,6 @@ import type { Order } from '../types';
  *   confirmed -> completed | cancelled
  * and marking a cash order paid when the cash is collected.
  */
-// Buttons the seller can press: confirm the order, decline it, or mark it complete.
 export type SellerOrderAction = 'confirm' | 'decline' | 'complete';
 
 // In: the order (only status and awaitingBuyer matter). Out: the list of allowed actions.

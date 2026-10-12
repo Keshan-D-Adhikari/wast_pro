@@ -1,6 +1,3 @@
-// NotAdmin.jsx: shown when someone signs in successfully but their users/<uid> document does
-// not have role "admin". They only see this message and a sign out button.
-// Hiding the pages is not the security. firestore.rules also block non-admins from the data.
 import { useAuth } from "../useAuth";
 import { IconShield, IconAlert, IconSignOut } from "../components/Icons";
 
@@ -10,7 +7,6 @@ export default function NotAdmin() {
 
   return (
     <div className="login-page">
-      {/* A red warning icon, a badge and the explanation (the style={{...}} props are inline CSS). */}
       <div className="login-form-panel" style={{ width: "100%" }}>
         <div className="login-card" style={{ textAlign: "center" }}>
           <div style={{

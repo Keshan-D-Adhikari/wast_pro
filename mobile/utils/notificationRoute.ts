@@ -1,5 +1,3 @@
-// Decides which screen opens when the user taps a notification (see notification-bell.tsx).
-
 import type { Href } from 'expo-router';
 
 /**

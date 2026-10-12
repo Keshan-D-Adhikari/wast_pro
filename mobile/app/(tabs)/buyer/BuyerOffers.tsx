@@ -1,18 +1,3 @@
-// BuyerOffers ("My offers"): offers the buyer sent to sellers, and their answers.
-//
-// Who uses it: a logged-in buyer. Reached with the Offers button on BuyerOrders.
-// Flow of an offer:
-//  1 Buyer sends an offer from BuyerDashboard (offers doc, status "pending").
-//  2 Seller accepts or rejects. On accept, an order is created with
-//    awaitingBuyer true and status "pending" (the listing is held for this buyer).
-//  3 Back here, the buyer chooses "Buy" (order becomes confirmed) or "Decline"
-//    (order cancelled and listing goes back to the marketplace).
-//
-// Firestore collections:
-//  - offers         READ (live, only this buyer's)
-//  - orders         READ (live, to find the order made from each offer) and UPDATE
-//  - marketplace    READ and UPDATE (restore the listing when the buyer declines)
-//  - notifications  CREATE (tell the seller the buyer's decision)
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -42,14 +27,11 @@ const offerStatusTone = (s: Offer['status']): 'success' | 'warning' | 'danger' |
 
 // The offers screen component.
 export default function BuyerOffers() {
-  // Logged in Firebase user (null until the saved login is ready).
   const authUser = useAuthUser();
-  // offers: this buyer's offers. loading: true until the first data arrives.
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   // The orders created by accepted offers, by offer id (the buyer decides on these)
   const [offerOrders, setOfferOrders] = useState<Record<string, Order>>({});
-  // Id of the offer being decided now (so only that card shows a busy state).
   const [decidingId, setDecidingId] = useState<string | null>(null);
 
   // Effect 1: live list of this buyer's offers, newest first.
@@ -57,7 +39,6 @@ export default function BuyerOffers() {
   useEffect(() => {
     if (!authUser) return;
 
-    // Query: only offers where buyerUid is me.
     const q = query(
       collection(db, 'offers'),
       where('buyerUid', '==', authUser.uid),
@@ -79,7 +60,6 @@ export default function BuyerOffers() {
       setLoading(false);
     });
 
-    // Cleanup: stop the listener when the screen closes.
     return () => unsubscribe();
   }, [authUser]);
 
@@ -138,14 +118,12 @@ export default function BuyerOffers() {
         onPress: async () => {
           setDecidingId(offer.id);
           try {
-            // Read the listing to check this order was the one holding it.
             const listingRef = doc(db, 'marketplace', order.listingId);
             const listingSnap = await getDoc(listingRef);
             // writeBatch: all writes succeed together or none do (atomic), so the order and
             // the listing can never get out of step.
             const batch = writeBatch(db);
             batch.update(doc(db, 'orders', order.id), { status: 'cancelled', cancelledAt: serverTimestamp() });
-            // Only put the listing back if this order owns it. deleteField removes soldOrderId.
             if (listingSnap.exists() && listingSnap.data().soldOrderId === order.id) {
               batch.update(listingRef, { status: 'available', soldOrderId: deleteField() });
             }
@@ -176,14 +154,11 @@ export default function BuyerOffers() {
 
   // One offer card. For accepted offers it shows the Buy and Decline buttons.
   const OfferCard = ({ offer }: { offer: Offer }) => {
-    // Accent color by waste type and a readable date (or "Just now" before the server
-    // has written the time).
     const accent = wasteAccent(offer.wasteType as any);
     const date = offer.createdAt?.toDate ? offer.createdAt.toDate().toLocaleDateString() : 'Just now';
 
     return (
       <Card style={[styles.card, offer.status === 'accepted' && styles.acceptedCard]}>
-        {/* Header: waste icon, type and status badge */}
         <View style={styles.cardHeader}>
           <View style={[styles.typeIcon, { backgroundColor: accent.tint }]}>
             <Ionicons name="cube-outline" size={17} color={accent.base} />
@@ -196,21 +171,15 @@ export default function BuyerOffers() {
 
         <Divider />
 
-        {/* Price details */}
         <DetailRow label="Seller" value={offer.sellerName} />
         <DetailRow label="Weight" value={`${offer.weightKg} kg`} />
         <DetailRow label="Asking price" value={formatRs(offer.askingPrice)} />
         <DetailRow label="Your offer" value={formatRs(offer.offeredPrice)} emphasis />
         <DetailRow label="Date" value={date} />
 
-        {/* Accepted offers. This runs a small function right in the JSX (IIFE) so we can */}
-        {/* use local variables. */}
         {offer.status === 'accepted' && (() => {
-          // The order created from this offer (found by offer id).
           const order = offerOrders[offer.id];
-          // waiting: the order exists and the buyer has not decided yet.
           const waiting = !!order && order.status === 'pending' && order.awaitingBuyer === true;
-          // declined: the order was cancelled, so the buyer did not buy.
           const declined = !!order && order.status === 'cancelled';
           const tone = declined ? Palette.status.danger.base : Palette.status.success.base;
           return (
@@ -225,7 +194,6 @@ export default function BuyerOffers() {
                       : 'Offer accepted. Check My Purchases for the order.'}
                 </Text>
               </View>
-              {/* Buy and Decline buttons, only while waiting for the buyer */}
               {waiting && (
                 <View style={styles.decideRow}>
                   <Button
@@ -247,7 +215,6 @@ export default function BuyerOffers() {
           );
         })()}
 
-        {/* Pending offers only show a waiting message */}
         {offer.status === 'pending' && (
           <View style={styles.waitingRow}>
             <Ionicons name="time-outline" size={16} color={Palette.status.warning.base} />
@@ -263,10 +230,8 @@ export default function BuyerOffers() {
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
-        {/* Screen header with back button */}
         <ScreenHeader title="My offers" subtitle="Offers you submitted to sellers" back />
 
-        {/* Loading, empty, or the two lists */}
         {loading ? (
           <LoadingState message="Loading your offers…" />
         ) : offers.length === 0 ? (
@@ -293,13 +258,11 @@ export default function BuyerOffers() {
           </>
         )}
       </Screen>
-      {/* Bottom tab bar for buyers (Orders tab is active) */}
       <BottomNav role="buyer" active="orders" />
     </View>
   );
 }
 
-// Styles.
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Palette.background },
   card: { marginBottom: Space.md },

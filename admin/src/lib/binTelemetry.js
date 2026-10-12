@@ -1,6 +1,3 @@
-// binTelemetry.js: turns the raw smart bin data from the Realtime Database into clean values.
-// Everything here is a plain function (no React), so it is easy to test.
-// The firmware sends text and grams; the dashboard wants percent, status words and kg.
 /**
  * The ESP32 firmware writes to Realtime Database as:
  *   bins/bin001/compartments/{plastic|food|metal}/{ level, weight }
@@ -16,7 +13,6 @@ export const WEIGHT_UNIT_DIVISOR = 1000;
 /** Data older than this is treated as "bin offline" (the firmware uploads every few seconds). */
 export const STALE_AFTER_MS = 2 * 60 * 1000;
 
-// The three compartments of a bin, in the order they are shown.
 const TYPES = ["plastic", "food", "metal"];
 
 // Number (percent) -> { level, status }. Example: 80 -> { level: 80, status: "75%" }.
@@ -40,7 +36,6 @@ export function parseLevel(raw) {
   if (text === "EMPTY") return { level: 0, status: "EMPTY" };
   if (text === "FULL") return { level: 100, status: "FULL" };
 
-  // The regex accepts a number with an optional decimal part and an optional % sign.
   const m = /^(\d+(?:\.\d+)?)\s*%?$/.exec(text);
   if (m) return fromPercent(parseFloat(m[1]));
 

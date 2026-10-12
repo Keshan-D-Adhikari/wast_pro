@@ -1,5 +1,3 @@
-// Short support codes built from long Firestore ids. Used by id-badge.tsx and the order screens.
-
 /**
  * Short, readable IDs for support. A user can read "USR-7K3F9A" out over the
  * phone and an admin can search for it. They are derived from the Firestore

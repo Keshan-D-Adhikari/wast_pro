@@ -1,13 +1,3 @@
-// BuyerProfile: the buyer's profile tab.
-//
-// Who uses it: a logged-in buyer, from the Profile tab in the bottom bar.
-// What it does: shows the name, email, address and ID, purchase statistics,
-// an estimated recycling impact, shortcuts to other screens, and Log out.
-//
-// Firestore collections (READ only):
-//  - users    the buyer's own profile document
-//  - orders   all orders where buyerUid is this buyer (to count orders and kilograms)
-// Editing the profile is done in EditProfile (which uses components/profile-editor).
 import { View, Text, StyleSheet, Alert, Image, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -29,10 +19,7 @@ import { UserProfile } from "../../../types";
 
 // The profile screen component.
 export default function BuyerProfile() {
-  // router: used to open other screens (push) or replace the current one (replace).
   const router = useRouter();
-  // loading: true until the data has loaded. userData: the profile document.
-  // stats: number of orders and total kg bought.
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState({
@@ -44,7 +31,6 @@ export default function BuyerProfile() {
   // It uses getDoc / getDocs, which read ONCE. This screen does not need live updates.
   useEffect(() => {
     const fetchProfileData = async () => {
-      // No user means nothing to load.
       if (!auth.currentUser) return;
       try {
         // 1. Fetch User Info
@@ -60,14 +46,12 @@ export default function BuyerProfile() {
         );
         const querySnapshot = await getDocs(q);
 
-        // Add up the weight of every order. "|| 0" protects against a missing weight.
         let weight = 0;
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           weight += (data.weightKg || 0);
         });
 
-        // Save the totals. querySnapshot.size is the number of orders.
         setStats({ totalPurchases: querySnapshot.size, totalWeight: weight });
       } catch (error) {
         console.error("Error fetching buyer profile stats:", error);
@@ -79,7 +63,6 @@ export default function BuyerProfile() {
     fetchProfileData();
   }, []);
 
-  // Current Firebase user (for email and uid).
   const user = auth.currentUser;
 
   // Firebase logout — clears the session stored in AsyncStorage
@@ -89,13 +72,10 @@ export default function BuyerProfile() {
       {
         text: "Logout",
         style: "destructive",
-        // Runs only if the user pressed Logout in the alert.
         onPress: async () => {
           try {
             // signOut ends the Firebase session.
             await signOut(auth);
-            // replace (not push) swaps the screen so the Back button cannot return to a
-            // screen that needs login.
             router.replace("/(tabs)/Welcome");
           } catch {
             Alert.alert("Error", "Could not logout. Please try again.");
@@ -105,7 +85,6 @@ export default function BuyerProfile() {
     ]);
   };
 
-  // While loading, show only a spinner.
   if (loading) {
     return (
       <Screen>
@@ -114,16 +93,13 @@ export default function BuyerProfile() {
     );
   }
 
-  // Show tonnes if 1000 kg or more, otherwise kilograms.
   const weightLabel = stats.totalWeight >= 1000
     ? (stats.totalWeight / 1000).toFixed(1) + ' t'
     : formatKgTotal(stats.totalWeight) + ' kg';
 
-  // Screen layout.
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
-        {/* Header with a settings button that opens EditProfile */}
         <ScreenHeader
           title="Profile"
           right={
@@ -139,7 +115,6 @@ export default function BuyerProfile() {
         />
         {/* Identity card */}
         <Card style={styles.identityCard} elevation={2}>
-          {/* Avatar: the photo if there is one, otherwise the first letter of the name */}
           <View style={styles.avatar}>
             {userData?.photoURL ? (
               <Image source={{ uri: userData.photoURL }} style={styles.avatarImage} />
@@ -154,7 +129,6 @@ export default function BuyerProfile() {
           <Text style={Type.small}>{user?.email || "No Email"}</Text>
           <IdBadge label="Your ID" code={userCode(user?.uid)} />
 
-          {/* Role label and address */}
           <View style={styles.rolePill}>
             <Ionicons name="repeat-outline" size={12} color={Palette.brand[700]} />
             <Text style={styles.rolePillText}>Recycling buyer</Text>
@@ -182,8 +156,6 @@ export default function BuyerProfile() {
         {/* Recycling impact */}
         <SectionTitle>Recycling impact 🌍</SectionTitle>
         <View style={styles.tileRow}>
-          {/* Impact is only an estimate: kg x a fixed factor (0.05 trees, 0.27 kg CO2, */}
-          {/* 0.47 kWh per kg) */}
           <StatTile
             value={(stats.totalWeight * 0.05).toFixed(1)}
             label="Trees saved"
@@ -235,13 +207,11 @@ export default function BuyerProfile() {
         />
       </Screen>
 
-      {/* Bottom tab bar for buyers (Profile tab is active) */}
       <BottomNav role="buyer" active="profile" />
     </View>
   );
 }
 
-// Styles for this screen. Groups: header button, identity card, stat tiles.
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({

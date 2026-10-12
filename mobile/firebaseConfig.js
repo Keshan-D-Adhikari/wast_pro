@@ -1,7 +1,6 @@
 // FIREBASE SETUP FOR THE PHONE APP (Android / iOS)
 // This file connects the app to our Firebase project and exports ready-to-use
 // tools. Other files import them, for example: import { auth, db } from '../firebaseConfig'.
-// There is a separate file, firebaseConfig.web.js, which Expo uses for the web build.
 import { initializeApp } from "firebase/app";
 import { initializeAuth, getReactNativePersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -40,5 +39,4 @@ export const storage = getStorage(app);
 // used for Stripe payments).
 export const functions = getFunctions(app);
 
-// The app itself is also exported in case another file needs it.
 export default app;

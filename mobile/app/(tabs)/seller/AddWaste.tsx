@@ -1,14 +1,3 @@
-// ADD WASTE SCREEN (list waste on the marketplace)
-// Who uses it: a seller. It is the "market" tab of the seller bottom navigation.
-// What it does: the seller picks which waste types (plastic, food, metal) to sell and how
-// many kg. The weight cannot be more than the bin sensor measures. Pressing the button
-// creates one marketplace listing per selected waste type.
-// Data it uses:
-//   - Firestore users/{uid}     (read) seller name, linked binId, saved bin location
-//   - Realtime Database bins/{binId} (read live) sensor level and weight per compartment
-//   - Firestore marketplace     (write) one new document per listing
-//   - The phone GPS (expo-location) is only a fallback for the listing location
-// Buyers then see the listings in their marketplace and can buy or make an offer.
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { db, auth } from '../../../firebaseConfig';
@@ -29,14 +18,12 @@ import { BottomNav } from '@/components/ui/bottom-nav';
 import { formatRs, roundMoney } from '../../../utils/money';
 import { BinCompartment, BinData, UserLocation, WasteType } from '../../../types';
 
-// Settings for one waste type: price per kg, icon and the name shown on screen.
 interface WasteTypeConfig {
   pricePerKg: number;
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
 }
 
-// Fixed selling price (Rs per kg) for each waste type.
 const priceConfig: Record<WasteType, WasteTypeConfig> = {
   plastic: {
     pricePerKg: 45,
@@ -55,7 +42,6 @@ const priceConfig: Record<WasteType, WasteTypeConfig> = {
   },
 };
 
-// What the seller typed for one waste type. weight is text because it comes from a text box.
 interface WasteItem {
   weight: string;
   total: number;
@@ -64,7 +50,6 @@ interface WasteItem {
 
 // Main component of the screen.
 export default function AddWaste() {
-  // loading is true while the listings are being saved (the button shows a spinner).
   const [loading, setLoading] = useState(false);
   // In mock mode the initial state already holds the mock telemetry, so the
   // effect below doesn't need to set it.
@@ -72,15 +57,11 @@ export default function AddWaste() {
     USE_MOCK_IOT ? (MOCK_BIN_DATA_NORMAL as BinData) : null
   );
   const [binExists, setBinExists] = useState<boolean | null>(USE_MOCK_IOT ? true : null);
-  // State group: seller details loaded from Firestore.
-  // sellerName goes on each listing. binId says which bin to read. sellerBinLocation is
-  // where buyers will go to collect the waste.
   const [sellerName, setSellerName] = useState('');
   // The bin this seller is linked to; falls back to the default prototype bin.
   const [binId, setBinId] = useState(DEFAULT_BIN_ID);
   const [sellerBinLocation, setSellerBinLocation] = useState<UserLocation | null>(null);
 
-  // One entry per waste type. useState keeps this form data and redraws the screen on change.
   const [wasteItems, setWasteItems] = useState<Record<WasteType, WasteItem>>({
     plastic: { weight: '', total: 0, selected: false },
     food:    { weight: '', total: 0, selected: false },
@@ -89,7 +70,6 @@ export default function AddWaste() {
 
   // Effect 1: runs once when the screen opens. Loads the seller's profile from Firestore.
   useEffect(() => {
-    // No logged in user, nothing to load.
     if (!auth.currentUser) return;
 
     const fetchUser = async () => {
@@ -114,7 +94,6 @@ export default function AddWaste() {
   useEffect(() => {
     if (USE_MOCK_IOT) return;
 
-    // A reference to the path bins/{binId} in the Realtime Database.
     const binNodeRef = dbRef(iotDb, `bins/${binId}`);
     // onValue is a LIVE listener. It runs now and again every time the sensor data changes.
     // normalizeBin turns the raw firmware data into the shape the app uses.
@@ -133,11 +112,9 @@ export default function AddWaste() {
       setBinExists(false);
     });
 
-    // Cleanup: stop listening when the screen closes or binId changes.
     return () => unsubscribe();
   }, [binId]);
 
-  // Effect 3: ask for location permission and read the phone position (a fallback only).
   // The firmware doesn't report the bin's GPS location, so capture the
   // seller's current device location at listing time instead — buyers need
   // some coordinate to route to, and this mirrors how BuyerDashboard already
@@ -147,9 +124,7 @@ export default function AddWaste() {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
-          // Low accuracy is enough here and is faster.
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-          // ?? keeps the saved bin location if there is one. Otherwise we use the phone position.
           setSellerBinLocation((prev) => prev ?? loc.coords);
         }
       } catch (error) {
@@ -169,13 +144,10 @@ export default function AddWaste() {
 
   // Runs on every key press in a weight box.
   const handleWeightChange = (type: WasteType, value: string) => {
-    // Keep only digits and the dot, so letters cannot be typed.
     const cleaned = value.replace(/[^0-9.]/g, '');
-    // Total price for this waste type = kg x price per kg.
     const price = priceConfig[type].pricePerKg;
     const total = parseFloat(cleaned) * price;
 
-    // Update only this waste type and keep the others unchanged.
     setWasteItems(prev => ({
       ...prev,
       [type]: {
@@ -186,7 +158,6 @@ export default function AddWaste() {
     }));
   };
 
-  // Totals shown in the summary: money for all selected types and how many are selected.
   const grandTotal = Object.values(wasteItems)
     .reduce((sum, item) => sum + item.total, 0);
 
@@ -195,7 +166,6 @@ export default function AddWaste() {
 
   // Called when the seller presses Post to marketplace. It checks the data first, then saves.
   const handleSubmit = async () => {
-    // Step 1: collect the waste types that have a weight above zero.
     const selectedItems = Object.entries(wasteItems)
       .filter(([_, item]) =>
         item.selected && parseFloat(item.weight) > 0
@@ -206,7 +176,6 @@ export default function AddWaste() {
       return;
     }
 
-    // Step 2: we need sensor data from the bin, otherwise we cannot check the weight.
     if (!binData) {
       Alert.alert(
         'No smart bin found',
@@ -215,7 +184,6 @@ export default function AddWaste() {
       return;
     }
 
-    // Step 3: each weight must not be more than what the bin sensor measured.
     // Validation check for all selected items against the weight
     // currently measured in each bin compartment
     for (const [type, item] of selectedItems) {
@@ -229,8 +197,6 @@ export default function AddWaste() {
       }
     }
 
-    // Step 4: buyers need coordinates to show the pickup route, so refuse to
-    // create a listing that would land in the marketplace without them.
     // Buyers need coordinates to show the pickup route, so refuse to
     // create a listing that would land in the marketplace without them.
     if (
@@ -245,12 +211,9 @@ export default function AddWaste() {
       return;
     }
 
-    // Step 5: save. try / catch / finally: errors are shown, and loading is always reset.
     try {
       setLoading(true);
 
-      // Normalise to a plain object. The bin document stores a Firestore
-      // GeoPoint, but MarketplaceItem.location is { latitude, longitude }
       // Normalise to a plain object — the bin document stores a Firestore
       // GeoPoint, but MarketplaceItem.location is { latitude, longitude }
       const listingLocation = {
@@ -258,8 +221,6 @@ export default function AddWaste() {
         longitude: sellerBinLocation.longitude,
       };
 
-      // One new document in the marketplace collection for each selected waste type.
-      // status 'available' means buyers can see it. serverTimestamp() lets the server set the time.
       for (const [type, item] of selectedItems) {
         await addDoc(collection(db, 'marketplace'), {
           sellerUid: auth.currentUser!.uid,
@@ -274,7 +235,6 @@ export default function AddWaste() {
         });
       }
 
-      // Step 6: tell the seller it worked, then clear the form.
       Alert.alert(
         'Listed Successfully!',
         selectedCount + ' waste type(s) added to marketplace.\n' +
@@ -295,23 +255,19 @@ export default function AddWaste() {
     }
   };
 
-  // Screen layout.
   return (
     <View style={styles.root}>
       <Screen withBottomNav keyboardAware>
-        {/* Page title with a back button */}
         <ScreenHeader
           title="Add to marketplace"
           subtitle="List waste measured in your smart bin"
           back
         />
 
-        {/* Warning when the bin sends no data */}
         {binExists === false && (
           <Notice text="The smart bin is not reporting any sensor data yet, so there are no readings to list from." />
         )}
 
-        {/* Title, then one card for each waste type */}
         <SectionTitle tight meta={selectedCount > 0 ? `${selectedCount} selected` : undefined}>
           Waste types
         </SectionTitle>
@@ -330,7 +286,6 @@ export default function AddWaste() {
               ]}
             >
               {/* Card Header */}
-              {/* Card header: icon, name, price per kg and the calculated price */}
               <View style={styles.wasteHeader}>
                 <View style={[styles.wasteIcon, { backgroundColor: accent.base }]}>
                   <Ionicons name={config.icon} size={19} color={Palette.white} />
@@ -347,7 +302,6 @@ export default function AddWaste() {
               </View>
 
               {/* Weight Input */}
-              {/* Weight input. It shows an error if the weight is more than the bin holds */}
               <TextField
                 placeholder="Enter weight"
                 value={item.weight}
@@ -359,7 +313,6 @@ export default function AddWaste() {
               />
 
               {/* Show bin availability */}
-              {/* Bar showing how full this bin compartment is */}
               {binData && (
                 <View style={styles.availabilityRow}>
                   <View style={styles.availabilityTrack}>
@@ -380,7 +333,6 @@ export default function AddWaste() {
         })}
 
         {/* TOTAL SUMMARY CARD */}
-        {/* Order summary, shown once something is selected */}
         {grandTotal > 0 && (
           <>
             <SectionTitle>Order summary</SectionTitle>
@@ -410,13 +362,11 @@ export default function AddWaste() {
         />
       </Screen>
 
-      {/* Bottom tab bar */}
       <BottomNav role="seller" active="market" />
     </View>
   );
 }
 
-// Styles: waste cards, price badge and the small fill bar.
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({

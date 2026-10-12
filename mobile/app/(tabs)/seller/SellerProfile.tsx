@@ -1,13 +1,3 @@
-// SELLER PROFILE SCREEN
-// Who uses it: a logged in seller (waste provider). It is the "profile" tab of the seller
-// bottom navigation.
-// What it shows: the seller's identity card, total money earned, total waste sold, an
-// estimate of the environmental impact, and links to other screens (dashboard, edit
-// profile, orders) plus the log out button.
-// Data it reads (it never writes):
-//   - Firestore users/{uid}                  -> name, email, photo, location, binId
-//   - Firestore orders (sellerUid == me, status == completed) -> sums for the stats
-// Log out uses Firebase Auth signOut and then sends the user back to the Welcome screen.
 import { formatRs } from '../../../utils/money';
 import { View, Text, StyleSheet, Image, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,14 +21,9 @@ import { UserProfile } from "../../../types";
 
 // Main component of the screen.
 export default function SellerProfile() {
-  // The router lets us move to other screens (push / replace).
   const router = useRouter();
-  // loading is true until the profile and stats are fetched. While true we show a spinner.
   const [loading, setLoading] = useState(true);
-  // userData holds the seller's profile document. null means not loaded yet.
-  // useState keeps a value that, when changed, makes React draw the screen again.
   const [userData, setUserData] = useState<UserProfile | null>(null);
-  // stats are the totals worked out from the seller's completed orders.
   const [stats, setStats] = useState({
     totalEarned: 0,
     totalWeight: 0
@@ -49,7 +34,6 @@ export default function SellerProfile() {
   useEffect(() => {
     // An async function is needed because Firestore calls return promises (we await them).
     const fetchProfileData = async () => {
-      // No logged in user yet, so there is nothing to load.
       if (!auth.currentUser) return;
       try {
         // Step 1: read this seller's profile document from the users collection.
@@ -59,8 +43,6 @@ export default function SellerProfile() {
           setUserData(userDoc.data() as UserProfile);
         }
 
-        // Step 2: read all COMPLETED orders where this user is the seller, then add them up.
-        // The two where() filters are combined with AND.
         // 2. Fetch Order Stats
         const q = query(
           collection(db, "orders"),
@@ -69,8 +51,6 @@ export default function SellerProfile() {
         );
         const querySnapshot = await getDocs(q);
 
-        // Add the price and weight of every completed order.
-        // || 0 protects us if a field is missing.
         let earned = 0;
         let weight = 0;
         querySnapshot.forEach((doc) => {
@@ -80,16 +60,13 @@ export default function SellerProfile() {
         });
 
         setStats({ totalEarned: earned, totalWeight: weight });
-      // If Firestore fails we only log it. The screen still shows with zero stats.
       } catch (error) {
         console.error("Error fetching seller profile stats:", error);
-      // finally runs on success and on error, so the spinner always stops.
       } finally {
         setLoading(false);
       }
     };
 
-    // Start the loading function.
     fetchProfileData();
   }, []);
 
@@ -105,8 +82,6 @@ export default function SellerProfile() {
             // signOut ends the Firebase session. Without it the login would stay saved on the phone.
             // Clear the Firebase session, otherwise it stays in AsyncStorage
             await signOut(auth);
-            // router.replace swaps the current screen for Welcome, so the back button
-            // cannot return to this logged in screen (push would keep it in the history).
             router.replace("/(tabs)/Welcome");
           } catch {
             Alert.alert("Error", "Could not logout. Please try again.");
@@ -116,7 +91,6 @@ export default function SellerProfile() {
     ]);
   };
 
-  // Show only a spinner while loading.
   if (loading) {
     return (
       <Screen>
@@ -125,12 +99,10 @@ export default function SellerProfile() {
     );
   }
 
-  // Format the earned money. 1000 or more is shown short, like Rs 1.5K.
   const earnedLabel = stats.totalEarned >= 1000
     ? 'Rs ' + (stats.totalEarned / 1000).toFixed(1) + 'K'
     : formatRs(stats.totalEarned);
 
-  // Screen body: a scrollable page and the bottom tab bar on top of a plain background view.
   return (
     <View style={styles.root}>
       <Screen withBottomNav contentStyle={styles.content}>
@@ -167,7 +139,6 @@ export default function SellerProfile() {
         {/* Sales stats */}
         <SectionTitle>Your sales</SectionTitle>
         <View style={styles.tileRow}>
-          {/* Two small tiles: money earned and total weight sold */}
           <StatTile value={earnedLabel} label="Total earned" icon="wallet-outline" />
           <StatTile value={`${formatKgTotal(stats.totalWeight)} kg`} label="Waste sold" icon="scale-outline" />
         </View>
@@ -175,8 +146,6 @@ export default function SellerProfile() {
         {/* Environmental impact */}
         <SectionTitle>Your environmental impact 🌍</SectionTitle>
         <View style={styles.tileRow}>
-          {/* Impact numbers are only estimates: weight in kg multiplied by a fixed factor */}
-          {/* (0.05 trees, 0.27 kg CO2, 0.47 kWh energy per kg). */}
           <StatTile
             value={(stats.totalWeight * 0.05).toFixed(1)}
             label="Trees saved"
@@ -196,7 +165,6 @@ export default function SellerProfile() {
             color={{ base: '#D97706', tint: '#FDF0DC' }}
           />
         </View>
-        {/* Small note telling the user these numbers are estimates */}
         <Text style={styles.impactNote}>
           Estimated using standard recycling conversion factors.
         </Text>
@@ -231,21 +199,17 @@ export default function SellerProfile() {
         />
       </Screen>
 
-      {/* Bottom tab bar. active tells it which tab to highlight. */}
       <BottomNav role="seller" active="profile" />
     </View>
   );
 }
 
-// Styles are plain objects. StyleSheet.create checks them and makes them fast.
-// Space, Radius and Type come from the shared design file so all screens look the same.
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Palette.background },
   content: { paddingTop: Space['3xl'] },
 
-  // Identity card and avatar (round picture or the first letter of the name).
   identityCard: { alignItems: 'center', paddingVertical: Space['2xl'], gap: Space.xs },
   avatar: {
     width: 84,
@@ -262,7 +226,6 @@ const styles = StyleSheet.create({
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: 32, fontWeight: '800', color: Palette.brand[600] },
   name: { ...Type.h2, fontSize: 25 },
-  // Small green pill that says "Waste provider" and the address row.
   rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -276,7 +239,6 @@ const styles = StyleSheet.create({
   rolePillText: { ...Type.caption, color: Palette.brand[700], fontWeight: '700' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, marginTop: Space.sm },
 
-  // Stat tiles and the estimate note.
   tileRow: { flexDirection: 'row', gap: Space.md },
   impactNote: { ...Type.caption, color: Palette.ink[300], marginTop: Space.sm },
 });

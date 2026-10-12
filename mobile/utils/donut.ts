@@ -1,11 +1,3 @@
-// Helpers for the donut chart (see components/ui/donut-chart.tsx).
-// A donut is drawn as a circle outline (stroke). To show a slice we draw only part of the
-// outline using SVG 'stroke-dasharray': [dash, gap] means 'draw dash, then skip gap'.
-// 'strokeDashoffset' moves where the drawing starts along the circle.
-//
-// One slice: value = the raw number, fraction = share of the total (0 to 1),
-// percent = fraction as a whole percent, dash = length of the drawn arc,
-// offset = how far along the circle the arc begins.
 export type DonutSlice = { value: number; fraction: number; percent: number; dash: number; offset: number };
 
 /**
@@ -23,17 +15,11 @@ export function donutSlices(values: number[], circumference: number, gap: number
   const total = clean.reduce((a, b) => a + b, 0);
   // How many slices will really be visible (non-zero).
   const drawn = clean.filter((v) => v > 0).length;
-  // 'start' is where the next slice begins along the circle.
   let start = 0;
   return clean.map((value) => {
-    // Share of the total; avoid dividing by zero.
     const fraction = total > 0 ? value / total : 0;
-    // Arc length for this slice.
     const length = fraction * circumference;
-    // A gap only makes sense when there are two or more visible slices.
     const useGap = drawn > 1 ? gap : 0;
-    // Shorten the dash by the gap and shift the start by half the gap,
-    // so the gap is split evenly on both sides of the slice.
     const slice: DonutSlice = {
       value,
       fraction,
@@ -41,7 +27,6 @@ export function donutSlices(values: number[], circumference: number, gap: number
       dash: value > 0 ? Math.max(0.01, length - useGap) : 0,
       offset: start + useGap / 2,
     };
-    // The next slice starts where this one ended.
     start += length;
     return slice;
   });
