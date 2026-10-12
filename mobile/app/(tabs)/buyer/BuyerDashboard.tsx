@@ -54,9 +54,9 @@ const TYPE_FILTERS = [
 ] as const;
 type TypeFilterKey = typeof TYPE_FILTERS[number]['key'];
 
-// The whole buyer marketplace screen. Expo Router shows this component as a route.
-// All the screen data lives in React state (useState). When a state value changes,
-// React draws the screen again with the new value.
+// FUNCTION: BuyerDashboard
+// Runs when: the buyer opens the Marketplace screen.
+// What it does: the whole Marketplace screen. All the other functions are inside it.
 export default function BuyerDashboard() {
   const authUser = useAuthUser();
   const router = useRouter();
@@ -86,6 +86,9 @@ export default function BuyerDashboard() {
   const [offerAmountError, setOfferAmountError] = useState('');
   const [offerLoading, setOfferLoading] = useState(false);
 
+  // FUNCTION: useEffect (load the screen data)
+  // Runs when: the screen opens, after the login is confirmed.
+  // What it does: gets the buyer's GPS location and loads the available listings live from Firestore.
   useEffect(() => {
     // Wait for the saved session to be restored; querying while signed out is denied by the rules.
     if (!authUser) return;
@@ -123,7 +126,9 @@ export default function BuyerDashboard() {
     return () => unsubscribe?.();
   }, [authUser]);
 
-  // Derived from items + searchText — no effect needed, just recompute on render.
+  // FUNCTION: filteredItems (filter)
+  // Runs when: every time the screen is drawn.
+  // What it does: keeps only the listings that match the search box and the selected type chip.
   const filteredItems = items.filter(item => {
     const type = (item.wasteType || '').toLowerCase();
     const matchesFilter = typeFilter === 'all' || type === typeFilter;
@@ -131,8 +136,9 @@ export default function BuyerDashboard() {
     return matchesFilter && matchesSearch;
   });
 
-  // Distance in km between the buyer and a seller's bin, as text with 1 decimal.
-  // Returns "N/A" if we do not know the buyer's position.
+  // FUNCTION: getDistance
+  // Runs when: each listing card is drawn.
+  // What it does: gives the distance in km between the buyer and the seller. "N/A" if the buyer's location is unknown.
   const getDistance = (sellerLoc: { latitude: number; longitude: number }) => {
     if (!userLocation || !sellerLoc) return "N/A";
     return calculateDistance(
@@ -141,7 +147,9 @@ export default function BuyerDashboard() {
     ).toFixed(1);
   };
 
-  // Opens the "Make an offer" sheet for one listing and clears any old input.
+  // FUNCTION: handleMakeOffer
+  // Runs when: the "Make an Offer" button is pressed.
+  // What it does: opens the "Make an offer" sheet for that listing and clears the old input.
   const handleMakeOffer = (item: MarketplaceItem) => {
     setOfferItem(item);
     setOfferAmount('');
@@ -149,9 +157,10 @@ export default function BuyerDashboard() {
     setOfferModalVisible(true);
   };
 
-  // Sends the buyer's offer to the seller.
-  // Steps: 1 validate the amount, 2 check the listing is still for sale,
-  // 3 save the offer, 4 notify the seller.
+  // FUNCTION: handleSubmitOffer
+  // Runs when: the "Submit offer" button is pressed.
+  // What it does: saves the offer in Firestore and sends a notification to the seller.
+  // Steps: 1 check the amount, 2 check the listing is still for sale, 3 save the offer, 4 notify the seller.
   const handleSubmitOffer = async () => {
     if (!auth.currentUser || !offerItem) return;
 
@@ -216,16 +225,19 @@ export default function BuyerDashboard() {
     }
   };
 
-  // Opens the payment sheet (cash or card) for one listing.
+  // FUNCTION: handleBuyNow
+  // Runs when: the "Buy Now" button is pressed.
+  // What it does: opens the "Complete purchase" sheet (cash or card) for that listing.
   const handleBuyNow = (item: MarketplaceItem) => {
     setBuyingItem(item);
     setPaymentMethod('');
     setPaymentModalVisible(true);
   };
 
-  // Final step of buying. Creates the order and marks the listing sold, then notifies.
-  // method is 'cash' or 'card'. For card, this is only called AFTER Stripe confirmed
-  // payment (see handleCardPayment), and cardLast4 is the last 4 digits for display.
+  // FUNCTION: confirmPurchase
+  // Runs when: the buyer confirms a cash order, or after a card payment is verified.
+  // What it does: creates the order and marks the listing sold in one batch, then notifies the seller.
+  // method is 'cash' or 'card'. cardLast4 is the last 4 digits of the card (card only).
   const confirmPurchase = async (method: 'cash' | 'card', cardLast4?: string | null) => {
     if (!auth.currentUser || !buyingItem) return;
 
@@ -312,13 +324,12 @@ export default function BuyerDashboard() {
     }
   };
 
-  // Card payment flow with Stripe Checkout, using Cloud Functions.
-  // 1 Ask our server for a Checkout page URL. 2 Open it in the in-app browser.
-  // 3 Read the result from the redirect URL. 4 Ask our server to verify the payment.
-  // Real card payment: a Cloud Function creates a Stripe Checkout Session
-  // (test mode) server-side — the secret key never touches the client —
-  // and the browser redirects back into the app via a custom-scheme URL, so
-  // no native Stripe SDK/dev build is needed; this works in Expo Go too.
+  // FUNCTION: handleCardPayment
+  // Runs when: "Card payment" is selected and the "Pay now" button is pressed.
+  // What it does: pays by card with Stripe Checkout, then calls confirmPurchase.
+  // Steps: 1 ask our server for a Checkout page, 2 open it in the in-app browser,
+  // 3 read the result, 4 ask our server to verify the payment.
+  // The Stripe secret key stays on the server (Cloud Function), never in the app.
   const handleCardPayment = async () => {
     if (!buyingItem) return;
 
@@ -366,15 +377,18 @@ export default function BuyerDashboard() {
     }
   };
 
-  // Runs when the buyer presses the main button in the payment sheet.
+  // FUNCTION: handleConfirmOrder
+  // Runs when: the "Confirm order" / "Pay now" button is pressed in the payment sheet.
+  // What it does: cash -> confirmPurchase('cash'). Card -> handleCardPayment().
   const handleConfirmOrder = () => {
     if (paymentMethod === 'cash') confirmPurchase('cash');
     else if (paymentMethod === 'card') handleCardPayment();
   };
 
-  // Opens the full screen pickup map for one listing.
-  // Steps: 1 get permission, 2 read GPS, 3 show straight line at once,
-  // 4 fetch the road route in the background.
+  // FUNCTION: openRouteMap
+  // Runs when: the "Route" button is pressed.
+  // What it does: opens the full screen pickup map for that listing.
+  // Steps: 1 get location permission, 2 read GPS, 3 show a straight line at once, 4 load the road route.
   const openRouteMap = async (item: MarketplaceItem) => {
     try {
       setSelectedItem(item);
@@ -415,8 +429,10 @@ export default function BuyerDashboard() {
     }
   };
 
-  // Listing card: one marketplace item with price, distance and the action buttons.
   /* ================= LISTING CARD ================= */
+  // FUNCTION: ListingCard
+  // Runs when: once for each listing in the list.
+  // What it does: draws one listing card with the price, distance and the three buttons.
   const ListingCard = ({ item }: { item: MarketplaceItem }) => {
     const accent = wasteAccent(item.wasteType);
     const distance = getDistance(item.location);
@@ -461,6 +477,7 @@ export default function BuyerDashboard() {
         </View>
 
         <View style={styles.listingActions}>
+          {/* BUTTON: "Route" -> runs openRouteMap (opens the pickup map) */}
           <Button
             label="Route"
             icon="map-outline"
@@ -468,6 +485,7 @@ export default function BuyerDashboard() {
             onPress={() => openRouteMap(item)}
             style={styles.actionFlex}
           />
+          {/* BUTTON: "Buy Now" -> runs handleBuyNow (opens the payment sheet) */}
           <Button
             label="Buy Now"
             icon="cart-outline"
@@ -475,6 +493,7 @@ export default function BuyerDashboard() {
             style={styles.actionFlex}
           />
         </View>
+        {/* BUTTON: "Make an Offer" -> runs handleMakeOffer (opens the offer sheet) */}
         <Button
           label="Make an Offer"
           icon="pricetag-outline"
@@ -491,6 +510,7 @@ export default function BuyerDashboard() {
       <Screen withBottomNav>
         <ScreenHeader title="Marketplace" subtitle="Find recyclable waste near you" right={<NotificationBell />} />
 
+        {/* SEARCH BOX: typing here changes searchText, which filters the list (filteredItems) */}
         <TextField
           icon="search-outline"
           placeholder="Search waste (plastic, metal, food…)"
@@ -500,6 +520,7 @@ export default function BuyerDashboard() {
           containerStyle={styles.search}
         />
 
+        {/* BUTTONS: "All types" / "Plastic" / "Food" / "Metal" chips -> change typeFilter (filters the list) */}
         <ChipGroup options={TYPE_FILTERS} value={typeFilter} onChange={setTypeFilter} />
 
         {loading ? (
@@ -542,6 +563,7 @@ export default function BuyerDashboard() {
                     : 'Calculating…'}
               </Text>
             </View>
+            {/* BUTTON: "X" (close) -> closes the map and clears the route */}
             <TouchableOpacity
               onPress={() => {
                 setMapModalVisible(false);
@@ -634,6 +656,7 @@ export default function BuyerDashboard() {
           </MapView>
 
           <View style={styles.mapFooter}>
+            {/* BUTTON: "Buy Now · Rs ..." (on the map) -> closes the map, then runs handleBuyNow */}
             <Button
               label={`Buy Now · ${formatRs(selectedItem?.totalPrice)}`}
               icon="cart-outline"
@@ -671,6 +694,7 @@ export default function BuyerDashboard() {
 
         <Text style={[Type.caption, styles.paymentLabel]}>PAYMENT METHOD</Text>
 
+        {/* BUTTONS: "Cash on delivery" / "Card payment" -> set paymentMethod to 'cash' or 'card' */}
         <View style={styles.payRow}>
           {([
             { key: 'cash', icon: 'cash-outline', title: 'Cash on delivery', sub: 'Pay when collected' },
@@ -709,7 +733,8 @@ export default function BuyerDashboard() {
           </View>
         )}
 
-        {/* Main action button. Disabled until a payment method is picked. */}
+        {/* BUTTON: "Confirm order" (cash) or "Pay now" (card) -> runs handleConfirmOrder.
+            Disabled until a payment method is picked. */}
         <Button
           label={paymentMethod === 'card' ? 'Pay now' : 'Confirm order'}
           onPress={handleConfirmOrder}
@@ -751,6 +776,7 @@ export default function BuyerDashboard() {
           error={offerAmountError}
         />
 
+        {/* BUTTON: "Submit offer" -> runs handleSubmitOffer (saves the offer) */}
         <Button
           label="Submit offer"
           icon="checkmark-outline"
