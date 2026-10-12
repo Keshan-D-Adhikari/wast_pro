@@ -1,8 +1,12 @@
+// Placeholder screens: EmptyState (nothing to show yet) and LoadingState (data is loading).
+// Used on list screens such as orders, offers and notifications.
+
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Space, Radius, Type } from '@/constants/design';
 import { Button } from './button';
 
+// Props: icon, title, optional message, and an optional button (actionLabel + onAction).
 type EmptyStateProps = {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
@@ -11,10 +15,12 @@ type EmptyStateProps = {
   onAction?: () => void;
 };
 
+// The button only appears when both actionLabel and onAction are given.
 /** Friendly placeholder for empty lists, with an optional call to action. */
 export function EmptyState({ icon, title, message, actionLabel, onAction }: EmptyStateProps) {
   return (
     <View style={styles.wrapper}>
+      {/* Round icon, title, message, then the optional button */}
       <View style={styles.iconCircle}>
         <Ionicons name={icon} size={38} color={Palette.brand[500]} />
       </View>
@@ -27,6 +33,7 @@ export function EmptyState({ icon, title, message, actionLabel, onAction }: Empt
   );
 }
 
+// Shows a leaf icon and a message (default 'Loading...').
 /** Centred spinner replacement shown while a screen's first data loads. */
 export function LoadingState({ message }: { message?: string }) {
   return (
@@ -39,6 +46,7 @@ export function LoadingState({ message }: { message?: string }) {
   );
 }
 
+// wrapper = centred column, iconCircle = round icon background, title/message/action = text and button.
 const styles = StyleSheet.create({
   wrapper: { alignItems: 'center', paddingVertical: Space['4xl'], paddingHorizontal: Space.xl },
   iconCircle: {

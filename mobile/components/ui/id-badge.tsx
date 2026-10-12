@@ -1,6 +1,11 @@
+// A small grey pill showing a short ID such as USR-7K3F9A (made by utils/shortId.ts).
+// Shown on profile screens so users can tell support their ID.
+
 import { View, Text, StyleSheet } from 'react-native';
 import { Palette, Space, Radius, Type } from '@/constants/design';
 
+// Props: label = text on the left (e.g. 'Your ID'), code = the ID itself.
+// 'selectable' lets the user long-press the code and copy it.
 /** A short ID the user can read out to support, e.g. "Your ID  USR-7K3F9A". The text can be selected and copied. */
 export function IdBadge({ label, code }: { label: string; code: string }) {
   return (
@@ -13,6 +18,7 @@ export function IdBadge({ label, code }: { label: string; code: string }) {
   );
 }
 
+// pill = the rounded background, label = grey text, code = darker bold text.
 const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',

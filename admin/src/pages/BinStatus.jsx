@@ -1,3 +1,9 @@
+// BinStatus.jsx: shows the smart bins (ESP32 devices with sensors).
+// Screen 1 (BinStatus, the default export): a table of all bins with search and a status filter.
+// Screen 2 (BinDetail): live readings of one bin (3 compartments: plastic, food, metal).
+// Data comes from the IoT Realtime Database (not Firestore): the path "bins" for the list and
+// "bins/<binId>" for one bin. The page only reads. It never writes.
+// For demos, USE_MOCK_IOT (see iotConfig.js) shows fake data instead.
 import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database";
 import { iotDb, BIN_ID, USE_MOCK_IOT, MOCK_BIN_DATA_NORMAL, MOCK_BIN_DATA_ALERT } from "../iotConfig";
@@ -5,8 +11,10 @@ import { IconBin, IconAlert, IconPulse, IconLeaf, IconSearch } from "../componen
 import { normalizeBin, normalizeBins, summarizeBin, describeFreshness } from "../lib/binTelemetry";
 import { filterBins } from "../lib/filters";
 
+// The three compartments of every bin, in display order.
 const COMPARTMENTS = ["plastic", "food", "metal"];
 
+// Status word -> CSS class for the colour. FULL/ERROR = red, HALF/75% = orange, else green.
 function levelClass(status) {
   switch ((status || "").toUpperCase()) {
     case "FULL":
@@ -20,6 +28,7 @@ function levelClass(status) {
   }
 }
 
+// Status word -> text for the badge. Example: "HALF" -> "Half", "75%" -> "75% full".
 function statusLabel(status) {
   if (!status) return "No data";
   const upper = status.toUpperCase();
@@ -27,10 +36,13 @@ function statusLabel(status) {
   return upper.charAt(0) + upper.slice(1).toLowerCase();
 }
 
+// BinDetail: one bin, live. Props: binId (which bin) and onBack (function to go back to the list).
 /** One bin: its three compartments, live. */
 function BinDetail({ binId, onBack }) {
+  // liveBin = the bin from the database; liveLoading = waiting for the first answer.
   const [liveBin, setLiveBin] = useState(null);
   const [liveLoading, setLiveLoading] = useState(true);
+  // mockPreset = which fake data set to show in demo mode ("normal" or "alert").
   const [mockPreset, setMockPreset] = useState("normal");
 
   // In mock mode the bin data is derived from the selected preset during
@@ -40,17 +52,26 @@ function BinDetail({ binId, onBack }) {
     : liveBin;
   const loading = USE_MOCK_IOT ? false : liveLoading;
 
+  // now = current time, kept in state. The timer below updates it every 15 seconds, which makes
+  // React redraw, so describeFreshness can turn the badge to OFF if no new data arrives.
+  // useState(() => Date.now()) with a function runs it only once, at the start.
   // Re-check "live vs offline" periodically so the badge turns Offline by
   // itself if the firmware stops uploading.
   const [now, setNow] = useState(() => Date.now());
+  // setInterval repeats; the returned cleanup stops the timer when the component goes away.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(id);
   }, []);
+  // Fresh = reported within the last 2 minutes (see binTelemetry.js).
   const freshness = USE_MOCK_IOT
     ? { live: true, label: "Demo data" }
     : describeFreshness(bin?.lastUpdated, now);
 
+  // Live listener on bins/<binId>. onValue calls the first function now and again whenever the
+  // data changes, so the screen updates by itself. It returns an unsubscribe function, which
+  // useEffect uses as cleanup. It restarts if binId changes ([binId] at the end). Not used in demo mode.
+  // normalizeBin cleans the raw data (see lib/binTelemetry.js). The 2nd function runs on error.
   useEffect(() => {
     if (USE_MOCK_IOT) return;
 
@@ -65,8 +86,10 @@ function BinDetail({ binId, onBack }) {
     );
   }, [binId]);
 
+  // BinDetail screen.
   return (
     <section>
+      {/* Title and back button */}
       <div className="page-header">
         <div>
           <button type="button" className="load-more-btn" style={{ margin: "0 0 0.75rem" }} onClick={onBack}>
@@ -77,6 +100,7 @@ function BinDetail({ binId, onBack }) {
         </div>
       </div>
 
+      {/* Yellow demo banner with preset buttons (only in demo mode) */}
       {USE_MOCK_IOT && (
         <div style={{
           backgroundColor: "var(--status-warning-tint)",
@@ -123,6 +147,7 @@ function BinDetail({ binId, onBack }) {
         </div>
       )}
 
+      {/* Bin id and the ON/OFF status pill */}
       <div className="bin-meta-banner">
         <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
           <div className="bin-id-badge">
@@ -147,6 +172,7 @@ function BinDetail({ binId, onBack }) {
         </div>
       </div>
 
+      {/* Time of the last update and the bin location */}
       {bin && (
         <p className="subtitle" style={{ margin: "0.25rem 0 1rem" }}>
           {freshness.label}
@@ -155,6 +181,7 @@ function BinDetail({ binId, onBack }) {
         </p>
       )}
 
+      {/* Loading spinner while waiting for the first data */}
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
@@ -162,6 +189,7 @@ function BinDetail({ binId, onBack }) {
         </div>
       )}
 
+      {/* Empty state: nothing recorded for this bin yet */}
       {!loading && !bin && (
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconBin size={24} /></div>
@@ -170,9 +198,12 @@ function BinDetail({ binId, onBack }) {
         </div>
       )}
 
+      {/* One card per compartment */}
       {bin && (
         <div className="card-grid">
           {COMPARTMENTS.map((type) => {
+            // c = this compartment's values (level %, status, weight kg, overweight).
+            // levelVal limits the number to 0..100 for the progress bar width.
             const c = bin[type] || {};
             const lvlCls = levelClass(c.status);
             const levelVal = c.level != null ? Math.min(100, Math.max(0, Number(c.level))) : 0;
@@ -186,6 +217,7 @@ function BinDetail({ binId, onBack }) {
                   </span>
                 </div>
 
+                {/* Fill level number and progress bar */}
                 <div className="fill-gauge-wrap">
                   <div className="fill-level-display">
                     <span className={`fill-percentage ${lvlCls}`}>
@@ -201,6 +233,7 @@ function BinDetail({ binId, onBack }) {
                   </div>
                 </div>
 
+                {/* Red warning when the compartment is over its weight limit */}
                 {c.overweight && (
                   <div className="overweight-alert-box">
                     <IconAlert size={16} />
@@ -208,6 +241,7 @@ function BinDetail({ binId, onBack }) {
                   </div>
                 )}
 
+                {/* Weight, moisture (food only) and time of the reading */}
                 <dl className="bin-data-list">
                   <dt>Measured Weight</dt>
                   <dd>{c.weight != null ? `${c.weight} kg` : "—"}</dd>
@@ -229,23 +263,29 @@ function BinDetail({ binId, onBack }) {
   );
 }
 
+// How many bins to show at first, and how many more each time "Show more" is pressed.
 const PAGE_SIZE = 25;
 
+// BinStatus: list of all bins. Clicking a row opens BinDetail for that bin.
 /** Every bin in the IoT database; pick one to see its live readings. */
 export default function BinStatus() {
+  // selectedId = bin being viewed (null shows the list). rawBins = raw data under "bins".
   const [selectedId, setSelectedId] = useState(null);
   const [rawBins, setRawBins] = useState(null);
   const [loading, setLoading] = useState(!USE_MOCK_IOT);
+  // search / status = toolbar values. shown = how many rows are visible now.
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [shown, setShown] = useState(PAGE_SIZE);
   const [now, setNow] = useState(() => Date.now());
 
+  // Timer: every 15 seconds update `now` so ON/OFF badges stay correct.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(id);
   }, []);
 
+  // Live listener on the whole "bins" node. It cleans up on leave. Not used in demo mode.
   useEffect(() => {
     if (USE_MOCK_IOT) return;
     return onValue(
@@ -258,8 +298,11 @@ export default function BinStatus() {
     );
   }, []);
 
+  // If a bin is selected show its detail screen instead of the list.
   if (selectedId) return <BinDetail binId={selectedId} onBack={() => setSelectedId(null)} />;
 
+  // Build the rows: real bins from the database, or one fake bin in demo mode.
+  // summaries maps bin id -> { live, maxLevel, attention }. filterBins applies the search/status.
   const items = USE_MOCK_IOT
     ? [{ id: BIN_ID, owner: undefined, bin: normalizeBin({ ...MOCK_BIN_DATA_NORMAL, lastUpdated: now, location: "Demo" }) }]
     : normalizeBins(rawBins);
@@ -267,12 +310,14 @@ export default function BinStatus() {
     items.map((i) => [i.id, USE_MOCK_IOT ? { live: true, maxLevel: 0, attention: false } : summarizeBin(i.bin, now)])
   );
   const filtered = filterBins(items, summaries, { search, status });
+  // Only the first `shown` rows are drawn. The counts feed the subtitle.
   const visible = filtered.slice(0, shown);
   const liveCount = items.filter((i) => summaries[i.id].live).length;
   const attentionCount = items.filter((i) => summaries[i.id].attention).length;
 
   return (
     <section>
+      {/* Title and counts (bins, ON, OFF, need attention) */}
       <div className="page-header">
         <div>
           <h1>Smart Bins</h1>
@@ -283,6 +328,7 @@ export default function BinStatus() {
         </div>
       </div>
 
+      {/* Search box and status filter. Changing them resets the page size. */}
       <div className="toolbar">
         <div className="search-input-wrapper">
           <span className="search-icon"><IconSearch size={16} /></span>
@@ -303,6 +349,7 @@ export default function BinStatus() {
         </div>
       </div>
 
+      {/* Loading spinner */}
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
@@ -310,6 +357,7 @@ export default function BinStatus() {
         </div>
       )}
 
+      {/* Empty state (no bins at all, or nothing matches the filter) */}
       {!loading && filtered.length === 0 && (
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconBin size={24} /></div>
@@ -318,6 +366,7 @@ export default function BinStatus() {
         </div>
       )}
 
+      {/* Table of bins. Clicking a row opens its live details. */}
       {!loading && filtered.length > 0 && (
         <div className="table-card">
           <div className="table-responsive">
@@ -333,6 +382,7 @@ export default function BinStatus() {
                 </tr>
               </thead>
               <tbody>
+                {/* One row per visible bin */}
                 {visible.map(({ id, bin }) => {
                   const s = summaries[id];
                   return (
@@ -359,6 +409,7 @@ export default function BinStatus() {
         </div>
       )}
 
+      {/* Button that shows 25 more bins */}
       {!loading && filtered.length > shown && (
         <button type="button" className="load-more-btn" onClick={() => setShown((n) => n + PAGE_SIZE)}>
           Show more bins

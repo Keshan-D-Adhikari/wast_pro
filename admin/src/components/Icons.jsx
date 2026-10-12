@@ -1,3 +1,6 @@
+// Icons.jsx: small inline SVG icon components used in the sidebar, cards and buttons.
+// Each one is a function that returns an <svg> drawing, so no image files are needed.
+// They take optional props className and size (default 20) and use the current text colour.
 export function IconOverview({ className = "", size = 20 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>

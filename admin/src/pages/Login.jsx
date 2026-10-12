@@ -1,18 +1,29 @@
+// Login.jsx: the sign in page for admins. The admin types an email and password.
+// It uses Firebase Authentication only (no Firestore here). After a successful sign in,
+// AuthContext notices the change and the Gate in App.jsx shows the dashboard.
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 import { IconMail, IconLock, IconShield, IconLeaf, IconBin, IconMarketplace, IconAlert } from "../components/Icons";
 
+// Login component.
 export default function Login() {
+  // Controlled form: each input's text lives in state (email, password), and the input shows
+  // that state. onChange updates the state on every key press.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // error = message shown above the form; submitting = true while waiting for Firebase.
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Runs when the form is submitted. async/await waits for Firebase without freezing the page.
   const handleSubmit = async (e) => {
+    // preventDefault stops the browser from reloading the page on submit.
     e.preventDefault();
     setError("");
     setSubmitting(true);
+    // try/catch/finally: try signing in; if it fails show a friendly message
+    // (we do not say which part was wrong); finally always re-enables the button.
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch {
@@ -22,6 +33,7 @@ export default function Login() {
     }
   };
 
+  // Page has two halves: a brand panel on the left and the sign in form on the right.
   return (
     <div className="login-page">
       {/* Left Brand Panel */}
@@ -45,6 +57,7 @@ export default function Login() {
             marketplace transactions, and real-time environmental impact.
           </p>
 
+          {/* A short list of what the platform does (text only). */}
           <div className="brand-feature-list">
             <div className="brand-feature-item">
               <div className="feature-icon-box">
@@ -84,6 +97,7 @@ export default function Login() {
             <p className="subtitle">Sign in with your administrator account to access platform management.</p>
           </div>
 
+          {/* Show the error banner only when there is an error message. */}
           {error && (
             <div className="error-banner" role="alert">
               <IconAlert size={18} />
@@ -91,6 +105,7 @@ export default function Login() {
             </div>
           )}
 
+          {/* Email field (controlled input). */}
           <div className="form-group">
             <label className="form-label" htmlFor="admin-email">Email Address</label>
             <div className="input-with-icon">
@@ -108,6 +123,7 @@ export default function Login() {
             </div>
           </div>
 
+          {/* Password field. type="password" hides the characters. */}
           <div className="form-group">
             <label className="form-label" htmlFor="admin-password">Password</label>
             <div className="input-with-icon">
@@ -125,6 +141,7 @@ export default function Login() {
             </div>
           </div>
 
+          {/* The button is disabled while signing in so the form cannot be sent twice. */}
           <button type="submit" className="btn-primary" disabled={submitting}>
             {submitting ? "Signing in…" : "Sign in to Dashboard"}
           </button>

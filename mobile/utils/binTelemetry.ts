@@ -1,3 +1,6 @@
+// Turns the raw text and numbers sent by the bin hardware (ESP32) into clean values.
+// Used by the seller dashboard and the buyer screens that show bin levels.
+
 import type { BinCompartment, BinData, WasteType } from '../types';
 
 /**
@@ -13,22 +16,35 @@ import type { BinCompartment, BinData, WasteType } from '../types';
  */
 
 /** Firmware weight unit -> kg. If a known weight on the scale reads 1000x too big or small, change this. */
+// Example: the bin sends 1500 (grams), we show 1.5 (kg).
 export const WEIGHT_UNIT_DIVISOR = 1000;
 
 /** Data older than this is treated as "bin offline" (the firmware uploads every few seconds). */
+// 2 minutes, written as 2 * 60 seconds * 1000 milliseconds.
 export const STALE_AFTER_MS = 2 * 60 * 1000;
 
+// The three compartments inside one smart bin.
 const TYPES: WasteType[] = ['plastic', 'food', 'metal'];
 
+// What one compartment looks like when it comes straight from the firmware.
+// Every field is optional/unknown because we cannot trust hardware data.
 type RawCompartment = { level?: unknown; weight?: unknown; overweight?: unknown } | undefined | null;
 
+/*
+ * Reads the fill level.
+ * In: a number (45) or text ('EMPTY', 'FULL', '50%', 'ERROR').
+ * Out: { level: 0-100, status: label }. Example: '50%' gives { level: 50, status: 'HALF' }.
+ */
 export function parseLevel(raw: unknown): { level: number; status: string } {
+  // Already a number: just use it.
   if (typeof raw === 'number' && Number.isFinite(raw)) return fromPercent(raw);
 
+  // Text: tidy it up (trim spaces, upper case) so 'full ' and 'FULL' are the same.
   const text = String(raw ?? '').trim().toUpperCase();
   if (text === 'EMPTY') return { level: 0, status: 'EMPTY' };
   if (text === 'FULL') return { level: 100, status: 'FULL' };
 
+  // Matches '50', '50%' or '12.5%'. m[1] is the number part.
   const m = /^(\d+(?:\.\d+)?)\s*%?$/.exec(text);
   if (m) return fromPercent(parseFloat(m[1]));
 
@@ -36,6 +52,7 @@ export function parseLevel(raw: unknown): { level: number; status: string } {
   return { level: 0, status: 'ERROR' };
 }
 
+// Picks a status label from a percent. Level is kept between 0 and 100.
 function fromPercent(p: number): { level: number; status: string } {
   const level = Math.max(0, Math.min(100, p));
   if (level >= 100) return { level, status: 'FULL' };
@@ -45,6 +62,10 @@ function fromPercent(p: number): { level: number; status: string } {
   return { level, status: 'EMPTY' };
 }
 
+/*
+ * Turns a raw weight (grams) into kilograms, rounded to 3 decimals.
+ * Example: 1500 gives 1.5. Bad or negative values give 0.
+ */
 export function parseWeightKg(raw: unknown): number {
   const n = typeof raw === 'number' ? raw : parseFloat(String(raw ?? ''));
   if (!Number.isFinite(n) || n <= 0) return 0; // load cells drift slightly negative at rest
@@ -56,6 +77,7 @@ export function parseOverweight(raw: unknown): boolean {
   return raw === true || (typeof raw === 'string' && raw.trim().toLowerCase() === 'true');
 }
 
+// Cleans one compartment. A missing compartment becomes an empty, normal one.
 function normalizeCompartment(raw: RawCompartment): BinCompartment {
   if (!raw) return { level: 0, weight: 0, overweight: false };
   const { level, status } = parseLevel(raw.level);
@@ -68,10 +90,13 @@ export function normalizeBin(raw: unknown): BinData | null {
   const obj = raw as Record<string, unknown>;
   const comps = (obj.compartments ?? obj) as Record<string, RawCompartment>;
 
+  // Build the bin with the common fields first, then add each compartment below.
+  // Some firmware versions put the compartments at the top level, so we fall back to obj.
   const bin = {
     lastUpdated: toEpochMs(obj.lastUpdated),
     location: typeof obj.location === 'string' ? obj.location : undefined,
   } as BinData;
+  // Fill plastic, food and metal one by one.
   for (const t of TYPES) bin[t] = normalizeCompartment(comps[t]);
   return bin;
 }
@@ -90,6 +115,11 @@ export function toEpochMs(raw: unknown): number | null {
   return null;
 }
 
+/*
+ * Says if the bin data is recent.
+ * In: the last update time (ms) and optionally 'now' (handy for tests).
+ * Out: { live: true/false, label: text }. Example label: 'Updated 3 min ago'.
+ */
 export function describeFreshness(lastUpdated: number | null | undefined, now: number = Date.now()) {
   if (!lastUpdated) return { live: false, label: 'No update time reported' };
   const age = Math.max(0, now - lastUpdated);
@@ -97,6 +127,10 @@ export function describeFreshness(lastUpdated: number | null | undefined, now: n
   return { live, label: `${live ? 'Updated' : 'Last update'} ${formatAge(age)}` };
 }
 
+/*
+ * Turns a time gap in milliseconds into friendly text.
+ * Examples: 3000 gives 'just now', 90000 gives '1 min ago'.
+ */
 export function formatAge(ms: number): string {
   const s = Math.floor(ms / 1000);
   if (s < 5) return 'just now';

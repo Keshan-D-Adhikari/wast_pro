@@ -1,3 +1,6 @@
+// Maps the status text sent by the bin to a colour and a label for the screens.
+// Used by badges and level bars on the dashboard.
+
 import { Palette, StatusTone } from './design';
 
 /**
@@ -8,6 +11,7 @@ import { Palette, StatusTone } from './design';
  */
 export type FirmwareBinStatus = 'EMPTY' | 'LOW' | 'HALF' | '75%' | 'FULL' | 'ERROR';
 
+// Which colour tone each status uses. FULL and ERROR are red (danger) so they stand out.
 const TONE_BY_STATUS: Record<FirmwareBinStatus, StatusTone> = {
   EMPTY: 'neutral',
   LOW: 'info',
@@ -36,4 +40,5 @@ export function isBinFull(status?: string): boolean {
   return (status || '').toUpperCase() === 'FULL';
 }
 
+// Status text straight to a colour from the palette.
 export const binStatusColor = (status?: string) => Palette.status[binStatusTone(status)];

@@ -1,16 +1,35 @@
+// Firestore security rules for SmartWaste Pro.
+// WHY THEY MATTER: the mobile app and the admin website talk to Firestore directly. There is
+// no server of our own in between. So these rules are the main protection of the data. Anyone
+// can copy the app's keys and send requests, but a request is allowed only if a rule says yes.
+// Hiding a button in the app is NOT security. These rules are.
+// HOW TO READ THEM:
+// - request.auth.uid      = the id of the signed in caller (null if nobody is signed in).
+// - resource.data         = the document as it is stored NOW (before the write).
+// - request.resource.data = the document as it WILL BE after the write.
+// - get(...) / exists(...) read other documents. getAfter(...) / existsAfter(...) read them as they
+//   will be after the same batch or transaction finishes.
+// - diff(...).affectedKeys() = the list of fields that this write changes.
+// - A write is allowed if ANY matching "allow" for it is true. The default is deny.
+// - `allow ...: if false;` means nobody can do it from the apps.
+// These rules are tested by the files in mobile/tests (run: npm run test:rules).
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // True for any signed in user. A caller with no sign in (request.auth is null) is rejected.
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // True if the caller is signed in and their uid is exactly `uid` (the owner of that document).
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // isAdmin(): reads the caller's own users/{uid} document and checks role == 'admin'.
+    // This costs one extra document read each time it is evaluated.
     // Admins are users/{uid} docs with role == 'admin'. Used to grant the
     // admin dashboard read access across collections it doesn't own.
     function isAdmin() {
@@ -18,6 +37,8 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // isOrderParty(orderId, toUid): the caller and `toUid` must be the two people on that order,
+    // one as the buyer and the other as the seller.
     // True if the caller and toUid are exactly the buyer and seller (in
     // either direction) on orders/{orderId}. Used to stop a signed-in user
     // from spoofing an order_placed/order_cancelled notification to an
@@ -28,6 +49,10 @@ service cloud.firestore {
         (order.sellerUid == request.auth.uid && order.buyerUid == toUid);
     }
 
+    // isAcceptedOfferOrder(order): used when a SELLER creates an order from an accepted offer.
+    // Rule of thumb: the seller cannot invent an order. It must match a real offer that this same
+    // transaction changes from pending to accepted. `before` = the offer now, `after` = the offer
+    // once the transaction is done.
     // True if `order` matches offers/{order.offerId} as it will be after this write/transaction:
     // offer accepted, same buyer/seller/listing, and the order price is the offered price
     // with payment still pending.
@@ -46,6 +71,9 @@ service cloud.firestore {
         order.awaitingBuyer == true;
     }
 
+    // isDirectPurchaseOfListing(order): used when a BUYER creates an order straight from a listing.
+    // The listing must still be available, and the order must use the listing's real seller and price,
+    // so a buyer cannot change the price.
     // True if `order` is a plain purchase of an available listing at the listing's own seller and price.
     function isDirectPurchaseOfListing(order) {
       let listing = get(/databases/$(database)/documents/marketplace/$(order.listingId)).data;
@@ -54,6 +82,9 @@ service cloud.firestore {
         order.totalPrice == listing.totalPrice;
     }
 
+    // isValidBinLocation(): when a profile contains a binLocation it must be a map with only a
+    // latitude and a longitude, both numbers in the valid range. A binPlaceName, if present, must be
+    // a string of at most 120 characters.
     // If binLocation is being set it must be a real coordinate pair.
     function isValidBinLocation() {
       return (!('binLocation' in request.resource.data) ||
@@ -68,6 +99,10 @@ service cloud.firestore {
           (request.resource.data.binPlaceName is string && request.resource.data.binPlaceName.size() <= 120));
     }
 
+    // isValidAdminProfileEdit(): used when an ADMIN edits a profile. Each field that is changed
+    // must still have a sane value: name 1-80 characters, phone up to 20, location up to 80, points a whole
+    // number from 0 to 1,000,000. `changed` = the list of fields this write touches.
+    // The admin form (admin/src/lib/userEdit.js) uses the same limits.
     // What an admin may correct on someone's profile: name, phone, location and points, each a sane
     // value. Role and email are never editable here.
     function isValidAdminProfileEdit() {
@@ -79,6 +114,14 @@ service cloud.firestore {
         (!changed.hasAny(['points']) || (d.points is int && d.points >= 0 && d.points <= 1000000));
     }
 
+    // users collection: ONE DOCUMENT PER PERSON
+    //  read   - the owner or an admin only (a profile has email and phone).
+    //  create - the owner creates their own profile at sign up, only as seller or buyer. They cannot
+    //           make themselves an admin, and cannot start with points or a disabled flag.
+    //  update - the owner: only contact fields (name, phone, location, photo, bin location), never role,
+    //           points, disabled or binId. An admin: disabled, binId, name, phone, location, points.
+    //           The binId must be 1-32 letters, numbers, - or _ .
+    //  delete - nobody (accounts are never deleted from the apps).
     // users/{uid} - profile doc, keyed by the account's own auth uid.
     // Private: only the owner and admins can read it (it holds email/phone/address). Buyer and
     // seller names shown to each other come from the names copied onto listings, offers and orders.
@@ -105,6 +148,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // bins collection: ONE DOCUMENT PER SELLER (the document id is the seller's uid)
+    //  read   - the owner or an admin.
+    //  write  - the owner only (create, update and delete).
+    //  Buyers never read it. Listings copy what buyers need.
     // bins/{uid} - IoT sensor readings, keyed by the seller's own uid. Never read by buyers directly
     // (marketplace listings snapshot the location/weight they need at creation time).
     match /bins/{uid} {
@@ -112,6 +159,9 @@ service cloud.firestore {
       allow write: if isOwner(uid);
     }
 
+    // isBuyingListing(listingId): the one way a BUYER may change someone else's listing.
+    // The only change allowed is available -> sold (plus soldOrderId), and the buyer's own order for that
+    // listing must be created in the same batch (existsAfter). It must not exist yet (!exists).
     // True if this update is a buyer buying the listing: available -> sold, in the same write
     // (batch/transaction) that creates their own order for it. `soldOrderId` records which order
     // bought it, so a later cancel can be tied back to that order.
@@ -126,6 +176,8 @@ service cloud.firestore {
         getAfter(orderPath).data.listingId == listingId;
     }
 
+    // isRestoringListing(listingId): the reverse. A sold listing goes back to available only when the
+    // buyer cancels the order that bought it, in the same write that marks that order cancelled.
     // True if this update puts a sold listing back on the market because its buyer cancelled the
     // order that bought it, in the same write that marks that order cancelled.
     function isRestoringListing(listingId) {
@@ -140,10 +192,13 @@ service cloud.firestore {
         getAfter(orderPath).data.listingId == listingId;
     }
 
+    // A number greater than zero.
     function isPositiveNumber(v) {
       return v is number && v > 0;
     }
 
+    // isValidNewListing(d): d = the new listing's data. Checks the type, weight and price limits,
+    // the status, the seller name and the location.
     // A new listing must be well-formed: a known waste type, a positive weight and price within
     // sane limits, a map location, and it starts available (never pre-marked sold).
     function isValidNewListing(d) {
@@ -156,6 +211,8 @@ service cloud.firestore {
         d.location.latitude is number && d.location.longitude is number;
     }
 
+    // isValidListingEdit(): used when the seller edits their own listing. Seller cannot be changed,
+    // status must be available or sold, and a changed weight, price or type must still be valid.
     // When the seller edits their own listing, the owner can't change, status must stay a known
     // value, and a changed weight/price must still be a sane positive number.
     function isValidListingEdit() {
@@ -167,6 +224,11 @@ service cloud.firestore {
         (!changed.hasAny(['wasteType']) || request.resource.data.wasteType in ['plastic', 'food', 'metal']);
     }
 
+    // marketplace collection: ONE DOCUMENT PER LISTING
+    //  read   - any signed in user (buyers browse listings).
+    //  create - a signed in user for themselves (sellerUid is their own uid) with a valid new listing.
+    //  update - the seller (valid edit), or a buyer buying it, or a buyer restoring it after a cancel.
+    //  delete - the seller of the listing, or an admin (this is the admin site's Remove button).
     // marketplace/{listingId} - waste listings. Any signed-in user can browse them.
     // The seller who created a listing can create/edit/delete it. A buyer can only change a
     // listing as part of buying it or cancelling that purchase (see the two functions above) -
@@ -183,6 +245,10 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (resource.data.sellerUid == request.auth.uid || isAdmin());
     }
 
+    // orders collection: ONE DOCUMENT PER ORDER
+    //  read   - the buyer, the seller or an admin.
+    //  create - the buyer (direct purchase) or the seller (from an accepted offer). See below.
+    //  update - only the specific steps listed below. delete - nobody.
     // orders/{orderId} - purchases. Only the buyer or seller involved can see or touch an order.
     // The buyer-side "cancel order" flow (BuyerOrders.tsx) marks the order cancelled via update
     // rather than deleting it, so history/evidence survives a cancellation — deletion is
@@ -216,6 +282,7 @@ service cloud.firestore {
       //  - buyer rates a completed order once (rating only)
       //  - admin changes status only
       allow update: if isSignedIn() && (
+        // Buyer cancels an order that is not paid or completed.
         (
           resource.data.buyerUid == request.auth.uid &&
           resource.data.status in ['pending', 'confirmed'] &&
@@ -223,6 +290,7 @@ service cloud.firestore {
           request.resource.data.status == 'cancelled' &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
         ) ||
+        // Buyer pays an accepted-offer order by card.
         (
           resource.data.buyerUid == request.auth.uid &&
           'offerId' in resource.data &&
@@ -242,6 +310,7 @@ service cloud.firestore {
           request.resource.data.awaitingBuyer == false &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'awaitingBuyer'])
         ) ||
+        // Seller moves the status forward (confirmed, completed) or cancels.
         (
           resource.data.sellerUid == request.auth.uid &&
           resource.data.status != 'cancelled' &&
@@ -250,6 +319,7 @@ service cloud.firestore {
           request.resource.data.status in ['confirmed', 'completed', 'cancelled'] &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
         ) ||
+        // Seller marks a cash order as paid.
         (
           resource.data.sellerUid == request.auth.uid &&
           resource.data.paymentMethod == 'cash' &&
@@ -266,11 +336,17 @@ service cloud.firestore {
           request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating'])
         ) ||
+        // Admin changes the status only (the admin website's status dropdown).
         (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
       );
       allow delete: if false;
     }
 
+    // notifications collection: ONE DOCUMENT PER MESSAGE
+    //  read   - the person it is for (toUid) or an admin.
+    //  create - a signed in user, but the message must be real: it must have the needed fields, be unread,
+    //           and go to an existing user. The rules check WHO can send each type (below).
+    //  update - the recipient only (mark read). delete - the recipient only.
     // notifications/{id} - only the recipient can read or mark their own notification.
     // The app writes these for two cases: a self-notification ("bin_full", toUid == the
     // creator's own uid) and an order event sent to the other party, carrying an `orderId`
@@ -279,6 +355,8 @@ service cloud.firestore {
     // arbitrary real user.
     // Offer notifications (offer_received, offer_accepted, offer_rejected) carry an `offerId`
     // so the sender/recipient can be verified against the offers collection.
+    // isOfferParty(offerId, toUid): same idea as isOrderParty, but for an offer: the caller and
+    // `toUid` must be that offer's buyer and seller.
     function isOfferParty(offerId, toUid) {
       let offer = get(/databases/$(database)/documents/offers/$(offerId)).data;
       return (offer.buyerUid == request.auth.uid && offer.sellerUid == toUid) ||
@@ -287,13 +365,16 @@ service cloud.firestore {
 
     match /notifications/{notifId} {
       allow read: if isSignedIn() && (resource.data.toUid == request.auth.uid || isAdmin());
+      // The allowed kinds of notification, one block each:
       allow create: if isSignedIn() &&
         request.resource.data.keys().hasAll(['toUid', 'type', 'message', 'read', 'createdAt']) &&
         request.resource.data.read == false &&
         exists(/databases/$(database)/documents/users/$(request.resource.data.toUid)) &&
         (
+          // A bin_full notice: you may only send it to yourself.
           (request.resource.data.type == 'bin_full' && request.resource.data.toUid == request.auth.uid) ||
           (
+            // order_confirmed and order_completed: only the seller of the order can send them.
             // Confirmed / completed notices can only come from the order's seller.
             request.resource.data.type in ['order_confirmed', 'order_completed'] &&
             'orderId' in request.resource.data &&
@@ -302,12 +383,14 @@ service cloud.firestore {
             isOrderParty(request.resource.data.orderId, request.resource.data.toUid)
           ) ||
           (
+            // order_placed and order_cancelled: sent between the buyer and the seller of the order.
             request.resource.data.type in ['order_placed', 'order_cancelled'] &&
             'orderId' in request.resource.data &&
             exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId)) &&
             isOrderParty(request.resource.data.orderId, request.resource.data.toUid)
           ) ||
           (
+            // Offer notices: sent between the buyer and the seller of the offer.
             request.resource.data.type in ['offer_received', 'offer_accepted', 'offer_rejected'] &&
             'offerId' in request.resource.data &&
             exists(/databases/$(database)/documents/offers/$(request.resource.data.offerId)) &&
@@ -318,6 +401,11 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.toUid == request.auth.uid;
     }
 
+    // offers collection: ONE DOCUMENT PER PRICE OFFER (the wording below explains the details)
+    //  read   - the buyer, the seller or an admin.
+    //  create - the buyer, for themselves, with a positive price, for a listing that is still available.
+    //  update - the seller (accept or reject while pending), or an admin.
+    //  delete - nobody.
     // offers/{offerId} - buyer-submitted price offers for marketplace listings.
     // Buyers create their own offers. A pending offer cannot be taken back: the seller answers it, and
     // an accepted offer is then declined or bought through the order (see orders).
@@ -360,6 +448,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // users/{uid} read stays open to any signed-in user (see above); nothing extra needed for isAdmin here.
+    // Note: a users/{uid} profile is private (owner and admins only, see the users rules above).
+    // Nothing more is needed here for admins.
   }
 }

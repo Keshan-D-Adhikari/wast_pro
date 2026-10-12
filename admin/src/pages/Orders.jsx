@@ -1,3 +1,8 @@
+// Orders.jsx: lets the admin watch orders.
+// Screen 1 (Orders): one row per person (buyer or seller) with counts of their orders.
+// Screen 2 (UserOrders): all orders of that person. The admin can change an order's status.
+// Firestore collection: "orders". Reads live with onSnapshot; the only write is updateDoc on status.
+// firestore.rules allow admins to update orders.
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, limit, onSnapshot, or, query, updateDoc, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
@@ -5,22 +10,30 @@ import { filterOrders, filterPeople, groupOrdersByUser } from "../lib/filters";
 import { IconSearch, IconOrders } from "../components/Icons";
 import { orderCode, userCode } from "../lib/shortId";
 
+// The order statuses shown in the dropdowns, in life-cycle order.
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
 
 // The people list is built from at most this many orders.
 const ORDER_SCAN_LIMIT = 500;
 
+// Formats money for display. Example: rs(2500) -> "Rs. 2,500"; rs(null) -> "Rs. 0".
 const rs = (value) =>
   `Rs. ${value != null ? Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}`;
 
+// Sort helper for newest first. createdAt is a Firestore Timestamp; toMillis() makes it a number.
+// Orders without a date count as 0 and go last.
 const newestFirst = (a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
 
+// UserOrders: all orders one person is in. Props: person (from groupOrdersByUser) and
+// onBack (function to return to the list).
 /** All orders one user is part of (as buyer or as seller), with a status filter and status change. */
 function UserOrders({ person, onBack }) {
   const [rawOrders, setRawOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // Live listener on orders where buyerUid OR sellerUid is this person. or(...) lets one query
+  // match either field. The returned function is the cleanup that stops the listener.
   useEffect(() => {
     return onSnapshot(
       query(
@@ -35,9 +48,11 @@ function UserOrders({ person, onBack }) {
     );
   }, [person.uid]);
 
+  // Newest first (copy with [...] before sort so we do not change the state array), then apply the status filter.
   const orders = useMemo(() => [...rawOrders].sort(newestFirst), [rawOrders]);
   const filtered = useMemo(() => filterOrders(orders, { status: statusFilter }), [orders, statusFilter]);
 
+  // Admin picked a new status in a row's dropdown: save it on orders/<id>. The listener refreshes the table.
   const handleStatusChange = async (order, status) => {
     if (status === order.status) return;
     await updateDoc(doc(db, "orders", order.id), { status });
@@ -45,6 +60,7 @@ function UserOrders({ person, onBack }) {
 
   return (
     <section>
+      {/* Back button, name and counts */}
       <div className="page-header">
         <div>
           <button type="button" className="load-more-btn" style={{ margin: "0 0 0.75rem" }} onClick={onBack}>
@@ -57,6 +73,7 @@ function UserOrders({ person, onBack }) {
         </div>
       </div>
 
+      {/* Status filter */}
       <div className="toolbar">
         <div className="select-filter-wrapper">
           <select className="select-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -70,6 +87,7 @@ function UserOrders({ person, onBack }) {
         </div>
       </div>
 
+      {/* Loading spinner */}
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
@@ -77,6 +95,7 @@ function UserOrders({ person, onBack }) {
         </div>
       )}
 
+      {/* Empty state */}
       {!loading && filtered.length === 0 && (
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconOrders size={24} /></div>
@@ -85,6 +104,7 @@ function UserOrders({ person, onBack }) {
         </div>
       )}
 
+      {/* Table of this person's orders */}
       {!loading && filtered.length > 0 && (
         <div className="table-card">
           <div className="table-responsive">
@@ -102,6 +122,7 @@ function UserOrders({ person, onBack }) {
                 </tr>
               </thead>
               <tbody>
+                {/* One row per order. The person's own side (buyer or seller) is shown in bold. */}
                 {filtered.map((o) => {
                   const typeCls = (o.wasteType || "").toLowerCase();
                   return (
@@ -122,6 +143,7 @@ function UserOrders({ person, onBack }) {
                           {o.paymentStatus ? ` · ${o.paymentStatus}` : ""}
                         </span>
                       </td>
+                      {/* Status dropdown: changing it updates the order in Firestore */}
                       <td>
                         <select
                           className={`badge status-${o.status}`}
@@ -148,13 +170,17 @@ function UserOrders({ person, onBack }) {
   );
 }
 
+// Orders: the people list. It reads up to ORDER_SCAN_LIMIT orders and groups them by buyer and
+// seller in the browser (groupOrdersByUser). Clicking a person opens UserOrders.
 /** Orders grouped by user (buyers and sellers); pick a user to see their orders. */
 export default function Orders() {
+  // selected = the person being viewed (null shows the list).
   const [selected, setSelected] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
+  // Live listener on the orders collection, capped with limit(). Cleanup stops it.
   useEffect(() => {
     return onSnapshot(
       query(collection(db, "orders"), limit(ORDER_SCAN_LIMIT)),
@@ -166,9 +192,11 @@ export default function Orders() {
     );
   }, []);
 
+  // people = one row per person. filtered = those that match the search (name, USR or ORD code).
   const people = useMemo(() => groupOrdersByUser(orders), [orders]);
   const filtered = useMemo(() => filterPeople(people, search), [people, search]);
 
+  // If a person is selected show their orders. `current` keeps the counts fresh while orders change.
   if (selected) {
     const current = people.find((p) => p.uid === selected.uid) ?? selected;
     return <UserOrders person={current} onBack={() => setSelected(null)} />;
@@ -176,6 +204,7 @@ export default function Orders() {
 
   return (
     <section>
+      {/* Title and counts */}
       <div className="page-header">
         <div>
           <h1>Order Management</h1>
@@ -186,6 +215,7 @@ export default function Orders() {
         </div>
       </div>
 
+      {/* Search box */}
       <div className="toolbar">
         <div className="search-input-wrapper">
           <span className="search-icon"><IconSearch size={16} /></span>
@@ -198,6 +228,7 @@ export default function Orders() {
         </div>
       </div>
 
+      {/* Loading spinner */}
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
@@ -205,6 +236,7 @@ export default function Orders() {
         </div>
       )}
 
+      {/* Empty state */}
       {!loading && filtered.length === 0 && (
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconOrders size={24} /></div>
@@ -213,6 +245,7 @@ export default function Orders() {
         </div>
       )}
 
+      {/* Table: one row per person. Clicking a row opens that person's orders. */}
       {!loading && filtered.length > 0 && (
         <div className="table-card">
           <div className="table-responsive">
@@ -258,6 +291,7 @@ export default function Orders() {
         </div>
       )}
 
+      {/* Notice shown when the cap was reached, so the list may be incomplete */}
       {!loading && orders.length >= ORDER_SCAN_LIMIT && (
         <p className="subtitle" style={{ marginTop: "1rem" }}>
           Showing users from the first {ORDER_SCAN_LIMIT} orders. Search for a user to narrow down.

@@ -1,3 +1,5 @@
+// Rules for which buttons a seller sees on an order card, and when cash is collected.
+
 import type { Order } from '../types';
 
 /**
@@ -7,8 +9,11 @@ import type { Order } from '../types';
  *   confirmed -> completed | cancelled
  * and marking a cash order paid when the cash is collected.
  */
+// Buttons the seller can press: confirm the order, decline it, or mark it complete.
 export type SellerOrderAction = 'confirm' | 'decline' | 'complete';
 
+// In: the order (only status and awaitingBuyer matter). Out: the list of allowed actions.
+// An empty list means the seller sees no buttons.
 export function sellerActionsFor(order: Pick<Order, 'status' | 'awaitingBuyer'>): SellerOrderAction[] {
   switch (order.status) {
     case 'pending':
@@ -22,6 +27,7 @@ export function sellerActionsFor(order: Pick<Order, 'status' | 'awaitingBuyer'>)
 }
 
 /** Completing a cash-on-delivery order is when the cash is collected, so it is also marked paid. */
+// In: the order's payment info. Out: true if completing it should also mark it paid.
 export function completingCollectsCash(order: Pick<Order, 'paymentMethod' | 'paymentStatus'>): boolean {
   return order.paymentMethod === 'cash' && order.paymentStatus === 'pending';
 }

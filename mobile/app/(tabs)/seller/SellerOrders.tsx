@@ -1,3 +1,14 @@
+// SELLER ORDERS SCREEN
+// Who uses it: a seller. It is the "orders" tab of the seller bottom navigation.
+// What it does: lists the orders buyers made on the seller's listings, in three tabs
+// (ongoing, completed, cancelled). The seller can confirm, decline or complete an order.
+// Order life: pending -> confirmed -> completed (or cancelled when declined).
+// Data it uses:
+//   - orders (read live where sellerUid == me; status / paymentStatus are updated)
+//   - marketplace/{listingId} (put back to "available" when the seller declines)
+//   - notifications (a message is written for the buyer after each action)
+// Which buttons are visible is decided by utils/orderActions, and the tab an order belongs
+// to by utils/orderTabs, so the rules live in one place and can be tested.
 import { View, Text, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -24,42 +35,57 @@ import { Order } from "../../../types";
 import { sellerActionsFor, completingCollectsCash } from "../../../utils/orderActions";
 import { buyerNotificationFor, SellerOrderEvent } from "../../../utils/orderNotifications";
 
+// Text shown when a tab has no orders.
 const EMPTY_TAB_TEXT: Record<OrderTab, string> = {
   ongoing: "No ongoing orders",
   completed: "No completed orders yet",
   cancelled: "No cancelled orders",
 };
 
+// Main component of the screen.
 export default function SellerOrders() {
+  // authUser is the logged in user (null while Firebase restores the login).
   const authUser = useAuthUser();
   const router = useRouter();
+  // orders: every order of this seller. loading: show a spinner first.
+  // tab: which tab is selected. useState keeps a value and redraws the screen when it changes.
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<OrderTab>("ongoing");
 
+  // useEffect: when authUser is known, start a live listener on this seller's orders.
   useEffect(() => {
     if (!authUser) return;
 
+    // Query: this seller's orders, newest first. Using where on one field and
+    // orderBy on another needs a Firestore composite index.
     const q = query(
       collection(db, "orders"),
       where("sellerUid", "==", authUser.uid),
       orderBy("createdAt", "desc")
     );
 
+    // onSnapshot is a LIVE listener. It runs now and again whenever an order changes,
+    // so a new order or a status change shows up without refreshing.
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setOrders(ordersList);
       setLoading(false);
+    // Error callback.
     }, (error) => {
       console.error("Error fetching seller orders:", error);
       setLoading(false);
     });
 
+    // Cleanup: stop the listener when the screen closes so it does not keep running.
     return () => unsubscribe();
   }, [authUser]);
 
+  // busyId is the id of the order being changed now. Its buttons show a spinner or are disabled.
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Helper that runs one action safely: mark the order as busy, run the work,
+  // show an alert if it fails, and always clear the busy mark at the end.
   const run = async (order: Order, work: () => Promise<void>, failMessage: string) => {
     setBusyId(order.id);
     try {
@@ -72,6 +98,7 @@ export default function SellerOrders() {
     }
   };
 
+  // Tell the buyer what happened. Best effort: a failed notification must not undo the order change.
   // Tell the buyer what happened. Best effort: a failed notification must not undo the order change.
   const notifyBuyer = async (order: Order, event: SellerOrderEvent) => {
     try {
@@ -89,13 +116,16 @@ export default function SellerOrders() {
     }
   };
 
+  // Seller taps Confirm: set the order status to confirmed, then tell the buyer.
   const handleConfirm = (order: Order) =>
     run(order, async () => {
       await updateDoc(doc(db, 'orders', order.id), { status: 'confirmed' });
       await notifyBuyer(order, 'confirmed');
     }, 'Could not confirm this order.');
 
+  // Seller taps Mark completed. For cash orders the seller must confirm the cash was received.
   const handleComplete = (order: Order) => {
+    // True when this is a cash on delivery order that is not paid yet.
     const collectsCash = completingCollectsCash(order);
     Alert.alert(
       'Mark as completed?',
@@ -109,6 +139,7 @@ export default function SellerOrders() {
           onPress: () =>
             run(order, async () => {
               // Cash on delivery: the cash is collected at hand-over, so record the payment first.
+              // Cash on delivery: the cash is collected at hand-over, so record the payment first.
               if (collectsCash) await updateDoc(doc(db, 'orders', order.id), { paymentStatus: 'paid' });
               await updateDoc(doc(db, 'orders', order.id), { status: 'completed' });
               await notifyBuyer(order, 'completed');
@@ -118,6 +149,7 @@ export default function SellerOrders() {
     );
   };
 
+  // Seller taps Decline. The order is cancelled and the waste goes back on the marketplace.
   const handleDecline = (order: Order) => {
     Alert.alert(
       'Decline this order?',
@@ -131,13 +163,21 @@ export default function SellerOrders() {
             run(order, async () => {
               // Cancel the order and relist the waste in one atomic batch. The listing is only
               // restored if this order is the one that bought it.
+              // Cancel the order and relist the waste in one atomic batch. The listing is only
+              // restored if this order is the one that bought it.
+              // 1. Read the listing to check which order bought it.
               const listingRef = doc(db, 'marketplace', order.listingId);
               const listingSnap = await getDoc(listingRef);
+              // 2. A writeBatch groups several writes and saves them together: all succeed or none do.
+              // This way the order is never cancelled while the listing stays sold.
               const batch = writeBatch(db);
               batch.update(doc(db, 'orders', order.id), { status: 'cancelled', cancelledAt: serverTimestamp() });
+              // 3. Only relist if this order is the one that bought the listing.
+              // deleteField() removes the soldOrderId field.
               if (listingSnap.exists() && listingSnap.data().soldOrderId === order.id) {
                 batch.update(listingRef, { status: 'available', soldOrderId: deleteField() });
               }
+              // 4. Send all the writes at once, then tell the buyer.
               await batch.commit();
               await notifyBuyer(order, 'declined');
             }, 'Could not decline this order.'),
@@ -146,18 +186,23 @@ export default function SellerOrders() {
     );
   };
 
+  // Money earned so far: the sum of completed orders.
   const totalEarned = orders
     .filter((o) => o.status === 'completed')
     .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
+  // One card for one order, with the buttons the seller is allowed to use.
   const OrderCard = ({ order }: { order: Order }) => {
+    // Colour for this waste type.
     const accent = wasteAccent(order.wasteType);
+    // createdAt is a Firestore timestamp. It can be missing just after saving.
     const date = order.createdAt?.toDate
       ? order.createdAt.toDate().toLocaleDateString()
       : "Just now";
 
     return (
       <Card style={styles.card}>
+        {/* Header: waste icon, type and the status badge */}
         <View style={styles.cardHeader}>
           <View style={[styles.typeIcon, { backgroundColor: accent.tint }]}>
             <Ionicons name="leaf" size={17} color={accent.base} />
@@ -168,6 +213,7 @@ export default function SellerOrders() {
           <Badge label={statusLabel(order.status)} tone={statusTone(order.status)} />
         </View>
 
+        {/* Order details */}
         <Divider />
 
         <DetailRow label="Order ID" value={orderCode(order.id)} />
@@ -176,6 +222,7 @@ export default function SellerOrders() {
         <DetailRow label="Date" value={date} />
         <DetailRow label="Total" value={formatRs(order.totalPrice)} emphasis />
 
+        {/* How the buyer pays and whether it is paid */}
         <View style={styles.paymentRow}>
           <Badge
             label={order.paymentMethod === 'card' ? 'Paid by card' : 'Cash on delivery'}
@@ -185,6 +232,7 @@ export default function SellerOrders() {
           {order.paymentStatus === 'paid' && <Badge label="Paid" tone="success" />}
         </View>
 
+        {/* Rating the buyer gave, shown only for completed orders */}
         {order.status === 'completed' && (
           <View style={styles.ratingRow}>
             <Text style={Type.small}>Buyer rating</Text>
@@ -192,6 +240,7 @@ export default function SellerOrders() {
           </View>
         )}
 
+        {/* Action buttons. Which ones show depends on the order status (see orderActions). */}
         {sellerActionsFor(order).length > 0 && (
           <View style={styles.actions}>
             {sellerActionsFor(order).includes('decline') && (
@@ -228,9 +277,11 @@ export default function SellerOrders() {
     );
   };
 
+  // Screen layout: header, summary, tabs and the list of orders.
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
+        {/* Page title, back button and a shortcut to the offers screen */}
         <ScreenHeader
           title="My orders"
           subtitle="Purchases buyers made from you"
@@ -246,6 +297,7 @@ export default function SellerOrders() {
           }
         />
 
+        {/* Summary strip: number of orders and money earned */}
         {!loading && orders.length > 0 && (
           <Card tone="brand" elevation={0} style={styles.summaryCard}>
             <View style={styles.summaryItem}>
@@ -260,10 +312,12 @@ export default function SellerOrders() {
           </Card>
         )}
 
+        {/* Spinner, or the tabs with their list */}
         {loading ? (
           <LoadingState message="Loading your orders…" />
         ) : (
           <>
+            {/* Ongoing / Completed / Cancelled tabs with counts */}
             <OrderTabs value={tab} counts={countByTab(orders)} onChange={setTab} />
             {orders.filter((o) => tabForOrder(o) === tab).length === 0 ? (
               <EmptyState
@@ -282,11 +336,13 @@ export default function SellerOrders() {
         )}
       </Screen>
 
+      {/* Bottom tab bar */}
       <BottomNav role="seller" active="orders" />
     </View>
   );
 }
 
+// Styles: summary strip, order cards and action buttons.
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({

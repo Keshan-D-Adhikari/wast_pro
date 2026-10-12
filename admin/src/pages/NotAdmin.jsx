@@ -1,11 +1,16 @@
+// NotAdmin.jsx: shown when someone signs in successfully but their users/<uid> document does
+// not have role "admin". They only see this message and a sign out button.
+// Hiding the pages is not the security. firestore.rules also block non-admins from the data.
 import { useAuth } from "../useAuth";
 import { IconShield, IconAlert, IconSignOut } from "../components/Icons";
 
+// NotAdmin component.
 export default function NotAdmin() {
   const { logout } = useAuth();
 
   return (
     <div className="login-page">
+      {/* A red warning icon, a badge and the explanation (the style={{...}} props are inline CSS). */}
       <div className="login-form-panel" style={{ width: "100%" }}>
         <div className="login-card" style={{ textAlign: "center" }}>
           <div style={{
@@ -32,6 +37,7 @@ export default function NotAdmin() {
             This account is not configured with administrative permissions. To grant access, an existing administrator must set your <code>users/&#123;uid&#125;</code> document's <code>role</code> field to <code>"admin"</code> in the Firebase Firestore database.
           </p>
 
+          {/* Sign out so they can try another account. */}
           <button type="button" className="btn-primary" onClick={logout} style={{ background: "var(--ink-700)" }}>
             <IconSignOut size={16} />
             <span>Sign out and return</span>

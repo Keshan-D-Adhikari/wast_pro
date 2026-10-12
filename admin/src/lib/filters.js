@@ -1,7 +1,12 @@
 import { matchesCode, orderCode, userCode } from "./shortId";
 
+// Every filter works the same way: lowercase and trim the search text, then keep a row
+// only if it passes the dropdown (status / role / type) AND the search text.
+// "all" means "do not filter on this".
 /** Shared row-filtering helpers, pulled out of the table pages so they're testable in isolation. */
 
+// Users page. In: the users list and { search, role }. Out: the matching users.
+// Search matches name, email or the short code (USR-XXXXXX).
 export function filterUsers(users, { search = "", role = "all" } = {}) {
   const term = search.trim().toLowerCase();
   return users.filter((u) => {
@@ -15,6 +20,7 @@ export function filterUsers(users, { search = "", role = "all" } = {}) {
   });
 }
 
+// Marketplace page. Keeps listings that match status, waste type and the seller name search.
 export function filterListings(listings, { search = "", status = "all", wasteType = "all" } = {}) {
   const term = search.trim().toLowerCase();
   return listings.filter((item) => {
@@ -25,6 +31,8 @@ export function filterListings(listings, { search = "", status = "all", wasteTyp
   });
 }
 
+// Orders page. Keeps orders by status; search matches buyer, seller or order code (ORD-XXXXXX).
+// The ?. is optional chaining: it gives undefined instead of an error if the field is missing.
 export function filterOrders(orders, { search = "", status = "all" } = {}) {
   const term = search.trim().toLowerCase();
   return orders.filter((o) => {
@@ -38,6 +46,8 @@ export function filterOrders(orders, { search = "", status = "all" } = {}) {
   });
 }
 
+// Status "on" = reporting recently, "off" = offline, "attention" = full or overweight.
+// Search matches the bin id, its location text or its owner.
 /** Rows for the bin list: `items` are { id, owner, bin } from normalizeBins, `summaries` maps id -> summarizeBin. */
 export function filterBins(items, summaries, { search = "", status = "all" } = {}) {
   const term = search.trim().toLowerCase();
@@ -57,6 +67,9 @@ export function filterBins(items, summaries, { search = "", status = "all" } = {
   });
 }
 
+// Uses a Map (key -> value) to collect one row per seller while looping over listings.
+// Example: 3 listings by Ann (2 available, 1 sold) -> one group with total 3, available 2, sold 1,
+// and value = the sum of totalPrice.
 /** Listings grouped by seller: { sellerUid, sellerName, total, available, sold, value }, sorted by name. */
 export function groupListingsBySeller(listings) {
   const groups = new Map();
@@ -79,6 +92,7 @@ export function groupListingsBySeller(listings) {
   return [...groups.values()].sort((a, b) => a.sellerName.localeCompare(b.sellerName));
 }
 
+// Search sellers by name or by the short user code.
 export function filterSellers(sellers, search = "") {
   const term = search.trim().toLowerCase();
   return sellers.filter(
@@ -91,6 +105,7 @@ export function filterSellers(sellers, search = "") {
  * seller. Each person: { uid, name, role, total, ongoing, completed, cancelled, value } where
  * value is the total of their completed orders. Sorted by name.
  */
+// The Map is keyed by user id, so one person who is both buyer and seller keeps one row.
 export function groupOrdersByUser(orders) {
   const people = new Map();
   const add = (uid, name, role, order) => {
@@ -115,6 +130,7 @@ export function groupOrdersByUser(orders) {
   return [...people.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Search people by name, user code, or by the code of any of their orders.
 export function filterPeople(people, search = "") {
   const term = search.trim().toLowerCase();
   return people.filter(
@@ -126,6 +142,8 @@ export function filterPeople(people, search = "") {
   );
 }
 
+// A Map keyed by id removes duplicates: admin accounts replace the same user from the page.
+// Sort: admins first (rank 0), then everyone else, each group by name (or email).
 /** Merges the paginated users with the admin accounts and puts admins first, then everyone else by name. */
 export function orderUsersAdminsFirst(users, admins = []) {
   const byId = new Map(users.map((u) => [u.id, u]));

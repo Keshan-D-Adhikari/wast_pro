@@ -1,3 +1,6 @@
+// The one button used everywhere in the app (login, checkout, order actions...).
+// Variants: primary (solid green), secondary (light green), danger (red tint), ghost (plain text).
+
 import {
   Text,
   StyleSheet,
@@ -10,8 +13,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
 
+// The four looks a button can have.
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
+// Props: label = text, onPress = function to run on tap, variant = look, icon = optional icon,
+// loading = show a spinner, disabled = cannot tap, compact = small width, style = extra styles.
 type ButtonProps = {
   label: string;
   onPress?: () => void;
@@ -25,6 +31,7 @@ type ButtonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
+// Colours for each variant: bg = background, fg = text/icon colour, border, and whether it has a shadow.
 const tone: Record<Variant, { bg: string; fg: string; border?: string; shadow: boolean }> = {
   primary: { bg: Palette.brand[600], fg: Palette.white, shadow: true },
   secondary: { bg: Palette.brand[100], fg: Palette.brand[700], border: Palette.brand[200], shadow: false },
@@ -32,6 +39,7 @@ const tone: Record<Variant, { bg: string; fg: string; border?: string; shadow: b
   ghost: { bg: 'transparent', fg: Palette.ink[500], shadow: false },
 };
 
+// A '?' after a prop name means it is optional. The '=' values are the defaults.
 /** Single button component for every tappable action in the app. */
 export function Button({
   label,
@@ -43,10 +51,13 @@ export function Button({
   compact = false,
   style,
 }: ButtonProps) {
+  // t holds the colours for the chosen variant.
   const t = tone[variant];
+  // A loading button must not be tapped again, so it counts as disabled too.
   const isDisabled = disabled || loading;
 
   return (
+    // The tappable area. It fades a little when pressed. The style array is applied in order.
     <TouchableOpacity
       onPress={onPress}
       disabled={isDisabled}
@@ -64,6 +75,7 @@ export function Button({
         style,
       ]}
     >
+      {/* Show a spinner while loading, otherwise the icon and label */}
       {loading ? (
         <ActivityIndicator color={t.fg} />
       ) : (
@@ -76,6 +88,7 @@ export function Button({
   );
 }
 
+// base = shared look, full = fills the row, compact = shrinks to fit, content = icon + text row.
 const styles = StyleSheet.create({
   base: {
     height: 52,

@@ -1,3 +1,7 @@
+// Users.jsx: the admin sees a table of all registered accounts (buyers, sellers, admins).
+// Admin can search, filter by role, edit a user's basic details and assign a smart bin to a seller.
+// Firestore collection: "users". Reads live with onSnapshot; writes with updateDoc (edit and
+// binId). Writes are allowed only for admins by firestore.rules (isAdmin and isValidAdminProfileEdit).
 import { useEffect, useMemo, useState } from "react";
 import { collection, deleteField, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
@@ -10,9 +14,12 @@ import { userCode } from "../lib/shortId";
 // Sellers without an assigned bin see the default prototype bin.
 const DEFAULT_BIN = "bin001";
 
+// Users component.
 export default function Users() {
+  // Hook from lib/: loads 25 users at a time. docs = loaded users, hasMore = more exist.
   const { docs: pagedUsers, loading, hasMore, loadMore } = usePaginatedCollection("users");
   // Admin accounts are fetched on their own so they always show at the top, even before "Load more".
+  // The query uses where("role", "==", "admin"). The cleanup (returned function) stops the listener.
   const [admins, setAdmins] = useState([]);
   useEffect(() => {
     return onSnapshot(
@@ -21,7 +28,10 @@ export default function Users() {
       () => {}
     );
   }, []);
+  // useMemo remembers a calculated value and recalculates only when the listed values change.
+  // Here: merge users and admins, admins first. It avoids repeating the sort on every render.
   const users = useMemo(() => orderUsersAdminsFirst(pagedUsers, admins), [pagedUsers, admins]);
+  // State for the toolbar (search text, role filter) and the edit window (editing user, form, errors).
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [editing, setEditing] = useState(null); // the user being edited, or null
@@ -31,15 +41,18 @@ export default function Users() {
   const [saveError, setSaveError] = useState("");
 
   // While the admin is searching, keep loading until the whole directory is available to search.
+  // (Search runs in the browser, so every user must be loaded first.)
   useEffect(() => {
     if (search.trim() && hasMore && !loading) loadMore();
   }, [search, hasMore, loading, loadMore, pagedUsers.length]);
 
+  // filtered = the users that match the search and the role filter (also memoized).
   const filtered = useMemo(
     () => filterUsers(users, { search, role: roleFilter }),
     [users, search, roleFilter]
   );
 
+  // Open the edit window: copy the user's current values into the form, clear old errors.
   const openEdit = (u) => {
     setEditing(u);
     setForm({
@@ -52,6 +65,9 @@ export default function Users() {
     setSaveError("");
   };
 
+  // Save button. Check the form first (validateUserEdit in lib/userEdit.js). If it is valid,
+  // update the users/<id> document. serverTimestamp() lets the server write the time.
+  // The listener updates the table by itself after the save.
   const saveEdit = async (e) => {
     e.preventDefault();
     const result = validateUserEdit(form);
@@ -70,25 +86,31 @@ export default function Users() {
     }
   };
 
+  // Returns an onChange handler for one field. [key] sets the property whose name is in `key`;
+  // { ...f } copies the old form values so the other fields are kept.
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   // Link a seller to a smart bin (a key under bins/ in the IoT database). Empty = use the default bin.
   const assignBin = async (u) => {
+    // window.prompt asks for text. Cancel returns null, so we stop without changing anything.
     const next = window.prompt(
       `Smart bin ID for ${u.fullName || u.email}\n(leave empty to use the default, ${DEFAULT_BIN})`,
       u.binId || ""
     );
     if (next === null) return;
     const id = next.trim();
+    // Accept only safe ids: letters, numbers, - or _ , 1 to 32 characters.
     if (id && !/^[A-Za-z0-9_-]{1,32}$/.test(id)) {
       window.alert("Use only letters, numbers, - or _ (up to 32 characters).");
       return;
     }
+    // Write binId on users/<id>. deleteField() removes the field when the box was empty.
     await updateDoc(doc(db, "users", u.id), { binId: id || deleteField() });
   };
 
   return (
     <section>
+      {/* Title and count */}
       <div className="page-header">
         <div>
           <h1>User Accounts</h1>
@@ -98,6 +120,7 @@ export default function Users() {
         </div>
       </div>
 
+      {/* Search box and role filter */}
       <div className="toolbar">
         <div className="search-input-wrapper">
           <span className="search-icon"><IconSearch size={16} /></span>
@@ -123,6 +146,7 @@ export default function Users() {
         </div>
       </div>
 
+      {/* Loading spinner */}
       {loading && (
         <div className="empty-state-box">
           <div className="loading-spinner" style={{ margin: "0 auto 1rem" }} />
@@ -130,6 +154,7 @@ export default function Users() {
         </div>
       )}
 
+      {/* Empty state when no user matches */}
       {!loading && filtered.length === 0 && (
         <div className="empty-state-box">
           <div className="empty-state-icon"><IconUsers size={24} /></div>
@@ -138,6 +163,7 @@ export default function Users() {
         </div>
       )}
 
+      {/* The users table. One row per user (filtered). */}
       {!loading && filtered.length > 0 && (
         <div className="table-card">
           <div className="table-responsive">
@@ -168,6 +194,7 @@ export default function Users() {
                     <td>{u.phone || "—"}</td>
                     <td>{u.location || "—"}</td>
                     <td>
+                      {/* Smart bin column: only sellers have one */}
                       {u.role === "seller" ? (
                         <>
                           <code>{u.binId || DEFAULT_BIN}</code>
@@ -203,12 +230,14 @@ export default function Users() {
         </div>
       )}
 
+      {/* Button to load 25 more users */}
       {!loading && hasMore && (
         <button type="button" className="load-more-btn" onClick={loadMore}>
           Load more accounts
         </button>
       )}
 
+      {/* Edit window (modal). Clicking the dark background closes it; clicks inside do not. */}
       {editing && (
         <div className="modal-overlay" onClick={() => !saving && setEditing(null)}>
           <form className="modal-card" onClick={(e) => e.stopPropagation()} onSubmit={saveEdit} noValidate>
@@ -217,6 +246,7 @@ export default function Users() {
               {editing.email} · <span className={`badge role-${editing.role}`}>{editing.role}</span>
             </p>
 
+            {/* One input per editable field, made from this list: [key, label, input type] */}
             {[
               ["fullName", "Full name", "text"],
               ["phone", "Phone number", "tel"],
@@ -237,6 +267,7 @@ export default function Users() {
               </div>
             ))}
 
+            {/* Note, error message and the Cancel / Save buttons */}
             <p className="subtitle" style={{ margin: "0 0 1rem", fontSize: "0.8rem" }}>
               The email and role cannot be changed here.
             </p>

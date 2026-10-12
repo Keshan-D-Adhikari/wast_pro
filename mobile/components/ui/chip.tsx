@@ -1,22 +1,31 @@
+// A row of filter pills where only one is selected (for example waste type filters).
+// Used on the buyer marketplace screen.
+
 import { ScrollView, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Palette, Space, Radius, Type } from '@/constants/design';
 
+// One pill: a key used in code and a label shown to the user.
 type ChipOption<T extends string> = { key: T; label: string };
 
+// Props: options = the pills, value = the key that is selected, onChange = called with the new key.
 type ChipGroupProps<T extends string> = {
   options: readonly ChipOption<T>[];
   value: T;
   onChange: (key: T) => void;
 };
 
+// <T extends string> is a TypeScript generic: it lets the keys be any string type,
+// such as 'all' | 'plastic', and keeps onChange typed to the same keys.
 /** Horizontal row of rounded filter pills — one active at a time. */
 export function ChipGroup<T extends string>({ options, value, onChange }: ChipGroupProps<T>) {
   return (
+    // Horizontal scroll so many pills still fit on a small screen
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}
     >
+      {/* One tappable pill per option; the active one gets the green style */}
       {options.map((opt) => {
         const active = opt.key === value;
         return (
@@ -38,6 +47,7 @@ export function ChipGroup<T extends string>({ options, value, onChange }: ChipGr
   );
 }
 
+// row = spacing between pills, chip/chipActive = pill look, label/labelActive = text colour.
 const styles = StyleSheet.create({
   row: { gap: Space.sm, paddingVertical: Space.xs },
   chip: {

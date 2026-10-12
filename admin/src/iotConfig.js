@@ -1,3 +1,6 @@
+// iotConfig.js: connection to the IoT Firebase project that holds the smart bin readings.
+// It uses the Realtime Database (a live JSON tree), not Firestore. The path used is
+// bins/<binId>/..., which the ESP32 device writes to.
 import { getApps, initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { getDatabase } from "firebase/database";
@@ -12,6 +15,8 @@ export const USE_MOCK_IOT =
   (import.meta.env.VITE_USE_MOCK_IOT === "true" ||
     (typeof window !== "undefined" && window.localStorage?.getItem("use_mock_iot") === "true"));
 
+// Fake data for demos: three compartments (plastic, food, metal) with a normal state.
+// level = percent full, weight = kg, moisture = percent (food only).
 export const MOCK_BIN_DATA_NORMAL = {
   plastic: {
     level: 45,
@@ -37,6 +42,7 @@ export const MOCK_BIN_DATA_NORMAL = {
   },
 };
 
+// Fake data for demos: an alert state (a full compartment and an overweight one).
 export const MOCK_BIN_DATA_ALERT = {
   plastic: {
     level: 100,
@@ -72,12 +78,18 @@ const iotFirebaseConfig = {
   databaseURL: import.meta.env.VITE_IOT_FIREBASE_DATABASE_URL,
 };
 
+// This is a second Firebase app named "iot", next to the default one in firebaseConfig.js.
+// getApps().find(...) reuses it if it already exists (this avoids an error when the
+// module is loaded twice during hot reload). ?? means "use the right side if the left is empty".
 const iotApp =
   getApps().find((app) => app.name === "iot") ??
   initializeApp(iotFirebaseConfig, "iot");
 
+// iotDb is the Realtime Database handle that pages use to listen to bins.
 export const iotDb = getDatabase(iotApp);
 
+// Sign in anonymously so the database rules allow reading. Not needed for mock data.
+// A failure only logs a warning, because the dashboard can still open.
 if (!USE_MOCK_IOT) {
   const iotAuth = getAuth(iotApp);
   signInAnonymously(iotAuth).catch((error) => {

@@ -1,3 +1,20 @@
+// BuyerOrders ("My purchases"): the buyer's list of orders.
+//
+// Who uses it: a logged-in buyer, after buying something or from the bottom tab bar.
+// What it does:
+//  - Shows all orders of this buyer, live, split into Ongoing / Completed / Cancelled.
+//  - Cancel a pending order (the listing goes back on the marketplace).
+//  - Pay by card for an order that came from an accepted offer.
+//  - Rate a completed order with stars.
+//  - Show the pickup location on a map.
+//
+// Where it fits: BuyerDashboard (buy) -> BuyerOrders. It links to BuyerOffers.
+//
+// Firestore collections:
+//  - orders         READ (live, only this buyer's), UPDATE (cancel, pay, rating)
+//  - marketplace    READ and UPDATE (put a cancelled order's listing back to "available")
+//  - notifications  CREATE (tell the seller about a cancellation)
+// Cloud Functions: createCheckoutSession and verifyCheckoutSession (Stripe, test mode).
 import {
   View,
   Text,
@@ -47,30 +64,44 @@ import { orderCode } from "../../../utils/shortId";
 import { OrderTabs } from "@/components/ui/order-tabs";
 import { OrderTab, tabForOrder, countByTab } from "../../../utils/orderTabs";
 
+// Text for the empty list of each tab. Record<OrderTab, string> means one string per tab.
 const EMPTY_TAB_TEXT: Record<OrderTab, string> = {
   ongoing: "No ongoing orders",
   completed: "No completed orders yet",
   cancelled: "No cancelled orders",
 };
 
+// The orders screen component.
 export default function BuyerOrders() {
+  // authUser: the logged in Firebase user (null until the saved login is restored).
+  // router: used to open other screens.
   const authUser = useAuthUser();
   const router = useRouter();
+  // State (useState keeps values that, when changed, redraw the screen).
+  //  orders         this buyer's orders from Firestore
+  //  tab            which tab is selected
+  //  loading        true until the first data arrives
   const [orders, setOrders] = useState<Order[]>([]);
   const [tab, setTab] = useState<OrderTab>("ongoing");
   const [loading, setLoading] = useState(true);
+  // Map modal state: whether it is open, both positions, which order, and the distance.
   const [orderMapVisible, setOrderMapVisible] = useState(false);
   const [buyerLocation, setBuyerLocation] = useState<UserLocation | null>(null);
   const [sellerLocation, setSellerLocation] = useState<UserLocation | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
+  // Id of the order being paid right now (so only that button shows a spinner).
   const [payingId, setPayingId] = useState<string | null>(null);
 
   // Pay by card for an order that was created unpaid (an accepted offer):
   // same Stripe Checkout flow as a direct purchase in BuyerDashboard.tsx.
   const handlePayOrder = async (order: Order) => {
+    // Steps: 1 mark busy, 2 get Stripe URL from the server, 3 open it in a browser,
+    // 4 read the result, 5 verify with the server, 6 mark the order paid.
     setPayingId(order.id);
     try {
+      // Step 2: the Cloud Function creates the Stripe Checkout session (secret key stays
+      // on the server).
       const createCheckoutSession = httpsCallable(functions, 'createCheckoutSession');
       const { data } = await createCheckoutSession({
         amount: order.totalPrice,
@@ -78,15 +109,18 @@ export default function BuyerOrders() {
         listingId: order.listingId,
       }) as { data: { url: string; sessionId: string } };
 
+      // Step 3: open Stripe's page. Stripe redirects back to our app URL when done.
       const result = await WebBrowser.openAuthSessionAsync(data.url, Linking.createURL('payment-complete'));
       if (result.type !== 'success' || !result.url) return;
 
+      // Step 4: read ?status=...&session_id=... from the redirect URL.
       const { queryParams } = Linking.parse(result.url);
       if (queryParams?.status !== 'success' || !queryParams?.session_id) {
         Alert.alert('Payment cancelled', 'The payment was not completed.');
         return;
       }
 
+      // Step 5: ask the server to confirm with Stripe that it was really paid.
       const verifyCheckoutSession = httpsCallable(functions, 'verifyCheckoutSession');
       const { data: verification } = await verifyCheckoutSession({
         sessionId: queryParams.session_id,
@@ -97,6 +131,7 @@ export default function BuyerOrders() {
         return;
       }
 
+      // Step 6: the order already exists, so we only update its payment fields.
       await updateDoc(doc(db, 'orders', order.id), {
         paymentMethod: 'card',
         paymentStatus: 'paid',
@@ -114,15 +149,20 @@ export default function BuyerOrders() {
   // Filters by buyerUid and sorts newest first
   // onSnapshot updates list automatically
   useEffect(() => {
+    // Wait until the user is known. Rules block reads when signed out.
     if (!authUser) return;
 
+    // Query: only orders where buyerUid is this buyer, newest first.
     const q = query(
       collection(db, "orders"),
       where("buyerUid", "==", authUser.uid),
       orderBy("createdAt", "desc")
     );
 
+    // Live listener: runs now and again whenever an order changes (for example the
+    // seller confirms it). The screen updates by itself.
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Turn each document into an object, adding its id. Then sort again by time.
       const ordersList = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Order))
         .sort((a, b) => {
@@ -137,9 +177,12 @@ export default function BuyerOrders() {
       setLoading(false);
     });
 
+    // Cleanup: stop the listener when the screen closes.
     return () => unsubscribe();
   }, [authUser]);
 
+  // Cancels an order. Steps: 1 ask the buyer, 2 cancel + restore the listing in one
+  // atomic batch, 3 notify the seller.
   const handleCancelOrder = async (order: Order) => {
     Alert.alert(
       'Cancel Order',
@@ -149,6 +192,7 @@ export default function BuyerOrders() {
         {
           text: 'Yes, Cancel',
           style: 'destructive',
+          // Runs only if the buyer pressed "Yes, Cancel".
           onPress: async () => {
             try {
 
@@ -158,16 +202,22 @@ export default function BuyerOrders() {
               // Cancel the order and put the listing back on the market in one
               // atomic batch. The listing is only restored if THIS order is the
               // one that bought it (soldOrderId); rules enforce the same.
+              // Step 1: read the listing to see whether it was sold to THIS order.
               const listingRef = doc(db, 'marketplace', order.listingId);
               const listingSnap = await getDoc(listingRef);
+              // Step 2: a writeBatch makes all the writes below succeed or fail together,
+              // so we never end with a cancelled order but a listing stuck as "sold".
               const batch = writeBatch(db);
               batch.update(doc(db, 'orders', order.id), {
                 status: 'cancelled',
                 cancelledAt: serverTimestamp(),
               });
+              // Step 3: only give the listing back to the marketplace if this order owns it.
+              // deleteField() removes the soldOrderId field.
               if (listingSnap.exists() && listingSnap.data().soldOrderId === order.id) {
                 batch.update(listingRef, { status: 'available', soldOrderId: deleteField() });
               }
+              // Step 4: send everything to Firestore at once.
               await batch.commit();
 
               // Notify seller. orderId lets Firestore rules verify the
@@ -202,6 +252,8 @@ export default function BuyerOrders() {
     );
   };
 
+  // Steps: 1 check the order has coordinates, 2 ask permission, 3 read GPS,
+  // 4 save both points, 5 open the map.
   // Opens map showing route to seller bin location
   // Gets buyer GPS location before opening modal
   const handleOrderMap = async (order: Order) => {
@@ -215,8 +267,10 @@ export default function BuyerOrders() {
         return;
       }
 
+      // Remember which order the modal is for.
       setSelectedOrder(order);
 
+      // Ask for location permission.
       const { status } = await
         Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -224,6 +278,7 @@ export default function BuyerOrders() {
         return;
       }
 
+      // Read the buyer's GPS position.
       const pos = await
         Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced
@@ -234,6 +289,7 @@ export default function BuyerOrders() {
         longitude: pos.coords.longitude
       };
 
+      // The seller's bin position comes from the order itself.
       const seller = {
         latitude: order.location.latitude,
         longitude: order.location.longitude
@@ -242,12 +298,14 @@ export default function BuyerOrders() {
       setBuyerLocation(buyer);
       setSellerLocation(seller);
 
+      // Straight-line distance in km (this screen does not fetch the road route).
       const dist = calculateDistance(
         buyer.latitude, buyer.longitude,
         seller.latitude, seller.longitude
       );
       setRouteDistance(dist.toFixed(1));
 
+      // Open the map modal.
       setOrderMapVisible(true);
 
     } catch (error) {
@@ -256,8 +314,10 @@ export default function BuyerOrders() {
     }
   };
 
+  // Sum of all orders that are not cancelled. "|| 0" protects against missing prices.
   const totalSpent = orders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
+  // Saves the star rating on the order. The stars can only be set once (see OrderCard).
   const handleRate = async (order: Order, rating: number) => {
     try {
       await updateDoc(doc(db, 'orders', order.id), { rating });
@@ -267,11 +327,14 @@ export default function BuyerOrders() {
     }
   };
 
+  // One order card. isLatest highlights the newest ongoing order with a green edge.
   const OrderCard = ({ order, isLatest }: { order: Order; isLatest: boolean }) => {
+    // Colors for the waste type icon.
     const accent = wasteAccent(order.wasteType);
 
     return (
       <Card style={[styles.card, isLatest && styles.cardLatest]}>
+        {/* Header: waste type icon, name and status badge */}
         <View style={styles.cardHeader}>
           <View style={[styles.typeIcon, { backgroundColor: accent.tint }]}>
             <Ionicons name="cube-outline" size={17} color={accent.base} />
@@ -284,11 +347,13 @@ export default function BuyerOrders() {
 
         <Divider />
 
+        {/* Order details */}
         <DetailRow label="Order ID" value={orderCode(order.id)} />
         <DetailRow label="Seller" value={order.sellerName || '—'} />
         <DetailRow label="Weight" value={`${order.weightKg} kg`} />
         <DetailRow label="Amount" value={formatRs(order.totalPrice)} emphasis />
 
+        {/* Payment badges (cash, card, paid) */}
         <View style={styles.badgeRow}>
           {order.paymentMethod === 'cash' ? (
             <Badge label="Cash on delivery" tone="warning" icon="cash-outline" />
@@ -302,6 +367,7 @@ export default function BuyerOrders() {
           {order.paymentStatus === 'paid' && <Badge label="Paid" tone="success" />}
         </View>
 
+        {/* Rating row only for completed orders */}
         {order.status === 'completed' && (
           <View style={styles.ratingRow}>
             <Text style={Type.small}>{order.rating ? 'Your rating' : 'Rate this order'}</Text>
@@ -309,6 +375,7 @@ export default function BuyerOrders() {
           </View>
         )}
 
+        {/* Pay by card button. Only for orders from an accepted offer that are confirmed but unpaid. */}
         {order.offerId && order.paymentStatus === 'pending' && order.status === 'confirmed' && (
           <Button
             label="Pay by card"
@@ -319,6 +386,7 @@ export default function BuyerOrders() {
           />
         )}
 
+        {/* Cancel (only while pending) and View location buttons */}
         <View style={styles.actions}>
           {order.status === 'pending' && (
             <Button
@@ -341,9 +409,11 @@ export default function BuyerOrders() {
     );
   };
 
+  // Screen layout.
   return (
     <View style={styles.root}>
       <Screen withBottomNav>
+        {/* Header with a button to the offers screen */}
         <ScreenHeader
           title="My purchases"
           subtitle="Orders you placed with sellers"
@@ -359,6 +429,7 @@ export default function BuyerOrders() {
           }
         />
 
+        {/* Summary card: number of orders and total value */}
         {!loading && orders.length > 0 && (
           <Card tone="brand" elevation={0} style={styles.summaryCard}>
             <View style={styles.summaryItem}>
@@ -373,6 +444,7 @@ export default function BuyerOrders() {
           </Card>
         )}
 
+        {/* Loading, then tabs and the list for the selected tab */}
         {loading ? (
           <LoadingState message="Loading your purchases…" />
         ) : (
@@ -397,6 +469,7 @@ export default function BuyerOrders() {
         )}
       </Screen>
 
+      {/* Order Location Map Modal. Opens from "View location". */}
       {/* Order Location Map Modal */}
       <Modal visible={orderMapVisible} animationType="slide">
         <SafeAreaView style={styles.mapRoot}>
@@ -422,6 +495,7 @@ export default function BuyerOrders() {
           <MapView
             provider={APP_MAP_PROVIDER}
             style={styles.flex}
+            // Center between the two points; the delta values set the zoom level.
             initialRegion={buyerLocation && sellerLocation ? {
               latitude: (buyerLocation.latitude + sellerLocation.latitude) / 2,
               longitude: (buyerLocation.longitude + sellerLocation.longitude) / 2,
@@ -429,6 +503,7 @@ export default function BuyerOrders() {
               longitudeDelta: Math.abs(buyerLocation.longitude - sellerLocation.longitude) * 2,
             } : undefined}
           >
+            {/* Markers and a dashed straight line between buyer and seller */}
             {buyerLocation && sellerLocation && (
               <>
                 <Marker coordinate={buyerLocation} title="You">
@@ -448,6 +523,7 @@ export default function BuyerOrders() {
             )}
           </MapView>
 
+          {/* Footer shows the order status */}
           <View style={styles.mapFooter}>
             <View
               style={[
@@ -475,6 +551,7 @@ export default function BuyerOrders() {
         </SafeAreaView>
       </Modal>
 
+      {/* Bottom tab bar for buyers (Orders tab is active) */}
       <BottomNav role="buyer" active="orders" />
     </View>
   );
@@ -482,6 +559,7 @@ export default function BuyerOrders() {
 
 /* ================= STYLES ================= */
 
+// Styles for this screen. Groups: summary, order card, map modal.
 const styles = StyleSheet.create({
   ratingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Space.md },
   root: { flex: 1, backgroundColor: Palette.background },

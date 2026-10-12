@@ -1,8 +1,13 @@
+// The standard text input: optional label, icon, unit text, error message and password eye button.
+// Used on the login, sign up, add waste and profile screens.
+
 import { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps, StyleProp, ViewStyle, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette, Space, Radius, Type } from '@/constants/design';
 
+// It accepts every normal TextInput prop too (value, onChangeText, placeholder, keyboardType...),
+// plus the extras below.
 type TextFieldProps = TextInputProps & {
   /** Label shown above the input. */
   label?: string;
@@ -17,6 +22,7 @@ type TextFieldProps = TextInputProps & {
   containerStyle?: StyleProp<ViewStyle>;
 };
 
+// The ...inputProps rest pattern collects all the other props and passes them straight to TextInput.
 /** Labelled text input with consistent height, radius and focus colours. */
 export function TextField({
   label,
@@ -28,19 +34,25 @@ export function TextField({
   style,
   ...inputProps
 }: TextFieldProps) {
+  // Whether the password is shown as plain text (only used with passwordToggle).
   const [passwordVisible, setPasswordVisible] = useState(false);
 
   return (
+    // Layout top to bottom: label, the bordered field row, then the error text
     <View style={[styles.wrapper, containerStyle]}>
+      {/* Small upper-case label above the input */}
       {!!label && <Text style={[Type.caption, styles.label]}>{label}</Text>}
+      {/* Bordered row: icon, input, eye button, suffix. The border turns red when there is an error */}
       <View style={[styles.field, !!error && styles.fieldError]}>
         {!!icon && <Ionicons name={icon} size={18} color={Palette.brand[600]} />}
+        {/* The real input. Props come after {...inputProps} so our password setting wins */}
         <TextInput
           placeholderTextColor={Palette.ink[300]}
           style={[styles.input, style]}
           {...inputProps}
           secureTextEntry={passwordToggle ? !passwordVisible : inputProps.secureTextEntry}
         />
+        {/* Eye button that flips passwordVisible */}
         {passwordToggle && (
           <TouchableOpacity
             onPress={() => setPasswordVisible((v) => !v)}
@@ -57,11 +69,13 @@ export function TextField({
         )}
         {!!suffix && <Text style={Type.smallStrong}>{suffix}</Text>}
       </View>
+      {/* Error message under the field */}
       {!!error && <Text style={[Type.caption, styles.errorText]}>{error}</Text>}
     </View>
   );
 }
 
+// wrapper = outer spacing, label = top text, field/fieldError = the border box, input = text style.
 const styles = StyleSheet.create({
   wrapper: { marginBottom: Space.lg },
   label: { marginBottom: Space.sm, textTransform: 'uppercase', letterSpacing: 0.4 },

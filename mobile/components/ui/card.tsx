@@ -1,7 +1,11 @@
+// Layout building blocks: Card (white box), SectionTitle (heading), Divider (line)
+// and DetailRow (label on the left, value on the right). Used on almost every screen.
+
 import { ReactNode } from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { Palette, Space, Radius, Shadow, Type } from '@/constants/design';
 
+// Props: children = whatever is placed inside, elevation = shadow level, tone = background colour.
 type CardProps = {
   children: ReactNode;
   /** 1 = resting (default), 2 = raised, 0 = flat with a hairline border. */
@@ -11,6 +15,7 @@ type CardProps = {
   style?: StyleProp<ViewStyle>;
 };
 
+// 'children' is a React idea: the content you write between <Card> and </Card>.
 /** The standard white rounded container used for almost all content blocks. */
 export function Card({ children, elevation = 1, tone = 'surface', style }: CardProps) {
   return (
@@ -27,6 +32,7 @@ export function Card({ children, elevation = 1, tone = 'surface', style }: CardP
   );
 }
 
+// Props: children = the title text, meta = small text on the right, tight = less space above.
 type SectionTitleProps = {
   children: ReactNode;
   /** Small muted text on the right, e.g. a count or "3 available". */
@@ -45,11 +51,13 @@ export function SectionTitle({ children, meta, tight = false }: SectionTitleProp
   );
 }
 
+// Takes an optional style so a screen can change its margin.
 /** Thin horizontal rule for splitting content inside a card. */
 export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.divider, style]} />;
 }
 
+// Props: label (left text), value (right text), emphasis = bigger, green value (e.g. for a total).
 /** Label/value row — used in order summaries and receipts. */
 export function DetailRow({
   label,
@@ -70,6 +78,8 @@ export function DetailRow({
   );
 }
 
+// card/brandCard/flat = the Card looks, sectionRow/sectionTight = heading layout,
+// divider = the line, detailRow/detailValueStrong = label and value rows.
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Palette.surface,
