@@ -70,10 +70,7 @@ export default function SellerProfile() {
     fetchProfileData();
   }, []);
 
-  // FUNCTION: handleLogout
-  // Runs when: the "Log out" row is pressed.
-  // What it does: signs out of Firebase and goes back to the Welcome screen.
-  // Asks for confirmation, then logs the seller out.
+  // FUNCTION: handleLogout - runs when the "Log out" row is pressed; signs out of Firebase and goes back to the Welcome screen.
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },

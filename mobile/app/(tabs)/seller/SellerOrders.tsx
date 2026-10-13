@@ -64,11 +64,7 @@ export default function SellerOrders() {
 
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // FUNCTION: run
-  // Runs when: any order button is pressed.
-  // What it does: shows the spinner, runs the work, and shows an error message if it fails.
-  // Helper that runs one action safely: mark the order as busy, run the work,
-  // show an alert if it fails, and always clear the busy mark at the end.
+  // FUNCTION: run - runs when any order button is pressed; shows the spinner, runs the work, and shows an error message if it fails.
   const run = async (order: Order, work: () => Promise<void>, failMessage: string) => {
     setBusyId(order.id);
     try {
@@ -81,11 +77,7 @@ export default function SellerOrders() {
     }
   };
 
-  // FUNCTION: notifyBuyer
-  // Runs when: the seller confirms, completes or declines an order.
-  // What it does: saves a notification for the buyer in Firestore.
-  // Tell the buyer what happened. Best effort: a failed notification must not undo the order change.
-  // Tell the buyer what happened. Best effort: a failed notification must not undo the order change.
+  // FUNCTION: notifyBuyer - runs when the seller confirms, completes or declines an order; saves a notification for the buyer in Firestore.
   const notifyBuyer = async (order: Order, event: SellerOrderEvent) => {
     try {
       const { type, message } = buyerNotificationFor(event, order);
@@ -102,20 +94,14 @@ export default function SellerOrders() {
     }
   };
 
-  // FUNCTION: handleConfirm
-  // Runs when: the "Confirm order" button is pressed.
-  // What it does: sets the order status to confirmed and notifies the buyer.
-  // Seller taps Confirm: set the order status to confirmed, then tell the buyer.
+  // FUNCTION: handleConfirm - runs when the "Confirm order" button is pressed; sets the order status to confirmed and notifies the buyer.
   const handleConfirm = (order: Order) =>
     run(order, async () => {
       await updateDoc(doc(db, 'orders', order.id), { status: 'confirmed' });
       await notifyBuyer(order, 'confirmed');
     }, 'Could not confirm this order.');
 
-  // FUNCTION: handleComplete
-  // Runs when: the "Mark completed" button is pressed.
-  // What it does: marks a cash order as paid, sets the status to completed and notifies the buyer.
-  // Seller taps Mark completed. For cash orders the seller must confirm the cash was received.
+  // FUNCTION: handleComplete - runs when the "Mark completed" button is pressed; marks a cash order as paid, sets the status to completed and notifies the buyer.
   const handleComplete = (order: Order) => {
     const collectsCash = completingCollectsCash(order);
     Alert.alert(
@@ -140,10 +126,7 @@ export default function SellerOrders() {
     );
   };
 
-  // FUNCTION: handleDecline
-  // Runs when: the "Decline" button is pressed.
-  // What it does: cancels the order and puts the listing back on the marketplace in one batch, then notifies the buyer.
-  // Seller taps Decline. The order is cancelled and the waste goes back on the marketplace.
+  // FUNCTION: handleDecline - runs when the "Decline" button is pressed; cancels the order and puts the listing back on the marketplace in one batch, then notifies the buyer.
   const handleDecline = (order: Order) => {
     Alert.alert(
       'Decline this order?',
@@ -179,10 +162,7 @@ export default function SellerOrders() {
     .filter((o) => o.status === 'completed')
     .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
-  // FUNCTION: OrderCard
-  // Runs when: once for each order in the list.
-  // What it does: draws one order card with its details and buttons.
-  // One card for one order, with the buttons the seller is allowed to use.
+  // FUNCTION: OrderCard - runs when once for each order in the list; draws one order card with its details and buttons.
   const OrderCard = ({ order }: { order: Order }) => {
     const accent = wasteAccent(order.wasteType);
     const date = order.createdAt?.toDate

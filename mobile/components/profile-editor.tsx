@@ -122,11 +122,7 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     ? SRI_LANKAN_LOCATIONS.filter(loc => loc.toLowerCase().includes(location.trim().toLowerCase())).slice(0, 6)
     : [];
 
-  // FUNCTION: handlePickImage
-  // Runs when: the profile photo is pressed.
-  // What it does: lets the user take a photo or pick one from the gallery.
-  // Asks the user to take a photo or choose one, then uploads it.
-  // Each option first asks for the needed permission.
+  // FUNCTION: handlePickImage - runs when the profile photo is pressed; lets the user take a photo or pick one from the gallery.
   const handlePickImage = async () => {
     Alert.alert('Profile Photo', 'Choose an option', [
       {
@@ -170,11 +166,7 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     ]);
   };
 
-  // FUNCTION: uploadImage
-  // Runs when: a photo has been chosen.
-  // What it does: uploads the photo to Firebase Storage and saves its link in the profile.
-  // Uploads the picked image to Firebase Storage and saves its link in Firestore.
-  // Steps: 1 file path, 2 image to blob, 3 upload, 4 get link, 5 save link.
+  // FUNCTION: uploadImage - runs when a photo has been chosen; uploads the photo to Firebase Storage and saves its link in the profile.
   const uploadImage = async (uri: string) => {
     if (!auth.currentUser) return;
     try {
@@ -222,10 +214,7 @@ export function ProfileEditor({ variant }: { variant: 'seller' | 'buyer' }) {
     }
   };
 
-  // FUNCTION: handleSave
-  // Runs when: the "Save changes" button is pressed.
-  // What it does: checks the phone number and saves the name, phone and location in Firestore.
-  // Validates the phone number, then saves the profile to Firestore.
+  // FUNCTION: handleSave - runs when the "Save changes" button is pressed; checks the phone number and saves the name, phone and location in Firestore.
   const handleSave = async () => {
     if (!auth.currentUser) return;
     

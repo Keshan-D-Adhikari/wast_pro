@@ -12,22 +12,7 @@ const DEAD_SESSION_CODES = [
   'auth/invalid-user-token',
 ];
 
-// FUNCTION: useAuthUser
-// Runs when: a protected screen opens.
-// What it does: gives the signed-in user, or sends the person to Login if nobody is signed in.
-/**
- * The signed-in Firebase user, kept up to date, for screens that need one.
- *
- * - `auth.currentUser` is null for a moment after the app starts while the saved
- *   session is restored from storage. A screen that reads it once in an effect
- *   would start its data listeners signed out and get "Missing or insufficient
- *   permissions". This hook reports the user only once Firebase knows it.
- * - The saved session can outlive the account (deleted or disabled on the
- *   server). It is checked once, and a dead session is signed out instead of
- *   being used for requests that would all be denied.
- * - When nobody is signed in, the user is sent to the Login screen.
- */
-// Returns the Firebase User, or null while we are still loading / not signed in.
+// FUNCTION: useAuthUser - runs when a protected screen opens; gives the signed-in user, or sends the person to Login if nobody is signed in.
 export function useAuthUser(): User | null {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);

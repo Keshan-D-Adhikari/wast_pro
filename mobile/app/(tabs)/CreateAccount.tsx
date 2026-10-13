@@ -49,10 +49,7 @@ export default function CreateAccount() {
 
   const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
-  // FUNCTION: handleContinue
-  // Runs when: the "Create Account" button is pressed.
-  // What it does: creates the login account, saves the profile with the chosen role, then opens the dashboard.
-  // ⬅️ The main function of registration
+  // FUNCTION: handleContinue - runs when the "Create Account" button is pressed; creates the login account, saves the profile with the chosen role, then opens the dashboard.
   const handleContinue = async () => {
     // 1. Basic Validation (check if empty)
     if (!name || !email || !password || !confirmPassword) {

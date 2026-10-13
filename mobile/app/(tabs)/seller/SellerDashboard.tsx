@@ -186,11 +186,7 @@ export default function SellerDashboard() {
   const placeError = placeAnswered ? placeState.error : '';
   const placeSearching = placeLongEnough && !placeAnswered;
 
-  // FUNCTION: handleSelectPlace
-  // Runs when: the seller taps a place in the search results.
-  // What it does: saves that place as the bin location in the seller profile.
-  // The seller picked a result: save it as where the bin is.
-  // The seller picked a result: save it as where the bin is.
+  // FUNCTION: handleSelectPlace - runs when the seller taps a place in the search results; saves that place as the bin location in the seller profile.
   const handleSelectPlace = async (place: PlaceResult) => {
     if (!user) return;
     setSavingLocation(true);
@@ -244,11 +240,7 @@ export default function SellerDashboard() {
   // Names of compartments that the firmware marked as over the weight limit.
   const overweightLabels = COMPARTMENTS.filter((c) => binData[c.type]?.overweight).map((c) => c.label);
 
-  // FUNCTION: handleReportSubmit
-  // Runs when: the "Submit report" button is pressed.
-  // What it does: checks the text and shows a confirmation message.
-  // Called when the seller sends the issue form. It only checks the text and shows a message;
-  // the report is not saved anywhere yet.
+  // FUNCTION: handleReportSubmit - runs when the "Submit report" button is pressed; checks the text and shows a confirmation message.
   const handleReportSubmit = () => {
     if (issueDescription.trim() === "") {
       Alert.alert("Error", "Please enter the issue details.");
@@ -259,10 +251,7 @@ export default function SellerDashboard() {
     setIssueDescription("");
   };
 
-  // FUNCTION: markAllAsRead
-  // Runs when: the notification bell is pressed.
-  // What it does: marks every unread notification as read in Firestore.
-  // Mark every unread notification as read. Called when the notification sheet opens.
+  // FUNCTION: markAllAsRead - runs when the notification bell is pressed; marks every unread notification as read in Firestore.
   const markAllAsRead = async () => {
     try {
       const unread = notifications.filter(n => !n.read);
@@ -279,11 +268,7 @@ export default function SellerDashboard() {
     0
   );
 
-  // FUNCTION: BinCard
-  // Runs when: once for each compartment (plastic, food, metal).
-  // What it does: draws one compartment card with the level, status, weight and overweight warning.
-  // Bin Card UI Component
-  // One card for one compartment. It is built inside the screen so it can read binData.
+  // FUNCTION: BinCard - runs when once for each compartment (plastic, food, metal); draws one compartment card with the level, status, weight and overweight warning.
   const BinCard = ({ type, label, icon }: { type: WasteType; label: string; icon: keyof typeof Ionicons.glyphMap }) => {
     const compartment = binData[type] || {};
     const level = compartment.level || 0;

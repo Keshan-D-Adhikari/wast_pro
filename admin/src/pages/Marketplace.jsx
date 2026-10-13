@@ -40,10 +40,7 @@ function SellerListings({ seller, onBack }) {
     [listings, statusFilter, typeFilter]
   );
 
-  // FUNCTION: handleRemove
-  // Runs when: the "Remove" button is pressed.
-  // What it does: deletes that listing from Firestore after a confirmation.
-  // Remove button: ask for confirmation, then delete the document marketplace/<id>.
+  // FUNCTION: handleRemove - runs when the "Remove" button is pressed; deletes that listing from Firestore after a confirmation.
   const handleRemove = async (id) => {
     if (!confirm("Remove this marketplace listing? This cannot be undone.")) return;
     await deleteDoc(doc(db, "marketplace", id));

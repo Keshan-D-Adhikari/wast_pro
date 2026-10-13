@@ -54,9 +54,7 @@ const TYPE_FILTERS = [
 ] as const;
 type TypeFilterKey = typeof TYPE_FILTERS[number]['key'];
 
-// FUNCTION: BuyerDashboard
-// Runs when: the buyer opens the Marketplace screen.
-// What it does: the whole Marketplace screen. All the other functions are inside it.
+// FUNCTION: BuyerDashboard - runs when the buyer opens the Marketplace screen; the whole Marketplace screen. All the other functions are inside it.
 export default function BuyerDashboard() {
   const authUser = useAuthUser();
   const router = useRouter();
@@ -86,9 +84,7 @@ export default function BuyerDashboard() {
   const [offerAmountError, setOfferAmountError] = useState('');
   const [offerLoading, setOfferLoading] = useState(false);
 
-  // FUNCTION: useEffect (load the screen data)
-  // Runs when: the screen opens, after the login is confirmed.
-  // What it does: gets the buyer's GPS location and loads the available listings live from Firestore.
+  // FUNCTION: useEffect (load the screen data) - runs when the screen opens, after the login is confirmed; gets the buyer's GPS location and loads the available listings live from Firestore.
   useEffect(() => {
     // Wait for the saved session to be restored; querying while signed out is denied by the rules.
     if (!authUser) return;
@@ -127,9 +123,7 @@ export default function BuyerDashboard() {
     return () => unsubscribe?.();
   }, [authUser]);
 
-  // FUNCTION: filteredItems (filter)
-  // Runs when: every time the screen is drawn.
-  // What it does: keeps only the listings that match the search box and the selected type chip.
+  // FUNCTION: filteredItems (filter) - runs when every time the screen is drawn; keeps only the listings that match the search box and the selected type chip.
   const filteredItems = items.filter(item => {
     const type = (item.wasteType || '').toLowerCase();
     const matchesFilter = typeFilter === 'all' || type === typeFilter;
@@ -137,9 +131,7 @@ export default function BuyerDashboard() {
     return matchesFilter && matchesSearch;
   });
 
-  // FUNCTION: getDistance
-  // Runs when: each listing card is drawn.
-  // What it does: gives the distance in km between the buyer and the seller. "N/A" if the buyer's location is unknown.
+  // FUNCTION: getDistance - runs when each listing card is drawn; gives the distance in km between the buyer and the seller. "N/A" if the buyer's location is unknown.
   const getDistance = (sellerLoc: { latitude: number; longitude: number }) => {
     if (!userLocation || !sellerLoc) return "N/A";
     return calculateDistance(
@@ -148,9 +140,7 @@ export default function BuyerDashboard() {
     ).toFixed(1);
   };
 
-  // FUNCTION: handleMakeOffer
-  // Runs when: the "Make an Offer" button is pressed.
-  // What it does: opens the "Make an offer" sheet for that listing and clears the old input.
+  // FUNCTION: handleMakeOffer - runs when the "Make an Offer" button is pressed; opens the "Make an offer" sheet for that listing and clears the old input.
   const handleMakeOffer = (item: MarketplaceItem) => {
     setOfferItem(item);
     setOfferAmount('');
@@ -158,10 +148,7 @@ export default function BuyerDashboard() {
     setOfferModalVisible(true);
   };
 
-  // FUNCTION: handleSubmitOffer
-  // Runs when: the "Submit offer" button is pressed.
-  // What it does: saves the offer in Firestore and sends a notification to the seller.
-  // Steps: 1 check the amount, 2 check the listing is still for sale, 3 save the offer, 4 notify the seller.
+  // FUNCTION: handleSubmitOffer - runs when the "Submit offer" button is pressed; saves the offer in Firestore and sends a notification to the seller.
   const handleSubmitOffer = async () => {
     if (!auth.currentUser || !offerItem) return;
 
@@ -226,19 +213,14 @@ export default function BuyerDashboard() {
     }
   };
 
-  // FUNCTION: handleBuyNow
-  // Runs when: the "Buy Now" button is pressed.
-  // What it does: opens the "Complete purchase" sheet (cash or card) for that listing.
+  // FUNCTION: handleBuyNow - runs when the "Buy Now" button is pressed; opens the "Complete purchase" sheet (cash or card) for that listing.
   const handleBuyNow = (item: MarketplaceItem) => {
     setBuyingItem(item);
     setPaymentMethod('');
     setPaymentModalVisible(true);
   };
 
-  // FUNCTION: confirmPurchase
-  // Runs when: the buyer confirms a cash order, or after a card payment is verified.
-  // What it does: creates the order and marks the listing sold in one batch, then notifies the seller.
-  // method is 'cash' or 'card'. cardLast4 is the last 4 digits of the card (card only).
+  // FUNCTION: confirmPurchase - runs when the buyer confirms a cash order, or after a card payment is verified; creates the order and marks the listing sold in one batch, then notifies the seller.
   const confirmPurchase = async (method: 'cash' | 'card', cardLast4?: string | null) => {
     if (!auth.currentUser || !buyingItem) return;
 
@@ -326,12 +308,7 @@ export default function BuyerDashboard() {
     }
   };
 
-  // FUNCTION: handleCardPayment
-  // Runs when: "Card payment" is selected and the "Pay now" button is pressed.
-  // What it does: pays by card with Stripe Checkout, then calls confirmPurchase.
-  // Steps: 1 ask our server for a Checkout page, 2 open it in the in-app browser,
-  // 3 read the result, 4 ask our server to verify the payment.
-  // The Stripe secret key stays on the server (Cloud Function), never in the app.
+  // FUNCTION: handleCardPayment - runs when "Card payment" is selected and the "Pay now" button is pressed; pays by card with Stripe Checkout, then calls confirmPurchase.
   const handleCardPayment = async () => {
     if (!buyingItem) return;
 
@@ -379,18 +356,13 @@ export default function BuyerDashboard() {
     }
   };
 
-  // FUNCTION: handleConfirmOrder
-  // Runs when: the "Confirm order" / "Pay now" button is pressed in the payment sheet.
-  // What it does: cash -> confirmPurchase('cash'). Card -> handleCardPayment().
+  // FUNCTION: handleConfirmOrder - runs when the "Confirm order" / "Pay now" button is pressed in the payment sheet; cash -> confirmPurchase('cash'). Card -> handleCardPayment().
   const handleConfirmOrder = () => {
     if (paymentMethod === 'cash') confirmPurchase('cash');
     else if (paymentMethod === 'card') handleCardPayment();
   };
 
-  // FUNCTION: openRouteMap
-  // Runs when: the "Route" button is pressed.
-  // What it does: opens the full screen pickup map for that listing.
-  // Steps: 1 get location permission, 2 read GPS, 3 show a straight line at once, 4 load the road route.
+  // FUNCTION: openRouteMap - runs when the "Route" button is pressed; opens the full screen pickup map for that listing.
   const openRouteMap = async (item: MarketplaceItem) => {
     try {
       setSelectedItem(item);
@@ -432,9 +404,7 @@ export default function BuyerDashboard() {
   };
 
   /* ================= LISTING CARD ================= */
-  // FUNCTION: ListingCard
-  // Runs when: once for each listing in the list.
-  // What it does: draws one listing card with the price, distance and the three buttons.
+  // FUNCTION: ListingCard - runs when once for each listing in the list; draws one listing card with the price, distance and the three buttons.
   const ListingCard = ({ item }: { item: MarketplaceItem }) => {
     const accent = wasteAccent(item.wasteType);
     const distance = getDistance(item.location);

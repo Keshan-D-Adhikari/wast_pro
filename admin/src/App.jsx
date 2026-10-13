@@ -11,12 +11,7 @@ import Marketplace from "./pages/Marketplace";
 import Orders from "./pages/Orders";
 import "./App.css";
 
-// FUNCTION: Gate
-// Runs when: the admin site opens.
-// What it does: shows Login, "Not an admin", or the admin pages.
-// Gate decides what to show, in this order:
-// 1. Still checking who is signed in -> a loading message.
-// 2. Nobody signed in -> the Login page.
+// FUNCTION: Gate - runs when the admin site opens; shows Login, "Not an admin", or the admin pages.
 function Gate() {
   const { user, isAdmin, loading } = useAuth();
 

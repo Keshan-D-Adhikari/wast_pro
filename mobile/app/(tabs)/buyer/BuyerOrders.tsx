@@ -67,11 +67,7 @@ export default function BuyerOrders() {
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
 
-  // FUNCTION: handlePayOrder
-  // Runs when: the "Pay by card" button is pressed.
-  // What it does: pays an accepted-offer order by card with Stripe, then marks it paid.
-  // Pay by card for an order that was created unpaid (an accepted offer):
-  // same Stripe Checkout flow as a direct purchase in BuyerDashboard.tsx.
+  // FUNCTION: handlePayOrder - runs when the "Pay by card" button is pressed; pays an accepted-offer order by card with Stripe, then marks it paid.
   const handlePayOrder = async (order: Order) => {
     setPayingId(order.id);
     try {
@@ -150,11 +146,7 @@ export default function BuyerOrders() {
     return () => unsubscribe();
   }, [authUser]);
 
-  // FUNCTION: handleCancelOrder
-  // Runs when: the "Cancel" button is pressed.
-  // What it does: cancels the order and puts the listing back on the marketplace in one batch, then notifies the seller.
-  // Cancels an order. Steps: 1 ask the buyer, 2 cancel + restore the listing in one
-  // atomic batch, 3 notify the seller.
+  // FUNCTION: handleCancelOrder - runs when the "Cancel" button is pressed; cancels the order and puts the listing back on the marketplace in one batch, then notifies the seller.
   const handleCancelOrder = async (order: Order) => {
     Alert.alert(
       'Cancel Order',
@@ -220,13 +212,7 @@ export default function BuyerOrders() {
     );
   };
 
-  // FUNCTION: handleOrderMap
-  // Runs when: the "View location" button is pressed.
-  // What it does: opens a map with the buyer and the pickup point.
-  // Steps: 1 check the order has coordinates, 2 ask permission, 3 read GPS,
-  // 4 save both points, 5 open the map.
-  // Opens map showing route to seller bin location
-  // Gets buyer GPS location before opening modal
+  // FUNCTION: handleOrderMap - runs when the "View location" button is pressed; opens a map with the buyer and the pickup point.
   const handleOrderMap = async (order: Order) => {
     try {
       // Older seeded orders were written without coordinates
@@ -282,10 +268,7 @@ export default function BuyerOrders() {
   // Sum of all orders that are not cancelled. "|| 0" protects against missing prices.
   const totalSpent = orders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + (o.totalPrice || 0), 0);
 
-  // FUNCTION: handleRate
-  // Runs when: the buyer taps a star on a completed order.
-  // What it does: saves the rating (1 to 5) on the order.
-  // Saves the star rating on the order. The stars can only be set once (see OrderCard).
+  // FUNCTION: handleRate - runs when the buyer taps a star on a completed order; saves the rating (1 to 5) on the order.
   const handleRate = async (order: Order, rating: number) => {
     try {
       await updateDoc(doc(db, 'orders', order.id), { rating });
@@ -295,10 +278,7 @@ export default function BuyerOrders() {
     }
   };
 
-  // FUNCTION: OrderCard
-  // Runs when: once for each order in the list.
-  // What it does: draws one order card with its details and buttons.
-  // One order card. isLatest highlights the newest ongoing order with a green edge.
+  // FUNCTION: OrderCard - runs when once for each order in the list; draws one order card with its details and buttons.
   const OrderCard = ({ order, isLatest }: { order: Order; isLatest: boolean }) => {
     const accent = wasteAccent(order.wasteType);
 

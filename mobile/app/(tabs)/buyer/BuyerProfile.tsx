@@ -65,10 +65,7 @@ export default function BuyerProfile() {
 
   const user = auth.currentUser;
 
-  // FUNCTION: handleLogout
-  // Runs when: the "Log out" row is pressed.
-  // What it does: signs out of Firebase and goes back to the Welcome screen.
-  // Firebase logout — clears the session stored in AsyncStorage
+  // FUNCTION: handleLogout - runs when the "Log out" row is pressed; signs out of Firebase and goes back to the Welcome screen.
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },

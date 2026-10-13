@@ -46,10 +46,7 @@ function UserOrders({ person, onBack }) {
   const orders = useMemo(() => [...rawOrders].sort(newestFirst), [rawOrders]);
   const filtered = useMemo(() => filterOrders(orders, { status: statusFilter }), [orders, statusFilter]);
 
-  // FUNCTION: handleStatusChange
-  // Runs when: the admin picks a status in the dropdown.
-  // What it does: updates the order status in Firestore.
-  // Admin picked a new status in a row's dropdown: save it on orders/<id>. The listener refreshes the table.
+  // FUNCTION: handleStatusChange - runs when the admin picks a status in the dropdown; updates the order status in Firestore.
   const handleStatusChange = async (order, status) => {
     if (status === order.status) return;
     await updateDoc(doc(db, "orders", order.id), { status });

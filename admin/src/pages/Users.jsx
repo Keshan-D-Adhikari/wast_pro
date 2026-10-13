@@ -44,10 +44,7 @@ export default function Users() {
     [users, search, roleFilter]
   );
 
-  // FUNCTION: openEdit
-  // Runs when: the "Edit" button is pressed.
-  // What it does: opens the edit form filled with that user.
-  // Open the edit window: copy the user's current values into the form, clear old errors.
+  // FUNCTION: openEdit - runs when the "Edit" button is pressed; opens the edit form filled with that user.
   const openEdit = (u) => {
     setEditing(u);
     setForm({
@@ -60,12 +57,7 @@ export default function Users() {
     setSaveError("");
   };
 
-  // FUNCTION: saveEdit
-  // Runs when: the edit form is saved.
-  // What it does: checks the values and updates the user in Firestore.
-  // Save button. Check the form first (validateUserEdit in lib/userEdit.js). If it is valid,
-  // update the users/<id> document. serverTimestamp() lets the server write the time.
-  // The listener updates the table by itself after the save.
+  // FUNCTION: saveEdit - runs when the edit form is saved; checks the values and updates the user in Firestore.
   const saveEdit = async (e) => {
     e.preventDefault();
     const result = validateUserEdit(form);
@@ -88,10 +80,7 @@ export default function Users() {
   // { ...f } copies the old form values so the other fields are kept.
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  // FUNCTION: assignBin
-  // Runs when: the "Set bin" button is pressed.
-  // What it does: saves which smart bin (binId) that seller sees.
-  // Link a seller to a smart bin (a key under bins/ in the IoT database). Empty = use the default bin.
+  // FUNCTION: assignBin - runs when the "Set bin" button is pressed; saves which smart bin (binId) that seller sees.
   const assignBin = async (u) => {
     const next = window.prompt(
       `Smart bin ID for ${u.fullName || u.email}\n(leave empty to use the default, ${DEFAULT_BIN})`,

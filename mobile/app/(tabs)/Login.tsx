@@ -34,12 +34,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // FUNCTION: handleLogin
-  // Runs when: the "Log In" button is pressed.
-  // What it does: checks the email and password with Firebase, reads the role, then opens the seller or buyer dashboard.
-  /* ================= FIREBASE LOGIN FUNCTION ================= */
-  // Runs when the user taps "Log In" (or presses "go" on the keyboard).
-  // "async" lets us use "await" to wait for Firebase without freezing the app.
+  // FUNCTION: handleLogin - runs when the "Log In" button is pressed; checks the email and password with Firebase, reads the role, then opens the seller or buyer dashboard.
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Please enter both email and password.");
@@ -93,11 +88,7 @@ export default function Login() {
     }
   };
 
-  // FUNCTION: handleForgotPassword
-  // Runs when: the "Forgot password?" link is pressed.
-  // What it does: asks Firebase to send a password reset email to the typed address.
-  /* ================= PASSWORD RESET ================= */
-  // Sends Firebase's "reset your password" email to the address in the email box.
+  // FUNCTION: handleForgotPassword - runs when the "Forgot password?" link is pressed; asks Firebase to send a password reset email to the typed address.
   const handleForgotPassword = async () => {
     const trimmed = email.trim();
     if (!trimmed) {

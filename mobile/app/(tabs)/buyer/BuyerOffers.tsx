@@ -79,12 +79,7 @@ export default function BuyerOffers() {
     }, (err) => console.error('Offer orders error:', err));
   }, [authUser]);
 
-  // FUNCTION: handleBuy
-  // Runs when: the "Buy at Rs ..." button is pressed.
-  // What it does: confirms the accepted-offer order and notifies the seller.
-  // Buy: the buyer agrees to the accepted price.
-  // Steps: 1 confirm the order, 2 notify the seller, 3 tell the buyer.
-  // The seller accepted: the buyer chooses to buy at the accepted price.
+  // FUNCTION: handleBuy - runs when the "Buy at Rs ..." button is pressed; confirms the accepted-offer order and notifies the seller.
   const handleBuy = async (offer: Offer, order: Order) => {
     setDecidingId(offer.id);
     try {
@@ -109,12 +104,7 @@ export default function BuyerOffers() {
     }
   };
 
-  // FUNCTION: handleDecline
-  // Runs when: the "Decline" button is pressed.
-  // What it does: cancels the order and puts the listing back on the marketplace in one batch, then notifies the seller.
-  // Decline: steps: 1 ask the buyer, 2 cancel the order and restore the listing in one
-  // atomic batch, 3 notify the seller.
-  // ...or declines: the order is cancelled and the listing goes back on the marketplace.
+  // FUNCTION: handleDecline - runs when the "Decline" button is pressed; cancels the order and puts the listing back on the marketplace in one batch, then notifies the seller.
   const handleDecline = (offer: Offer, order: Order) => {
     Alert.alert('Decline this offer?', 'The listing goes back on the marketplace and you will not buy it at this price.', [
       { text: 'Keep', style: 'cancel' },
@@ -158,10 +148,7 @@ export default function BuyerOffers() {
   const pendingOffers = offers.filter(o => o.status === 'pending');
   const answeredOffers = offers.filter(o => o.status !== 'pending');
 
-  // FUNCTION: OfferCard
-  // Runs when: once for each offer in the list.
-  // What it does: draws one offer card. Shows Buy and Decline after the seller accepts.
-  // One offer card. For accepted offers it shows the Buy and Decline buttons.
+  // FUNCTION: OfferCard - runs when once for each offer in the list; draws one offer card. Shows Buy and Decline after the seller accepts.
   const OfferCard = ({ offer }: { offer: Offer }) => {
     const accent = wasteAccent(offer.wasteType as any);
     const date = offer.createdAt?.toDate ? offer.createdAt.toDate().toLocaleDateString() : 'Just now';

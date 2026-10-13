@@ -22,14 +22,7 @@ const TYPES: WasteType[] = ['plastic', 'food', 'metal'];
 
 type RawCompartment = { level?: unknown; weight?: unknown; overweight?: unknown } | undefined | null;
 
-// FUNCTION: parseLevel
-// Runs when: bin data arrives.
-// What it does: turns the level text ("EMPTY", "50%", "FULL") into a number and a status.
-/*
- * Reads the fill level.
- * In: a number (45) or text ('EMPTY', 'FULL', '50%', 'ERROR').
- * Out: { level: 0-100, status: label }. Example: '50%' gives { level: 50, status: 'HALF' }.
- */
+// FUNCTION: parseLevel - runs when bin data arrives; turns the level text ("EMPTY", "50%", "FULL") into a number and a status.
 export function parseLevel(raw: unknown): { level: number; status: string } {
   if (typeof raw === 'number' && Number.isFinite(raw)) return fromPercent(raw);
 
@@ -54,13 +47,7 @@ function fromPercent(p: number): { level: number; status: string } {
   return { level, status: 'EMPTY' };
 }
 
-// FUNCTION: parseWeightKg
-// Runs when: bin data arrives.
-// What it does: turns the weight from grams into kg.
-/*
- * Turns a raw weight (grams) into kilograms, rounded to 3 decimals.
- * Example: 1500 gives 1.5. Bad or negative values give 0.
- */
+// FUNCTION: parseWeightKg - runs when bin data arrives; turns the weight from grams into kg.
 export function parseWeightKg(raw: unknown): number {
   const n = typeof raw === 'number' ? raw : parseFloat(String(raw ?? ''));
   if (!Number.isFinite(n) || n <= 0) return 0; // load cells drift slightly negative at rest
@@ -79,10 +66,7 @@ function normalizeCompartment(raw: RawCompartment): BinCompartment {
   return { level, status, weight: parseWeightKg(raw.weight), overweight: parseOverweight(raw.overweight) };
 }
 
-// FUNCTION: normalizeBin
-// Runs when: bin data arrives.
-// What it does: cleans the raw bin data for the three compartments.
-/** Raw `bins/<id>` value from the firmware -> BinData. Returns null when there is no data. */
+// FUNCTION: normalizeBin - runs when bin data arrives; cleans the raw bin data for the three compartments.
 export function normalizeBin(raw: unknown): BinData | null {
   if (!raw || typeof raw !== 'object') return null;
   const obj = raw as Record<string, unknown>;
@@ -110,14 +94,7 @@ export function toEpochMs(raw: unknown): number | null {
   return null;
 }
 
-// FUNCTION: describeFreshness
-// Runs when: the dashboard is drawn.
-// What it does: says if the bin is ON (updated in the last 2 minutes) or OFF.
-/*
- * Says if the bin data is recent.
- * In: the last update time (ms) and optionally 'now' (handy for tests).
- * Out: { live: true/false, label: text }. Example label: 'Updated 3 min ago'.
- */
+// FUNCTION: describeFreshness - runs when the dashboard is drawn; says if the bin is ON (updated in the last 2 minutes) or OFF.
 export function describeFreshness(lastUpdated: number | null | undefined, now: number = Date.now()) {
   if (!lastUpdated) return { live: false, label: 'No update time reported' };
   const age = Math.max(0, now - lastUpdated);

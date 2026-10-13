@@ -143,10 +143,7 @@ export default function AddWaste() {
   const availableKg = (type: WasteType): number => getCompartment(type).weight ?? 0;
   const fillLevel = (type: WasteType): number => getCompartment(type).level ?? 0;
 
-  // FUNCTION: handleWeightChange
-  // Runs when: the seller types a weight.
-  // What it does: calculates the total price: weight x price per kg.
-  // Runs on every key press in a weight box.
+  // FUNCTION: handleWeightChange - runs when the seller types a weight; calculates the total price: weight x price per kg.
   const handleWeightChange = (type: WasteType, value: string) => {
     const cleaned = value.replace(/[^0-9.]/g, '');
     const price = priceConfig[type].pricePerKg;
@@ -168,10 +165,7 @@ export default function AddWaste() {
   const selectedCount = Object.values(wasteItems)
     .filter(item => item.selected).length;
 
-  // FUNCTION: handleSubmit
-  // Runs when: the "Post to marketplace" button is pressed.
-  // What it does: checks the weights, then saves one listing per waste type in Firestore.
-  // Called when the seller presses Post to marketplace. It checks the data first, then saves.
+  // FUNCTION: handleSubmit - runs when the "Post to marketplace" button is pressed; checks the weights, then saves one listing per waste type in Firestore.
   const handleSubmit = async () => {
     const selectedItems = Object.entries(wasteItems)
       .filter(([_, item]) =>

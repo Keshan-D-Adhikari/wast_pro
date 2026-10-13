@@ -1,10 +1,4 @@
-// FUNCTION: calculateDistance
-// Runs when: a distance is needed.
-// What it does: gives the distance in km between two GPS points (Haversine formula).
-// Distance between two GPS points. Used to show how far a buyer is from a seller's bin.
-//
-// Haversine in simple words: the Earth is a ball, so a straight line on a flat map is wrong.
-/** Great-circle distance between two lat/lon points, in kilometres (Haversine formula). */
+// FUNCTION: calculateDistance - runs when a distance is needed; gives the distance in km between two GPS points (Haversine formula).
 export function calculateDistance(
   lat1: number, lon1: number,
   lat2: number, lon2: number

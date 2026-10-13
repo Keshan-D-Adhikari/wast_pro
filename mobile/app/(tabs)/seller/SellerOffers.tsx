@@ -73,10 +73,7 @@ export default function SellerOffers() {
     return () => unsubscribe();
   }, [authUser]);
 
-  // FUNCTION: handleAccept
-  // Runs when: the "Accept" button is pressed.
-  // What it does: accepts the offer, marks the listing sold and creates the order in one transaction, then notifies the buyers.
-  // Called when the seller taps Accept. First ask for confirmation with an alert.
+  // FUNCTION: handleAccept - runs when the "Accept" button is pressed; accepts the offer, marks the listing sold and creates the order in one transaction, then notifies the buyers.
   const handleAccept = (offer: Offer) => {
     Alert.alert(
       'Accept offer?',
@@ -191,10 +188,7 @@ export default function SellerOffers() {
     );
   };
 
-  // FUNCTION: handleReject
-  // Runs when: the "Reject" button is pressed.
-  // What it does: sets the offer to rejected and notifies the buyer.
-  // Called when the seller taps Reject. The listing stays available for other offers.
+  // FUNCTION: handleReject - runs when the "Reject" button is pressed; sets the offer to rejected and notifies the buyer.
   const handleReject = (offer: Offer) => {
     Alert.alert(
       'Reject offer?',
@@ -235,10 +229,7 @@ export default function SellerOffers() {
   const pendingOffers = offers.filter(o => o.status === 'pending');
   const otherOffers = offers.filter(o => o.status !== 'pending');
 
-  // FUNCTION: OfferCard
-  // Runs when: once for each offer in the list.
-  // What it does: draws one offer card with the Accept and Reject buttons.
-  // One card for one offer. highest is true for the first (best) pending offer.
+  // FUNCTION: OfferCard - runs when once for each offer in the list; draws one offer card with the Accept and Reject buttons.
   const OfferCard = ({ offer, highest }: { offer: Offer; highest: boolean }) => {
     const accent = wasteAccent(offer.wasteType as any);
     const isPending = offer.status === 'pending';
