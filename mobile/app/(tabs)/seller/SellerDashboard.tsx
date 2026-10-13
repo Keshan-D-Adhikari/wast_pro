@@ -51,6 +51,67 @@ const EMPTY_BIN: BinData = {
   metal: { level: 0, weight: 0 },
 };
 
+// REMOVED WEIGHT: when waste is taken out of a compartment the weight goes down. Each time that
+// happens we keep how many grams went down, so the card can show it (for example -100 g) and a
+// list of the earlier ones. Kept outside the component so the list is not lost when the screen reopens.
+type Removal = { grams: number; at: number };
+const MIN_DROP_G = 5;     // smaller changes are sensor noise
+const SETTLE_MS = 5000;   // no change for this long means that removal is finished
+const removalHistory: Record<WasteType, Removal[]> = { plastic: [], food: [], metal: [] };
+const removalTracker: Record<WasteType, { baseG: number | null; active: boolean; lastChangeAt: number }> = {
+  plastic: { baseG: null, active: false, lastChangeAt: 0 },
+  food: { baseG: null, active: false, lastChangeAt: 0 },
+  metal: { baseG: null, active: false, lastChangeAt: 0 },
+};
+
+// FUNCTION: trackRemoval - runs when new bin data arrives; compares the weight with the weight before and records how many grams were taken out.
+function trackRemoval(type: WasteType, weightKg: number, now: number) {
+  const g = Math.round((weightKg || 0) * 1000);   // weight now, in grams
+  const t = removalTracker[type];
+  const list = removalHistory[type];
+
+  // First reading: just remember it.
+  if (t.baseG === null) { t.baseG = g; return; }
+
+  // The last removal has stopped changing, so it is finished. The next drop is a new one.
+  if (t.active && now - t.lastChangeAt >= SETTLE_MS) {
+    t.baseG = t.baseG - list[0].grams;
+    t.active = false;
+  }
+
+  // CALCULATION: removed = weight before - weight now.
+  const drop = t.baseG - g;
+
+  if (t.active) {
+    if (drop < MIN_DROP_G) {
+      // The waste was put back: forget this removal.
+      list.shift();
+      t.active = false;
+      if (g > t.baseG) t.baseG = g;
+    } else if (Math.abs(drop - list[0].grams) >= 3) {
+      // Still taking waste out: the same removal gets bigger.
+      list[0] = { grams: drop, at: now };
+      t.lastChangeAt = now;
+    }
+  } else if (drop >= MIN_DROP_G) {
+    // A new removal starts.
+    list.unshift({ grams: drop, at: now });
+    if (list.length > 30) list.pop();
+    t.active = true;
+    t.lastChangeAt = now;
+  } else if (g - t.baseG >= MIN_DROP_G) {
+    // Waste was added: the new weight is the weight to compare with.
+    t.baseG = g;
+  }
+}
+
+// A fresh copy of the history, so React sees a change and redraws.
+const copyRemovals = (): Record<WasteType, Removal[]> => ({
+  plastic: [...removalHistory.plastic],
+  food: [...removalHistory.food],
+  metal: [...removalHistory.metal],
+});
+
 // Main component of the screen.
 export default function SellerDashboard() {
   const user = useAuthUser();
@@ -98,6 +159,10 @@ export default function SellerDashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
+
+  // Removed weight: the history for each compartment, and which compartment's list is open.
+  const [removals, setRemovals] = useState(copyRemovals);
+  const [historyType, setHistoryType] = useState<WasteType | null>(null);
 
   // Effect: two LIVE Firestore listeners (onSnapshot). They run now and again each time the
   // data changes. They restart when the user changes.
@@ -151,6 +216,12 @@ export default function SellerDashboard() {
       const normalized = snapshot.exists() ? normalizeBin(snapshot.val()) : null;
       // A bin with no data yet shows as empty/offline rather than keeping another bin's readings.
       setBinData(normalized ?? EMPTY_BIN);
+      // REMOVED WEIGHT: check each compartment for weight that was taken out.
+      if (normalized) {
+        const now = Date.now();
+        COMPARTMENTS.forEach((c) => trackRemoval(c.type, normalized[c.type]?.weight || 0, now));
+        setRemovals(copyRemovals());
+      }
       setLoading(false);
     }, (error) => {
       console.error("Bin fetch error:", error);
@@ -277,6 +348,8 @@ export default function SellerDashboard() {
     const accent = wasteAccent(type);
     const alert = isBinFull(compartment.status) || !!compartment.overweight;
     const statusColor = binStatusColor(compartment.status);
+    // REMOVED WEIGHT: the latest amount taken out of this compartment.
+    const lastRemoved = removals[type][0];
 
     return (
       <View style={styles.binCard}>
@@ -310,6 +383,23 @@ export default function SellerDashboard() {
         </View>
 
         <Text style={styles.binWeight}>{weight} kg</Text>
+
+        {/* REMOVED WEIGHT: the grams taken out last (for example -100 g) and a button for the list */}
+        {lastRemoved && (
+          <View style={styles.removedRow}>
+            <Text style={styles.removedText}>-{lastRemoved.grams} g</Text>
+            {/* BUTTON: "Removed history" */}
+            <TouchableOpacity
+              style={styles.removedBtn}
+              hitSlop={8}
+              onPress={() => setHistoryType(type)}
+              accessibilityRole="button"
+              accessibilityLabel={`Show the ${label} removed history`}
+            >
+              <Ionicons name="list" size={14} color={Palette.ink[700]} />
+            </TouchableOpacity>
+          </View>
+        )}
         {compartment.overweight && (
           <Text style={styles.binOverweight}>⚠ Overweight</Text>
         )}
@@ -533,6 +623,24 @@ export default function SellerDashboard() {
         />
       </Screen>
 
+      {/* REMOVED WEIGHT: the list of amounts taken out of one compartment, newest first */}
+      <Sheet
+        visible={historyType !== null}
+        title={`${COMPARTMENTS.find((c) => c.type === historyType)?.label ?? ''} removed`}
+        onClose={() => setHistoryType(null)}
+        scrollable
+      >
+        {historyType && removals[historyType].length === 0 && (
+          <Text style={Type.small}>Nothing has been taken out yet.</Text>
+        )}
+        {historyType && removals[historyType].map((r, index) => (
+          <View key={`${r.at}-${index}`} style={styles.historyRow}>
+            <Text style={styles.historyGrams}>-{r.grams} g</Text>
+            <Text style={Type.small}>{new Date(r.at).toLocaleTimeString()}</Text>
+          </View>
+        ))}
+      </Sheet>
+
       {/* Report Sheet */}
       <Sheet
         visible={reportModalVisible}
@@ -692,6 +800,27 @@ const styles = StyleSheet.create({
   statusPillText: { ...Type.caption, fontWeight: '700' },
   binWeight: { ...Type.smallStrong, marginTop: Space.sm },
   binOverweight: { ...Type.caption, color: Palette.status.danger.base, fontWeight: '700', marginTop: 2 },
+
+  // Removed weight (under the weight on a compartment card) and its history list
+  removedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+  removedText: { ...Type.smallStrong, color: Palette.status.danger.base, fontWeight: '800' },
+  removedBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.ink[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Space.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.ink[100],
+  },
+  historyGrams: { ...Type.bodyStrong, color: Palette.status.danger.base },
   binMoisture: { ...Type.caption, marginTop: 2 },
   binMoistureHigh: { color: Palette.status.warning.base, fontWeight: '700' },
 
