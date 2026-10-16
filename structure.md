@@ -98,7 +98,7 @@ Key decisions:
 wast-pro/
 ├── README.md                    Project overview, setup, features, test counts
 ├── structure.md                 This file
-├── reqament.txt                 Requirements notes
+├── SETUP_REQUIREMENTS.txt                 Requirements notes
 ├── thesis_code_segments.md      Code excerpts used in the thesis
 ├── .gitignore
 ├── .github/workflows/ci.yml     CI: admin, mobile, Firestore rules jobs
